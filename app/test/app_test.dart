@@ -1,0 +1,145 @@
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+import 'package:manabi/core/backend/backend.dart';
+import 'package:manabi/core/catalog/catalog_service.dart';
+import 'package:manabi/core/models/answer.dart';
+import 'package:manabi/core/pipeline/answer_pipeline.dart';
+import 'package:manabi/core/storage/chat_store.dart';
+import 'package:manabi/main.dart';
+import 'package:manabi/state/chat_controller.dart';
+import 'package:manabi/state/settings_controller.dart';
+import 'package:manabi/ui/export/exporter.dart';
+import 'package:manabi/l10n/gen/app_localizations_en.dart';
+import 'package:manabi/core/models/chat.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+const sampleResult = {
+  'status': 'answered',
+  'answer': 'The hadith is narrated by **al-Bukhari and Muslim** [1].\n\n- First point [1]',
+  'sources': [
+    {
+      'n': 1,
+      'bookId': '147927',
+      'bookTitle': 'الأربعون النووية مع زيادات ابن رجب',
+      'authorName': 'النووي',
+      'volume': '1',
+      'printedPage': 5,
+      'internalPage': 5,
+      'url': 'https://app.turath.io/book/147927?page=5',
+      'quotes': [
+        {'text': 'إِنَّمَا الْأَعْمَالُ بِالنِّيَّاتِ', 'exact': true}
+      ],
+    }
+  ],
+  'language': 'en',
+};
+
+void main() {
+  test('server backend parses the SSE stream', () async {
+    final client = MockClient.streaming((req, body) async {
+      expect(req.url.path, '/api/ask');
+      expect(req.headers['accept'], 'text/event-stream');
+      final events = [
+        'event: stage\ndata: {"stage":"planning"}\n\n',
+        'event: plan\ndata: {"queries":["النية"]}\n\n',
+        'event: stage\ndata: {"stage":"searching"}\n\n',
+        ': keep-alive\n\n',
+        'event: sources\ndata: {"count":3,"totalMatches":40}\n\n',
+        'event: result\ndata: ${jsonEncode(sampleResult)}\n\n',
+      ];
+      return http.StreamedResponse(Stream.fromIterable(events.map(utf8.encode)), 200, headers: {'content-type': 'text/event-stream; charset=utf-8'});
+    });
+    final backend = ServerBackend('https://example.org/', client: client);
+    final events = await backend.ask(const AskRequest(question: 'q')).toList();
+    expect(events.whereType<AskStageEvent>().map((e) => e.stage), [AskStage.planning, AskStage.searching]);
+    expect(events.whereType<AskPlanEvent>().single.queries, ['النية']);
+    expect(events.whereType<AskSourcesEvent>().single.count, 3);
+    final result = events.whereType<AskResultEvent>().single.result;
+    expect(result.sources.single.printedPage, 5);
+  });
+
+  test('server errors are mapped to codes', () async {
+    final client = MockClient((req) async => http.Response(jsonEncode({'error': {'code': 'GEMINI_QUOTA', 'message': 'x'}}), 503, headers: {'content-type': 'application/json'}));
+    final backend = ServerBackend('https://example.org', client: client);
+    expect(backend.ask(const AskRequest(question: 'q')).toList(), throwsA(isA<BackendException>().having((e) => e.code, 'code', 'GEMINI_QUOTA')));
+  });
+
+  test('markdown and text export include citation data', () {
+    final turn = ChatTurn(id: '1', question: 'Who narrated it?', askedAt: DateTime(2026), language: 'en', state: MessageState.done)
+      ..result = AnswerResult.fromJson(sampleResult);
+    final l = AppLocalizationsEn();
+    final md = turnsAsMarkdown('Test', [turn], l);
+    expect(md, contains('الأربعون النووية مع زيادات ابن رجب'));
+    expect(md, contains('https://app.turath.io/book/147927?page=5'));
+    expect(md, contains('> إِنَّمَا الْأَعْمَالُ بِالنِّيَّاتِ'));
+    final txt = answerAsText(turn, l);
+    expect(txt, isNot(contains('**')));
+    expect(txt, contains('Vol. 1'));
+  });
+
+  group('app', () {
+    late Directory tmp;
+    setUp(() async {
+      tmp = await Directory.systemTemp.createTemp('manabi_test');
+      SharedPreferences.setMockInitialValues({'uiLanguage': 'en', 'mode': 'server', 'serverUrl': ''});
+    });
+    tearDown(() => tmp.delete(recursive: true));
+
+    Future<AppServices> services() async {
+      final catalog = CatalogService.parse(File('assets/catalog/catalog.json').readAsStringSync());
+      final settings = await SettingsController.load(catalog);
+      final store = await ChatStore.openAt(tmp.path);
+      return AppServices(catalog, settings, ChatController(store, () => settings.backend));
+    }
+
+    testWidgets('welcome screen, unconfigured warning and navigation', (tester) async {
+      tester.view.physicalSize = const Size(1400, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final s = await tester.runAsync(services);
+      await tester.pumpWidget(ManabiApp(services: Future.value(s)));
+      await tester.pumpAndSettle();
+      expect(find.text('Assalamu alaikum'), findsOneWidget);
+      expect(find.text('Set up a connection'), findsOneWidget);
+      // Asking without a server configured fails gracefully with a setup hint.
+      await tester.enterText(find.byType(TextField).last, 'What is ihsan?');
+      await tester.pump();
+      await tester.tap(find.byTooltip('Send'));
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 300)));
+      await tester.pumpAndSettle();
+      expect(find.text('No Manabi server is set. Add the server address in Settings.'), findsOneWidget);
+      // Library tab shows the offline catalog.
+      await tester.tap(find.text('Library').first);
+      await tester.pumpAndSettle();
+      expect(find.text('Books'), findsWidgets);
+      await tester.tap(find.text('Settings').first);
+      await tester.pumpAndSettle();
+      expect(find.text('Test connection'), findsOneWidget);
+    });
+
+    for (final lang in ['ps', 'fa', 'ar']) {
+      testWidgets('phone layout in $lang (dark) renders every section', (tester) async {
+        tester.view.physicalSize = const Size(390 * 3, 844 * 3);
+        tester.view.devicePixelRatio = 3;
+        addTearDown(tester.view.reset);
+        SharedPreferences.setMockInitialValues({'uiLanguage': lang, 'themeMode': 'dark', 'mode': 'server', 'serverUrl': ''});
+        final s = await tester.runAsync(services);
+        await tester.pumpWidget(ManabiApp(services: Future.value(s)));
+        await tester.pumpAndSettle();
+        expect(find.byType(NavigationBar), findsOneWidget);
+        for (var i = 1; i < 5; i++) {
+          await tester.tap(find.byType(NavigationDestination).at(i));
+          await tester.pumpAndSettle();
+        }
+        await tester.tap(find.byType(NavigationDestination).at(0));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      });
+    }
+  });
+}

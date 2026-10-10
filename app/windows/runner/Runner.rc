@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "com.manabi" "\0"
-            VALUE "FileDescription", "manabi" "\0"
+            VALUE "FileDescription", "Manabi" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
             VALUE "InternalName", "manabi" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 com.manabi. All rights reserved." "\0"
             VALUE "OriginalFilename", "manabi.exe" "\0"
-            VALUE "ProductName", "manabi" "\0"
+            VALUE "ProductName", "Manabi" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

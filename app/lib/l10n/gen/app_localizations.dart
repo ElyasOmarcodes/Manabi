@@ -1,0 +1,1096 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:intl/intl.dart' as intl;
+
+import 'app_localizations_ar.dart';
+import 'app_localizations_en.dart';
+import 'app_localizations_fa.dart';
+import 'app_localizations_ps.dart';
+
+// ignore_for_file: type=lint
+
+/// Callers can lookup localized strings with an instance of AppLocalizations
+/// returned by `AppLocalizations.of(context)`.
+///
+/// Applications need to include `AppLocalizations.delegate()` in their app's
+/// `localizationDelegates` list, and the locales they support in the app's
+/// `supportedLocales` list. For example:
+///
+/// ```dart
+/// import 'gen/app_localizations.dart';
+///
+/// return MaterialApp(
+///   localizationsDelegates: AppLocalizations.localizationsDelegates,
+///   supportedLocales: AppLocalizations.supportedLocales,
+///   home: MyApplicationHome(),
+/// );
+/// ```
+///
+/// ## Update pubspec.yaml
+///
+/// Please make sure to update your pubspec.yaml to include the following
+/// packages:
+///
+/// ```yaml
+/// dependencies:
+///   # Internationalization support.
+///   flutter_localizations:
+///     sdk: flutter
+///   intl: any # Use the pinned version from flutter_localizations
+///
+///   # Rest of dependencies
+/// ```
+///
+/// ## iOS Applications
+///
+/// iOS applications define key application metadata, including supported
+/// locales, in an Info.plist file that is built into the application bundle.
+/// To configure the locales supported by your app, you’ll need to edit this
+/// file.
+///
+/// First, open your project’s ios/Runner.xcworkspace Xcode workspace file.
+/// Then, in the Project Navigator, open the Info.plist file under the Runner
+/// project’s Runner folder.
+///
+/// Next, select the Information Property List item, select Add Item from the
+/// Editor menu, then select Localizations from the pop-up menu.
+///
+/// Select and expand the newly-created Localizations item then, for each
+/// locale your application supports, add a new item and select the locale
+/// you wish to add from the pop-up menu in the Value field. This list should
+/// be consistent with the languages listed in the AppLocalizations.supportedLocales
+/// property.
+abstract class AppLocalizations {
+  AppLocalizations(String locale)
+    : localeName = intl.Intl.canonicalizedLocale(locale.toString());
+
+  final String localeName;
+
+  static AppLocalizations of(BuildContext context) {
+    return Localizations.of<AppLocalizations>(context, AppLocalizations)!;
+  }
+
+  static const LocalizationsDelegate<AppLocalizations> delegate =
+      _AppLocalizationsDelegate();
+
+  /// A list of this localizations delegate along with the default localizations
+  /// delegates.
+  ///
+  /// Returns a list of localizations delegates containing this delegate along with
+  /// GlobalMaterialLocalizations.delegate, GlobalCupertinoLocalizations.delegate,
+  /// and GlobalWidgetsLocalizations.delegate.
+  ///
+  /// Additional delegates can be added by appending to this list in
+  /// MaterialApp. This list does not have to be used at all if a custom list
+  /// of delegates is preferred or required.
+  static const List<LocalizationsDelegate<dynamic>> localizationsDelegates =
+      <LocalizationsDelegate<dynamic>>[
+        delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+      ];
+
+  /// A list of this localizations delegate's supported locales.
+  static const List<Locale> supportedLocales = <Locale>[
+    Locale('ar'),
+    Locale('en'),
+    Locale('fa'),
+    Locale('ps'),
+  ];
+
+  /// No description provided for @appName.
+  ///
+  /// In en, this message translates to:
+  /// **'Manabi'**
+  String get appName;
+
+  /// No description provided for @tagline.
+  ///
+  /// In en, this message translates to:
+  /// **'Answers from the books of Turath — with their sources'**
+  String get tagline;
+
+  /// No description provided for @navChat.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat'**
+  String get navChat;
+
+  /// No description provided for @navLibrary.
+  ///
+  /// In en, this message translates to:
+  /// **'Library'**
+  String get navLibrary;
+
+  /// No description provided for @navFavorites.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved'**
+  String get navFavorites;
+
+  /// No description provided for @navHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'History'**
+  String get navHistory;
+
+  /// No description provided for @navSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get navSettings;
+
+  /// No description provided for @newChat.
+  ///
+  /// In en, this message translates to:
+  /// **'New chat'**
+  String get newChat;
+
+  /// No description provided for @chats.
+  ///
+  /// In en, this message translates to:
+  /// **'Chats'**
+  String get chats;
+
+  /// No description provided for @searchChats.
+  ///
+  /// In en, this message translates to:
+  /// **'Search chats'**
+  String get searchChats;
+
+  /// No description provided for @noChats.
+  ///
+  /// In en, this message translates to:
+  /// **'No chats yet. Ask your first question.'**
+  String get noChats;
+
+  /// No description provided for @pinned.
+  ///
+  /// In en, this message translates to:
+  /// **'Pinned'**
+  String get pinned;
+
+  /// No description provided for @recent.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent'**
+  String get recent;
+
+  /// No description provided for @askPlaceholder.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask about Quran, hadith, fiqh…'**
+  String get askPlaceholder;
+
+  /// No description provided for @send.
+  ///
+  /// In en, this message translates to:
+  /// **'Send'**
+  String get send;
+
+  /// No description provided for @stop.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop'**
+  String get stop;
+
+  /// No description provided for @scopeAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Whole library'**
+  String get scopeAll;
+
+  /// No description provided for @scopeBook.
+  ///
+  /// In en, this message translates to:
+  /// **'Book'**
+  String get scopeBook;
+
+  /// No description provided for @scopeAuthor.
+  ///
+  /// In en, this message translates to:
+  /// **'Author'**
+  String get scopeAuthor;
+
+  /// No description provided for @scopeCategory.
+  ///
+  /// In en, this message translates to:
+  /// **'Category'**
+  String get scopeCategory;
+
+  /// No description provided for @scopeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Search scope'**
+  String get scopeTitle;
+
+  /// No description provided for @chooseBook.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a book'**
+  String get chooseBook;
+
+  /// No description provided for @chooseAuthor.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose an author'**
+  String get chooseAuthor;
+
+  /// No description provided for @chooseCategory.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a category'**
+  String get chooseCategory;
+
+  /// No description provided for @clearScope.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear scope'**
+  String get clearScope;
+
+  /// No description provided for @answerLanguage.
+  ///
+  /// In en, this message translates to:
+  /// **'Answer language'**
+  String get answerLanguage;
+
+  /// No description provided for @langAuto.
+  ///
+  /// In en, this message translates to:
+  /// **'Same as question'**
+  String get langAuto;
+
+  /// No description provided for @welcomeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Assalamu alaikum'**
+  String get welcomeTitle;
+
+  /// No description provided for @welcomeBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask in Pashto, Dari, Arabic or English. Manabi searches the classical books of Turath and answers only from what it finds, with the book, author, volume, page and original Arabic text.'**
+  String get welcomeBody;
+
+  /// No description provided for @suggestion1.
+  ///
+  /// In en, this message translates to:
+  /// **'Who narrated the hadith «إنما الأعمال بالنيات»?'**
+  String get suggestion1;
+
+  /// No description provided for @suggestion2.
+  ///
+  /// In en, this message translates to:
+  /// **'What do the fiqh books say about touching the private part and wudu?'**
+  String get suggestion2;
+
+  /// No description provided for @suggestion3.
+  ///
+  /// In en, this message translates to:
+  /// **'What is the meaning of Ihsan in the hadith of Jibril?'**
+  String get suggestion3;
+
+  /// No description provided for @suggestion4.
+  ///
+  /// In en, this message translates to:
+  /// **'What did the scholars say about the virtue of seeking knowledge?'**
+  String get suggestion4;
+
+  /// No description provided for @stagePlanning.
+  ///
+  /// In en, this message translates to:
+  /// **'Understanding the question'**
+  String get stagePlanning;
+
+  /// No description provided for @stageSearching.
+  ///
+  /// In en, this message translates to:
+  /// **'Searching the Turath library'**
+  String get stageSearching;
+
+  /// No description provided for @stageComposing.
+  ///
+  /// In en, this message translates to:
+  /// **'Writing the answer from the sources'**
+  String get stageComposing;
+
+  /// No description provided for @stageVerifying.
+  ///
+  /// In en, this message translates to:
+  /// **'Verifying every quote against the books'**
+  String get stageVerifying;
+
+  /// No description provided for @foundSources.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No pages found} =1{1 page found} other{{count} pages found}}'**
+  String foundSources(int count);
+
+  /// No description provided for @searchedFor.
+  ///
+  /// In en, this message translates to:
+  /// **'Searched for'**
+  String get searchedFor;
+
+  /// No description provided for @statusAnswered.
+  ///
+  /// In en, this message translates to:
+  /// **'Documented answer'**
+  String get statusAnswered;
+
+  /// No description provided for @statusPartial.
+  ///
+  /// In en, this message translates to:
+  /// **'Partly documented'**
+  String get statusPartial;
+
+  /// No description provided for @statusInsufficient.
+  ///
+  /// In en, this message translates to:
+  /// **'No documented answer found'**
+  String get statusInsufficient;
+
+  /// No description provided for @sources.
+  ///
+  /// In en, this message translates to:
+  /// **'Sources'**
+  String get sources;
+
+  /// No description provided for @sourceCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 source} other{{count} sources}}'**
+  String sourceCount(int count);
+
+  /// No description provided for @viewSource.
+  ///
+  /// In en, this message translates to:
+  /// **'Read page'**
+  String get viewSource;
+
+  /// No description provided for @openLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Open in Turath'**
+  String get openLink;
+
+  /// No description provided for @openShamela.
+  ///
+  /// In en, this message translates to:
+  /// **'Open in Shamela'**
+  String get openShamela;
+
+  /// No description provided for @copy.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get copy;
+
+  /// No description provided for @copied.
+  ///
+  /// In en, this message translates to:
+  /// **'Copied'**
+  String get copied;
+
+  /// No description provided for @share.
+  ///
+  /// In en, this message translates to:
+  /// **'Share'**
+  String get share;
+
+  /// No description provided for @save.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get save;
+
+  /// No description provided for @saved.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved'**
+  String get saved;
+
+  /// No description provided for @unsave.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove from saved'**
+  String get unsave;
+
+  /// No description provided for @export.
+  ///
+  /// In en, this message translates to:
+  /// **'Export'**
+  String get export;
+
+  /// No description provided for @exportPdf.
+  ///
+  /// In en, this message translates to:
+  /// **'PDF document'**
+  String get exportPdf;
+
+  /// No description provided for @exportMarkdown.
+  ///
+  /// In en, this message translates to:
+  /// **'Markdown'**
+  String get exportMarkdown;
+
+  /// No description provided for @exportText.
+  ///
+  /// In en, this message translates to:
+  /// **'Plain text'**
+  String get exportText;
+
+  /// No description provided for @exportChat.
+  ///
+  /// In en, this message translates to:
+  /// **'Export chat'**
+  String get exportChat;
+
+  /// No description provided for @exported.
+  ///
+  /// In en, this message translates to:
+  /// **'Exported'**
+  String get exported;
+
+  /// No description provided for @retry.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get retry;
+
+  /// No description provided for @cancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get cancel;
+
+  /// No description provided for @delete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get delete;
+
+  /// No description provided for @rename.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename'**
+  String get rename;
+
+  /// No description provided for @pin.
+  ///
+  /// In en, this message translates to:
+  /// **'Pin'**
+  String get pin;
+
+  /// No description provided for @unpin.
+  ///
+  /// In en, this message translates to:
+  /// **'Unpin'**
+  String get unpin;
+
+  /// No description provided for @ok.
+  ///
+  /// In en, this message translates to:
+  /// **'OK'**
+  String get ok;
+
+  /// No description provided for @deleteChatConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this chat? This cannot be undone.'**
+  String get deleteChatConfirm;
+
+  /// No description provided for @volume.
+  ///
+  /// In en, this message translates to:
+  /// **'Vol.'**
+  String get volume;
+
+  /// No description provided for @page.
+  ///
+  /// In en, this message translates to:
+  /// **'p.'**
+  String get page;
+
+  /// No description provided for @turathPage.
+  ///
+  /// In en, this message translates to:
+  /// **'Turath page'**
+  String get turathPage;
+
+  /// No description provided for @author.
+  ///
+  /// In en, this message translates to:
+  /// **'Author'**
+  String get author;
+
+  /// No description provided for @book.
+  ///
+  /// In en, this message translates to:
+  /// **'Book'**
+  String get book;
+
+  /// No description provided for @category.
+  ///
+  /// In en, this message translates to:
+  /// **'Category'**
+  String get category;
+
+  /// No description provided for @quoteVerified.
+  ///
+  /// In en, this message translates to:
+  /// **'Verified word-for-word against the book'**
+  String get quoteVerified;
+
+  /// No description provided for @quoteClose.
+  ///
+  /// In en, this message translates to:
+  /// **'Matched closely — shown exactly as in the book'**
+  String get quoteClose;
+
+  /// No description provided for @originalText.
+  ///
+  /// In en, this message translates to:
+  /// **'Original text'**
+  String get originalText;
+
+  /// No description provided for @opinions.
+  ///
+  /// In en, this message translates to:
+  /// **'Scholarly views in the sources'**
+  String get opinions;
+
+  /// No description provided for @notes.
+  ///
+  /// In en, this message translates to:
+  /// **'Notes'**
+  String get notes;
+
+  /// No description provided for @relatedSources.
+  ///
+  /// In en, this message translates to:
+  /// **'Pages that were searched (not evidence)'**
+  String get relatedSources;
+
+  /// No description provided for @disclaimer.
+  ///
+  /// In en, this message translates to:
+  /// **'Manabi reports what the books say; it is not a fatwa. For personal rulings consult a qualified scholar.'**
+  String get disclaimer;
+
+  /// No description provided for @errNetwork.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not connect. Check your internet connection and try again.'**
+  String get errNetwork;
+
+  /// No description provided for @errServerNotConfigured.
+  ///
+  /// In en, this message translates to:
+  /// **'No Manabi server is set. Add the server address in Settings.'**
+  String get errServerNotConfigured;
+
+  /// No description provided for @errNoApiKey.
+  ///
+  /// In en, this message translates to:
+  /// **'Add your Gemini API key in Settings to use direct mode.'**
+  String get errNoApiKey;
+
+  /// No description provided for @errDirectNotOnWeb.
+  ///
+  /// In en, this message translates to:
+  /// **'Direct mode is not available in the browser. Use a Manabi server.'**
+  String get errDirectNotOnWeb;
+
+  /// No description provided for @errGeminiAuth.
+  ///
+  /// In en, this message translates to:
+  /// **'The Gemini API key is missing or invalid.'**
+  String get errGeminiAuth;
+
+  /// No description provided for @errGeminiQuota.
+  ///
+  /// In en, this message translates to:
+  /// **'Gemini usage limit reached. Please try again later.'**
+  String get errGeminiQuota;
+
+  /// No description provided for @errGeminiUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'The AI service is not responding right now. Please try again.'**
+  String get errGeminiUnavailable;
+
+  /// No description provided for @errTurathUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'The Turath library cannot be reached right now. Please try again.'**
+  String get errTurathUnavailable;
+
+  /// No description provided for @errRateLimited.
+  ///
+  /// In en, this message translates to:
+  /// **'Too many questions in a short time. Please wait a moment.'**
+  String get errRateLimited;
+
+  /// No description provided for @errUnauthorized.
+  ///
+  /// In en, this message translates to:
+  /// **'The server rejected the access token.'**
+  String get errUnauthorized;
+
+  /// No description provided for @errInterrupted.
+  ///
+  /// In en, this message translates to:
+  /// **'This answer was interrupted.'**
+  String get errInterrupted;
+
+  /// No description provided for @errCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Stopped.'**
+  String get errCancelled;
+
+  /// No description provided for @errNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'Not found.'**
+  String get errNotFound;
+
+  /// No description provided for @errGeneric.
+  ///
+  /// In en, this message translates to:
+  /// **'Something went wrong. Please try again.'**
+  String get errGeneric;
+
+  /// No description provided for @library.
+  ///
+  /// In en, this message translates to:
+  /// **'Library'**
+  String get library;
+
+  /// No description provided for @books.
+  ///
+  /// In en, this message translates to:
+  /// **'Books'**
+  String get books;
+
+  /// No description provided for @authors.
+  ///
+  /// In en, this message translates to:
+  /// **'Authors'**
+  String get authors;
+
+  /// No description provided for @categories.
+  ///
+  /// In en, this message translates to:
+  /// **'Categories'**
+  String get categories;
+
+  /// No description provided for @searchBooks.
+  ///
+  /// In en, this message translates to:
+  /// **'Search book titles'**
+  String get searchBooks;
+
+  /// No description provided for @searchAuthors.
+  ///
+  /// In en, this message translates to:
+  /// **'Search authors'**
+  String get searchAuthors;
+
+  /// No description provided for @booksCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 book} other{{count} books}}'**
+  String booksCount(int count);
+
+  /// No description provided for @noResults.
+  ///
+  /// In en, this message translates to:
+  /// **'No results'**
+  String get noResults;
+
+  /// No description provided for @askInThisBook.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask within this book'**
+  String get askInThisBook;
+
+  /// No description provided for @askThisAuthor.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask within this author\'s works'**
+  String get askThisAuthor;
+
+  /// No description provided for @askInCategory.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask within this category'**
+  String get askInCategory;
+
+  /// No description provided for @tableOfContents.
+  ///
+  /// In en, this message translates to:
+  /// **'Table of contents'**
+  String get tableOfContents;
+
+  /// No description provided for @description.
+  ///
+  /// In en, this message translates to:
+  /// **'About the book'**
+  String get description;
+
+  /// No description provided for @biography.
+  ///
+  /// In en, this message translates to:
+  /// **'Biography'**
+  String get biography;
+
+  /// No description provided for @authorBooks.
+  ///
+  /// In en, this message translates to:
+  /// **'Works in the library'**
+  String get authorBooks;
+
+  /// No description provided for @fullTextSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Full-text search'**
+  String get fullTextSearch;
+
+  /// No description provided for @searchInText.
+  ///
+  /// In en, this message translates to:
+  /// **'Search the text of the books (Arabic)'**
+  String get searchInText;
+
+  /// No description provided for @matches.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} matches'**
+  String matches(int count);
+
+  /// No description provided for @readPage.
+  ///
+  /// In en, this message translates to:
+  /// **'Read'**
+  String get readPage;
+
+  /// No description provided for @previousPage.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous page'**
+  String get previousPage;
+
+  /// No description provided for @nextPage.
+  ///
+  /// In en, this message translates to:
+  /// **'Next page'**
+  String get nextPage;
+
+  /// No description provided for @loading.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading…'**
+  String get loading;
+
+  /// No description provided for @loadMore.
+  ///
+  /// In en, this message translates to:
+  /// **'Load more'**
+  String get loadMore;
+
+  /// No description provided for @noFavorites.
+  ///
+  /// In en, this message translates to:
+  /// **'Answers you save will appear here.'**
+  String get noFavorites;
+
+  /// No description provided for @history.
+  ///
+  /// In en, this message translates to:
+  /// **'Question history'**
+  String get history;
+
+  /// No description provided for @searchHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Search your questions'**
+  String get searchHistory;
+
+  /// No description provided for @noHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'No questions yet.'**
+  String get noHistory;
+
+  /// No description provided for @settings.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get settings;
+
+  /// No description provided for @appearance.
+  ///
+  /// In en, this message translates to:
+  /// **'Appearance'**
+  String get appearance;
+
+  /// No description provided for @theme.
+  ///
+  /// In en, this message translates to:
+  /// **'Theme'**
+  String get theme;
+
+  /// No description provided for @themeSystem.
+  ///
+  /// In en, this message translates to:
+  /// **'System'**
+  String get themeSystem;
+
+  /// No description provided for @themeLight.
+  ///
+  /// In en, this message translates to:
+  /// **'Light'**
+  String get themeLight;
+
+  /// No description provided for @themeDark.
+  ///
+  /// In en, this message translates to:
+  /// **'Dark'**
+  String get themeDark;
+
+  /// No description provided for @interfaceLanguage.
+  ///
+  /// In en, this message translates to:
+  /// **'App language'**
+  String get interfaceLanguage;
+
+  /// No description provided for @defaultAnswerLanguage.
+  ///
+  /// In en, this message translates to:
+  /// **'Default answer language'**
+  String get defaultAnswerLanguage;
+
+  /// No description provided for @arabicTextSize.
+  ///
+  /// In en, this message translates to:
+  /// **'Arabic text size'**
+  String get arabicTextSize;
+
+  /// No description provided for @answers.
+  ///
+  /// In en, this message translates to:
+  /// **'Answers'**
+  String get answers;
+
+  /// No description provided for @maxSources.
+  ///
+  /// In en, this message translates to:
+  /// **'Pages to consult per question'**
+  String get maxSources;
+
+  /// No description provided for @connection.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection'**
+  String get connection;
+
+  /// No description provided for @modeServer.
+  ///
+  /// In en, this message translates to:
+  /// **'Manabi server'**
+  String get modeServer;
+
+  /// No description provided for @modeServerInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Recommended. The Gemini key stays on the server and the app works on every platform, including the web.'**
+  String get modeServerInfo;
+
+  /// No description provided for @modeDirect.
+  ///
+  /// In en, this message translates to:
+  /// **'Direct (own key)'**
+  String get modeDirect;
+
+  /// No description provided for @modeDirectInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'The app talks to Turath and Gemini itself using your own Gemini API key, stored securely on this device. Not available on the web.'**
+  String get modeDirectInfo;
+
+  /// No description provided for @serverUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'Server address'**
+  String get serverUrl;
+
+  /// No description provided for @accessToken.
+  ///
+  /// In en, this message translates to:
+  /// **'Access token (optional)'**
+  String get accessToken;
+
+  /// No description provided for @geminiKey.
+  ///
+  /// In en, this message translates to:
+  /// **'Gemini API key'**
+  String get geminiKey;
+
+  /// No description provided for @geminiKeyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Stored in the device\'s secure storage'**
+  String get geminiKeyHint;
+
+  /// No description provided for @modelOverride.
+  ///
+  /// In en, this message translates to:
+  /// **'Gemini model (optional)'**
+  String get modelOverride;
+
+  /// No description provided for @modelOverrideHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Empty = newest available Flash model'**
+  String get modelOverrideHint;
+
+  /// No description provided for @testConnection.
+  ///
+  /// In en, this message translates to:
+  /// **'Test connection'**
+  String get testConnection;
+
+  /// No description provided for @connectionOk.
+  ///
+  /// In en, this message translates to:
+  /// **'Connected · {model}'**
+  String connectionOk(String model);
+
+  /// No description provided for @data.
+  ///
+  /// In en, this message translates to:
+  /// **'Data'**
+  String get data;
+
+  /// No description provided for @clearHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete all chats'**
+  String get clearHistory;
+
+  /// No description provided for @clearHistoryConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete all chats and saved answers from this device?'**
+  String get clearHistoryConfirm;
+
+  /// No description provided for @about.
+  ///
+  /// In en, this message translates to:
+  /// **'About'**
+  String get about;
+
+  /// No description provided for @aboutBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Manabi searches the Turath library (turath.io) through the open-source Nusus SDK and uses Gemini only to plan searches and to arrange answers from the retrieved pages. Every quote is checked against the book text before it is shown.'**
+  String get aboutBody;
+
+  /// No description provided for @catalogInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline catalog: {books} books · {authors} authors (snapshot {date})'**
+  String catalogInfo(int books, int authors, String date);
+
+  /// No description provided for @version.
+  ///
+  /// In en, this message translates to:
+  /// **'Version {v}'**
+  String version(String v);
+
+  /// No description provided for @chatWith.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask Manabi'**
+  String get chatWith;
+
+  /// No description provided for @question.
+  ///
+  /// In en, this message translates to:
+  /// **'Question'**
+  String get question;
+
+  /// No description provided for @answer.
+  ///
+  /// In en, this message translates to:
+  /// **'Answer'**
+  String get answer;
+
+  /// No description provided for @generatedBy.
+  ///
+  /// In en, this message translates to:
+  /// **'Generated by Manabi from Turath sources'**
+  String get generatedBy;
+
+  /// No description provided for @notConfiguredTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Set up a connection'**
+  String get notConfiguredTitle;
+
+  /// No description provided for @openSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Open settings'**
+  String get openSettings;
+
+  /// No description provided for @allCategories.
+  ///
+  /// In en, this message translates to:
+  /// **'All categories'**
+  String get allCategories;
+}
+
+class _AppLocalizationsDelegate
+    extends LocalizationsDelegate<AppLocalizations> {
+  const _AppLocalizationsDelegate();
+
+  @override
+  Future<AppLocalizations> load(Locale locale) {
+    return SynchronousFuture<AppLocalizations>(lookupAppLocalizations(locale));
+  }
+
+  @override
+  bool isSupported(Locale locale) =>
+      <String>['ar', 'en', 'fa', 'ps'].contains(locale.languageCode);
+
+  @override
+  bool shouldReload(_AppLocalizationsDelegate old) => false;
+}
+
+AppLocalizations lookupAppLocalizations(Locale locale) {
+  // Lookup logic when only language code is specified.
+  switch (locale.languageCode) {
+    case 'ar':
+      return AppLocalizationsAr();
+    case 'en':
+      return AppLocalizationsEn();
+    case 'fa':
+      return AppLocalizationsFa();
+    case 'ps':
+      return AppLocalizationsPs();
+  }
+
+  throw FlutterError(
+    'AppLocalizations.delegate failed to load unsupported locale "$locale". This is likely '
+    'an issue with the localizations generation tool. Please file an issue '
+    'on GitHub with a reproducible sample app and the gen-l10n configuration '
+    'that was used.',
+  );
+}
