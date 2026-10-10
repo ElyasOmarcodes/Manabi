@@ -279,7 +279,8 @@ const publicSource = (quotes) => (source, index) => ({
   shamelaUrl: source.shamelaUrl,
   citation: source.citation,
   quotes: (quotes.get?.(source.key) ?? []).map((q) => ({ text: q.text, exact: q.exact, relevance: q.relevance })),
-  excerpt: (source.snippet || source.text || "").slice(0, 600),
+  // The passage around the search match, shown when no quote was verified.
+  excerpt: (source.excerpt || source.text || "").slice(0, 700),
 });
 
 /** Verifies citations, renders inline quotes, renumbers markers to [1], [2] … */

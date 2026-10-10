@@ -323,7 +323,8 @@ class PipelineSource {
         shamelaUrl: passage.shamelaUrl,
         citation: passage.citation,
         quotes: quotes,
-        excerpt: (passage.snippet?.isNotEmpty == true ? passage.snippet! : text).let((s) => s.length <= 600 ? s : s.substring(0, 600)),
+        // The passage around the search match, shown when no quote was verified.
+        excerpt: (excerpt.trim().isNotEmpty ? excerpt : text).let((s) => s.length <= 700 ? s : s.substring(0, 700)),
       );
 }
 

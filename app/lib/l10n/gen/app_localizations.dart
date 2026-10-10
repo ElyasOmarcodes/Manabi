@@ -1397,6 +1397,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Offline catalog'**
   String get dataCatalog;
+
+  /// No description provided for @pageExcerpt.
+  ///
+  /// In en, this message translates to:
+  /// **'Page excerpt — cited in the answer (not a word-for-word quote)'**
+  String get pageExcerpt;
 }
 
 class _AppLocalizationsDelegate

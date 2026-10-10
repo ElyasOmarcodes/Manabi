@@ -722,4 +722,8 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get dataCatalog => 'Offline catalog';
+
+  @override
+  String get pageExcerpt =>
+      'Page excerpt — cited in the answer (not a word-for-word quote)';
 }

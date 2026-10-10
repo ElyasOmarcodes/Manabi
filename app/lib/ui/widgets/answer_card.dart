@@ -299,7 +299,20 @@ class SourceCard extends StatelessWidget {
               const SizedBox(width: 4),
               Expanded(child: Text(l.quoteVerified, style: TextStyle(fontFamily: uiFont, fontSize: 11.5, color: a.success))),
             ]),
+          )
+        else if (s.excerpt.trim().isNotEmpty) ...[
+          // Cited without a word-for-word quote: show the page passage it relies on.
+          const SizedBox(height: 10),
+          _Excerpt(text: s.excerpt.trim(), scale: scale),
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Row(children: [
+              Icon(Icons.description_outlined, size: 14, color: a.muted),
+              const SizedBox(width: 4),
+              Expanded(child: Text(l.pageExcerpt, style: TextStyle(fontFamily: uiFont, fontSize: 11.5, color: a.muted))),
+            ]),
           ),
+        ],
         const SizedBox(height: 6),
         Wrap(spacing: 6, runSpacing: 6, children: [
           if (s.internalPage != null)
@@ -314,6 +327,42 @@ class SourceCard extends StatelessWidget {
           SoftButton(dense: true, icon: Icons.copy_rounded, label: l.copy, color: a.muted, onTap: () => copyText(context, sourceAsText(s, l))),
         ]),
       ]),
+    );
+  }
+}
+
+/// A page passage that can be expanded (collapsed to a few lines).
+class _Excerpt extends StatefulWidget {
+  const _Excerpt({required this.text, required this.scale});
+  final String text;
+  final double scale;
+  @override
+  State<_Excerpt> createState() => _ExcerptState();
+}
+
+class _ExcerptState extends State<_Excerpt> {
+  bool _open = false;
+  @override
+  Widget build(BuildContext context) {
+    final a = context.aura;
+    return GestureDetector(
+      onTap: () => setState(() => _open = !_open),
+      child: AnimatedSize(
+        duration: const Duration(milliseconds: 220),
+        alignment: Alignment.topCenter,
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
+          decoration: BoxDecoration(color: a.surfaceAlt, borderRadius: BorderRadius.circular(14)),
+          child: Text(
+            widget.text,
+            textDirection: TextDirection.rtl,
+            maxLines: _open ? null : 4,
+            overflow: _open ? TextOverflow.visible : TextOverflow.ellipsis,
+            style: arabicStyle(context, size: 16, scale: widget.scale, color: a.text.withValues(alpha: 0.85)),
+          ),
+        ),
+      ),
     );
   }
 }

@@ -719,4 +719,8 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get dataCatalog => 'فهرست آفلاین';
+
+  @override
+  String get pageExcerpt =>
+      'بخشی از صفحه — در پاسخ به آن ارجاع شده (نقل کلمه به کلمه نیست)';
 }

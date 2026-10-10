@@ -720,4 +720,8 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get dataCatalog => 'الفهرس دون اتصال';
+
+  @override
+  String get pageExcerpt =>
+      'مقتطف من الصفحة — أُحيل إليه في الجواب (ليس نقلًا حرفيًا)';
 }

@@ -270,5 +270,6 @@
   "aboutMission": "Our aim: easy, faithful and documented access to the original sources of the Islamic sciences — in Pashto, Dari, Arabic and English.",
   "aboutCredits": "With thanks to the Turath library (turath.io) and the Nusus SDK.",
   "sourceCode": "Source code",
-  "dataCatalog": "Offline catalog"
+  "dataCatalog": "Offline catalog",
+  "pageExcerpt": "Page excerpt — cited in the answer (not a word-for-word quote)"
 }

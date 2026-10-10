@@ -718,4 +718,8 @@ class AppLocalizationsPs extends AppLocalizations {
 
   @override
   String get dataCatalog => 'آفلاین فهرست';
+
+  @override
+  String get pageExcerpt =>
+      'د مخ برخه — دا ځای په ځواب کې یاد شوی (کلمه په کلمه نقل نه دی)';
 }
