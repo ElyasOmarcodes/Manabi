@@ -6,10 +6,9 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
-import '../pipeline/answer_pipeline.dart' show JsonModel;
+import '../pipeline/answer_pipeline.dart' show JsonModel, ModelTier;
 
 const _api = 'https://generativelanguage.googleapis.com/v1beta';
-const fallbackModel = 'gemini-2.5-flash';
 
 class GeminiException implements Exception {
   const GeminiException(this.code, this.message, {this.retryable = false});
@@ -22,21 +21,36 @@ class GeminiException implements Exception {
   String toString() => 'GeminiException($code): $message';
 }
 
-/// Newest stable `gemini-X.Y-flash` (preferred) or `-pro` model.
-String? pickModel(List<Map<String, dynamic>> models) {
-  final re = RegExp(r'^models/gemini-(\d+)(?:\.(\d+))?-(flash|pro)$');
-  final candidates = <(int, String)>[];
+const _fallback = {
+  ModelTier.main: ['gemini-2.5-flash', 'gemini-2.5-flash-lite'],
+  ModelTier.fast: ['gemini-2.5-flash-lite', 'gemini-2.5-flash'],
+};
+
+/// Usable models for a tier, newest first, preferred kind first
+/// (flash-lite for [ModelTier.fast], flash for [ModelTier.main]).
+List<String> rankModels(List<Map<String, dynamic>> models, [ModelTier tier = ModelTier.main]) {
+  final prefer = tier == ModelTier.fast ? const ['flash-lite', 'flash'] : const ['flash', 'flash-lite'];
+  final re = RegExp(r'^(?:models/)?gemini-(\d+)(?:\.(\d+))?-(flash-lite|flash|pro)$');
+  final ranked = <(int, int, int, String)>[];
   for (final m in models) {
-    final methods = (m['supportedGenerationMethods'] as List?)?.cast<String>() ?? const [];
+    final methods = (m['supportedGenerationMethods'] as List?)?.cast<String>() ?? const ['generateContent'];
     final name = m['name'] as String? ?? '';
     final match = re.firstMatch(name);
-    if (match == null || !methods.contains('generateContent')) continue;
-    final score = (match.group(3) == 'flash' ? 1000000 : 0) + int.parse(match.group(1)!) * 1000 + int.parse(match.group(2) ?? '0');
-    candidates.add((score, name.substring('models/'.length)));
+    if (match == null || !methods.contains('generateContent') || !prefer.contains(match.group(3))) continue;
+    ranked.add((prefer.indexOf(match.group(3)!), int.parse(match.group(1)!), int.parse(match.group(2) ?? '0'), name.replaceFirst('models/', '')));
   }
-  candidates.sort((a, b) => b.$1.compareTo(a.$1));
-  return candidates.isEmpty ? null : candidates.first.$2;
+  ranked.sort((a, b) => a.$1 != b.$1 ? a.$1.compareTo(b.$1) : a.$2 != b.$2 ? b.$2.compareTo(a.$2) : b.$3.compareTo(a.$3));
+  return [for (final r in ranked) r.$4];
 }
+
+/// Kept for compatibility: the best main model.
+String? pickModel(List<Map<String, dynamic>> models) {
+  final ranked = rankModels(models);
+  return ranked.isEmpty ? null : ranked.first;
+}
+
+/// A 429 that names a daily/plan quota (as opposed to a short burst limit).
+bool _isExhausted(String message) => RegExp('quota|exceeded your current', caseSensitive: false).hasMatch(message);
 
 class GeminiClient implements JsonModel {
   GeminiClient({required this.apiKey, this.model, http.Client? client, this.timeout = const Duration(seconds: 90)})
@@ -46,7 +60,8 @@ class GeminiClient implements JsonModel {
   final String? model;
   final Duration timeout;
   final http.Client _http;
-  String? _resolved;
+  List<Map<String, dynamic>>? _listed;
+  final _exhausted = <String, DateTime>{};
 
   Future<Map<String, dynamic>> _call(String method, String url, [Object? body]) async {
     final uri = Uri.parse(url);
@@ -72,27 +87,36 @@ class GeminiClient implements JsonModel {
       throw GeminiException('AUTH', message);
     }
     if (res.statusCode == 404) throw GeminiException('MODEL_NOT_FOUND', message);
-    if (res.statusCode == 429) throw GeminiException('QUOTA', message, retryable: true);
+    if (res.statusCode == 429) throw GeminiException('QUOTA', message, retryable: !_isExhausted(message));
     throw GeminiException('HTTP', message, retryable: res.statusCode >= 500);
   }
 
-  Future<String> resolveModel() async {
-    if (model != null && model!.isNotEmpty) return model!;
-    if (_resolved != null) return _resolved!;
+  Future<List<Map<String, dynamic>>> _listModels() async {
+    if (_listed != null) return _listed!;
     try {
       final body = await _call('GET', '$_api/models?pageSize=1000');
-      final models = (body['models'] as List?)?.whereType<Map>().map((m) => m.cast<String, dynamic>()).toList() ?? const [];
-      _resolved = pickModel(models) ?? fallbackModel;
+      _listed = (body['models'] as List?)?.whereType<Map>().map((m) => m.cast<String, dynamic>()).toList() ?? const [];
     } on GeminiException catch (e) {
       if (e.code == 'AUTH') rethrow;
-      _resolved = fallbackModel;
+      _listed = const [];
     }
-    return _resolved!;
+    return _listed!;
   }
+
+  /// Candidate models for a tier, skipping those whose quota is exhausted.
+  Future<List<String>> _candidates(ModelTier tier) async {
+    if (model != null && model!.isNotEmpty) return [model!];
+    final unique = {...rankModels(await _listModels(), tier), ..._fallback[tier]!}.toList();
+    final now = DateTime.now();
+    final ready = unique.where((m) => !(_exhausted[m]?.isAfter(now) ?? false)).toList();
+    return ready.isNotEmpty ? ready : unique.take(1).toList();
+  }
+
+  Future<String> resolveModel([ModelTier tier = ModelTier.main]) async => (await _candidates(tier)).first;
 
   /// Validates the key with a cheap call (lists models).
   Future<String> check() async {
-    _resolved = null;
+    _listed = null;
     return resolveModel();
   }
 
@@ -102,6 +126,7 @@ class GeminiClient implements JsonModel {
     required String prompt,
     required Map<String, dynamic> schema,
     double temperature = 0.2,
+    ModelTier tier = ModelTier.main,
   }) async {
     final body = {
       'systemInstruction': {
@@ -120,8 +145,10 @@ class GeminiClient implements JsonModel {
       'generationConfig': {'temperature': temperature, 'responseMimeType': 'application/json', 'responseSchema': schema},
     };
     GeminiException? last;
-    for (var attempt = 0; attempt < 3; attempt++) {
-      final name = await resolveModel();
+    final tried = <String>{};
+    final pinned = model != null && model!.isNotEmpty;
+    for (var attempt = 0; attempt < 6; attempt++) {
+      final name = await resolveModel(tier);
       try {
         final result = await _call('POST', '$_api/models/${Uri.encodeComponent(name)}:generateContent', body);
         final candidates = result['candidates'] as List?;
@@ -138,8 +165,11 @@ class GeminiClient implements JsonModel {
         }
       } on GeminiException catch (e) {
         last = e;
-        if (e.code == 'MODEL_NOT_FOUND' && (model == null || model!.isEmpty)) {
-          _resolved = _resolved == fallbackModel ? null : fallbackModel;
+        tried.add(name);
+        if (!pinned && (e.code == 'MODEL_NOT_FOUND' || (e.code == 'QUOTA' && !e.retryable))) {
+          // This model's daily quota is used up (or it is gone): move on to the next one.
+          _exhausted[name] = DateTime.now().add(const Duration(hours: 1));
+          if ((await _candidates(tier)).every(tried.contains)) rethrow;
           continue;
         }
         if (!e.retryable) rethrow;

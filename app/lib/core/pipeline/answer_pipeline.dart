@@ -36,11 +36,19 @@ class Limits {
   static const excerptChars = 650;
   static const sourceChars = 2400;
   static const maxSelected = 14;
+  static const continuationPages = 6;
 }
+
+/// `fast` is used for planning and ranking, `main` for writing the answer.
+enum ModelTier { fast, main }
 
 abstract interface class JsonModel {
   Future<({Map<String, dynamic> data, String model})> generateJson(
-      {required String system, required String prompt, required Map<String, dynamic> schema, double temperature = 0.2});
+      {required String system,
+      required String prompt,
+      required Map<String, dynamic> schema,
+      double temperature = 0.2,
+      ModelTier tier = ModelTier.main});
 }
 
 class SearchHits {
@@ -54,6 +62,7 @@ class SearchHits {
 
 abstract interface class PassageSearch {
   Future<SearchHits> searchHits(String query, {String? bookId, String? authorId, String? categoryId});
+  Future<PagePassage> getPage(String bookId, int page);
 }
 
 class PipelineException implements Exception {
@@ -401,11 +410,42 @@ class AnswerPipeline {
     return (candidates: pool, total: total, failed: plan.isNotEmpty && failures == plan.length);
   }
 
+  /// Adds the page after each of the strongest sources as its own source.
+  Future<List<PipelineSource>> _withContinuations(List<PipelineSource> selected) async {
+    final have = {for (final c in selected) c.id};
+    final targets = selected.where((c) => c.passage.internalPage != null).take(Limits.continuationPages).toList();
+    final next = await Future.wait([
+      for (final c in targets)
+        turath.getPage(c.passage.bookId, c.passage.internalPage! + 1).then<PagePassage?>((p) => p).catchError((Object _) => null),
+    ]);
+    final out = <PipelineSource>[];
+    for (final c in selected) {
+      out.add(c);
+      final i = targets.indexOf(c);
+      final page = i < 0 ? null : next[i];
+      if (page == null || page.text.trim().isEmpty) continue;
+      final candidate = _candidate(page, null, catalog);
+      if (!have.add(candidate.id)) continue;
+      out.add(PipelineSource(
+        id: candidate.id,
+        passage: candidate.passage,
+        excerpt: candidate.excerpt,
+        text: boundText(page.text, 1600, null),
+        authorId: candidate.authorId,
+        authorName: candidate.authorName,
+        categoryId: candidate.categoryId,
+        categoryTitle: candidate.categoryTitle,
+      ));
+    }
+    return out;
+  }
+
   Future<Map<String, dynamic>> _rank(String question, List<PipelineSource> pool, List<String> queries) async => (await model.generateJson(
         system: rerankSystem,
         prompt: rerankPrompt(question: question, candidates: [for (final c in pool) c.prompt(full: false)], queries: queries),
         schema: rerankSchema,
         temperature: 0.1,
+        tier: ModelTier.fast,
       ))
           .data;
 
@@ -423,6 +463,7 @@ class AnswerPipeline {
       prompt: planPrompt(question: question, history: request.history, scopeLabel: _scopeLabel(scope)),
       schema: planSchema,
       temperature: 0.1,
+      tier: ModelTier.fast,
     );
     final p = plan.data;
     final queries = cleanQueries(p['queries']);
@@ -505,7 +546,8 @@ class AnswerPipeline {
       yield AskResultEvent(nothing(total: total, related: [for (var i = 0; i < candidates.length && i < 6; i++) candidates[i].withKey('S${i + 1}')]));
       return;
     }
-    final sources = [for (var i = 0; i < selected.length; i++) selected[i].withKey('S${i + 1}')];
+    final expanded = await _withContinuations(selected);
+    final sources = [for (var i = 0; i < expanded.length; i++) expanded[i].withKey('S${i + 1}')];
 
     // 4. compose
     yield const AskStageEvent(AskStage.composing);

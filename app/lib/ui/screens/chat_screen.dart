@@ -115,7 +115,12 @@ class _Welcome extends StatelessWidget {
     final l = context.l;
     final a = context.aura;
     final nav = context.read<NavController>();
-    final suggestions = [l.suggestion1, l.suggestion2, l.suggestion3, l.suggestion4];
+    final suggestions = [
+      (l.suggestion1, Icons.format_quote_rounded, AuraHues.amber),
+      (l.suggestion2, Icons.balance_rounded, AuraHues.green),
+      (l.suggestion3, Icons.auto_awesome_rounded, AuraHues.violet),
+      (l.suggestion4, Icons.school_rounded, AuraHues.teal),
+    ];
     return Center(
       child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(22, 12, 22, 12),
@@ -137,7 +142,7 @@ class _Welcome extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.only(bottom: 16),
                 child: Pressable(
-                  onTap: () => nav.go(Section.settings),
+                  onTap: () => openSection(context, Section.settings),
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                     decoration: BoxDecoration(color: a.accentTint, borderRadius: BorderRadius.circular(16)),
@@ -154,7 +159,7 @@ class _Welcome extends StatelessWidget {
             LayoutBuilder(builder: (context, c) {
               final two = c.maxWidth > 520;
               return Wrap(spacing: 10, runSpacing: 10, children: [
-                for (final (i, text) in suggestions.indexed)
+                for (final (i, (text, icon, color)) in suggestions.indexed)
                   SizedBox(
                     width: two ? (c.maxWidth - 10) / 2 : c.maxWidth,
                     child: Reveal(
@@ -162,9 +167,18 @@ class _Welcome extends StatelessWidget {
                       child: Pressable(
                         onTap: () => nav.prefill(text),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                          decoration: BoxDecoration(border: Border.all(color: a.border), borderRadius: BorderRadius.circular(18)),
-                          child: Text(text, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontFamily: uiFont, fontSize: 14, height: 1.55, color: a.text)),
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(color: a.surface, border: Border.all(color: a.border), borderRadius: BorderRadius.circular(20)),
+                          child: Row(children: [
+                            Container(
+                              width: 38,
+                              height: 38,
+                              decoration: BoxDecoration(color: color.withValues(alpha: a.dark ? 0.2 : 0.11), borderRadius: BorderRadius.circular(12)),
+                              child: Icon(icon, size: 20, color: color),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(child: Text(text, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontFamily: uiFont, fontSize: 14, height: 1.55, color: a.text))),
+                          ]),
                         ),
                       ),
                     ),
@@ -258,7 +272,7 @@ class _ErrorLine extends StatelessWidget {
           Text(errorText(l, code), style: TextStyle(fontFamily: uiFont, color: a.text, height: 1.6)),
           const SizedBox(height: 6),
           if (isSetupError(code))
-            SoftButton(dense: true, label: l.openSettings, icon: Icons.tune_rounded, onTap: () => context.read<NavController>().go(Section.settings))
+            SoftButton(dense: true, label: l.openSettings, icon: Icons.tune_rounded, onTap: () => openSection(context, Section.settings))
           else
             SoftButton(dense: true, label: l.retry, icon: Icons.refresh_rounded, onTap: onRetry),
         ]),

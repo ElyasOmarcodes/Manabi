@@ -543,4 +543,35 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get options => 'خيارات البحث';
+
+  @override
+  String get today => 'اليوم';
+
+  @override
+  String get yesterday => 'أمس';
+
+  @override
+  String get previous7Days => 'الأيام السبعة الماضية';
+
+  @override
+  String get earlier => 'أقدم';
+
+  @override
+  String get libraryHeroTitle => 'مكتبة تراث';
+
+  @override
+  String get libraryHeroBody =>
+      'كتب التفسير والحديث والفقه والعقيدة والتاريخ واللغة — للبحث والنقل والإحالة.';
+
+  @override
+  String get browseCategories => 'تصفّح التصنيفات';
+
+  @override
+  String get browseCategoriesSub => 'العلوم وكتبها';
+
+  @override
+  String get fullTextSub => 'ابحث داخل نصوص الكتب كلها';
+
+  @override
+  String get allBooks => 'كل الكتب';
 }

@@ -540,4 +540,35 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get options => 'گزینه‌های جست‌وجو';
+
+  @override
+  String get today => 'امروز';
+
+  @override
+  String get yesterday => 'دیروز';
+
+  @override
+  String get previous7Days => 'هفتهٔ گذشته';
+
+  @override
+  String get earlier => 'پیش‌تر';
+
+  @override
+  String get libraryHeroTitle => 'کتابخانهٔ تراث';
+
+  @override
+  String get libraryHeroBody =>
+      'کتاب‌های کلاسیک تفسیر، حدیث، فقه، عقیده، تاریخ و زبان — قابل جست‌وجو و استناد.';
+
+  @override
+  String get browseCategories => 'مرور دسته‌ها';
+
+  @override
+  String get browseCategoriesSub => 'علوم و کتاب‌هایشان';
+
+  @override
+  String get fullTextSub => 'جست‌وجو در متن همهٔ کتاب‌ها';
+
+  @override
+  String get allBooks => 'همهٔ کتاب‌ها';
 }

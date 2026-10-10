@@ -216,5 +216,15 @@
   "allCategories": "All categories",
   "stageReading": "Reading and ranking the pages",
   "welcomeQuestion": "What would you like to research today?",
-  "options": "Search options"
+  "options": "Search options",
+  "today": "Today",
+  "yesterday": "Yesterday",
+  "previous7Days": "Previous 7 days",
+  "earlier": "Earlier",
+  "libraryHeroTitle": "The Turath library",
+  "libraryHeroBody": "Classical books of tafsir, hadith, fiqh, creed, history and language – searchable and quotable.",
+  "browseCategories": "Browse categories",
+  "browseCategoriesSub": "Sciences and their books",
+  "fullTextSub": "Search inside the text of every book",
+  "allBooks": "All books"
 }

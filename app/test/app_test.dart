@@ -39,6 +39,13 @@ const sampleResult = {
   'language': 'en',
 };
 
+/// Lets a page transition finish (several frames).
+Future<void> settle(WidgetTester t) async {
+  for (var i = 0; i < 4; i++) {
+    await t.pump(const Duration(milliseconds: 300));
+  }
+}
+
 void main() {
   test('server backend parses the SSE stream', () async {
     final client = MockClient.streaming((req, body) async {
@@ -113,12 +120,15 @@ void main() {
       await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 300)));
       await tester.pump(const Duration(seconds: 1));
       expect(find.text('No Manabi server is set. Add the server address in Settings.'), findsOneWidget);
-      // Library tab shows the offline catalog.
+      // The sidebar opens the library (offline catalog) and settings as pages.
       await tester.tap(find.text('Library').first);
-      await tester.pump(const Duration(seconds: 1));
-      expect(find.text('Books'), findsWidgets);
+      await settle(tester);
+      expect(find.text('The Turath library'), findsOneWidget);
+      await tester.tap(find.byIcon(Icons.arrow_back_rounded));
+      await settle(tester);
       await tester.tap(find.text('Settings').first);
-      await tester.pump(const Duration(seconds: 1));
+      await settle(tester);
+      await tester.scrollUntilVisible(find.text('Test connection'), 300, scrollable: find.byType(Scrollable).last);
       expect(find.text('Test connection'), findsOneWidget);
     });
 
@@ -131,9 +141,15 @@ void main() {
         final s = await tester.runAsync(services);
         await tester.pumpWidget(ManabiApp(services: Future.value(s)));
         await tester.pump(const Duration(seconds: 2));
-        for (final icon in [Icons.auto_stories_outlined, Icons.bookmark_outline_rounded, Icons.history_rounded, Icons.tune_rounded, Icons.chat_bubble_outline_rounded]) {
+        // GPT-style structure: menu → each destination opens as a page.
+        for (final icon in [Icons.auto_stories_rounded, Icons.bookmark_rounded, Icons.history_rounded, Icons.settings_rounded]) {
+          await tester.tap(find.byIcon(Icons.menu_rounded));
+          await settle(tester);
           await tester.tap(find.byIcon(icon).last);
-          await tester.pump(const Duration(milliseconds: 600));
+          await settle(tester);
+          expect(find.byIcon(Icons.arrow_forward_rounded), findsOneWidget, reason: 'page has a back button (RTL)');
+          await tester.tap(find.byIcon(Icons.arrow_forward_rounded));
+          await settle(tester);
         }
         expect(tester.takeException(), isNull);
       });

@@ -1073,6 +1073,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Search options'**
   String get options;
+
+  /// No description provided for @today.
+  ///
+  /// In en, this message translates to:
+  /// **'Today'**
+  String get today;
+
+  /// No description provided for @yesterday.
+  ///
+  /// In en, this message translates to:
+  /// **'Yesterday'**
+  String get yesterday;
+
+  /// No description provided for @previous7Days.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous 7 days'**
+  String get previous7Days;
+
+  /// No description provided for @earlier.
+  ///
+  /// In en, this message translates to:
+  /// **'Earlier'**
+  String get earlier;
+
+  /// No description provided for @libraryHeroTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'The Turath library'**
+  String get libraryHeroTitle;
+
+  /// No description provided for @libraryHeroBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Classical books of tafsir, hadith, fiqh, creed, history and language – searchable and quotable.'**
+  String get libraryHeroBody;
+
+  /// No description provided for @browseCategories.
+  ///
+  /// In en, this message translates to:
+  /// **'Browse categories'**
+  String get browseCategories;
+
+  /// No description provided for @browseCategoriesSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Sciences and their books'**
+  String get browseCategoriesSub;
+
+  /// No description provided for @fullTextSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Search inside the text of every book'**
+  String get fullTextSub;
+
+  /// No description provided for @allBooks.
+  ///
+  /// In en, this message translates to:
+  /// **'All books'**
+  String get allBooks;
 }
 
 class _AppLocalizationsDelegate

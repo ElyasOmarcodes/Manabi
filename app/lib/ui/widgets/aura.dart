@@ -267,11 +267,10 @@ class AuraChip extends StatelessWidget {
         curve: Curves.easeOutCubic,
         padding: EdgeInsetsDirectional.fromSTEB(icon == null ? 14 : 10, 8, onClear != null && selected ? 6 : 14, 8),
         decoration: BoxDecoration(
-          gradient: selected ? a.brand : null,
-          color: selected ? null : a.surface.withValues(alpha: a.dark ? 0.6 : 0.85),
+          color: selected ? a.accent : a.surface,
           borderRadius: BorderRadius.circular(40),
           border: Border.all(color: selected ? Colors.transparent : a.border),
-          boxShadow: selected ? [BoxShadow(color: AuraHues.violet.withValues(alpha: 0.28), blurRadius: 16, offset: const Offset(0, 6), spreadRadius: -6)] : null,
+          boxShadow: selected ? [BoxShadow(color: a.accent.withValues(alpha: 0.35), blurRadius: 16, offset: const Offset(0, 6), spreadRadius: -6)] : null,
         ),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
           if (icon != null) ...[
@@ -515,9 +514,7 @@ class SectionLabel extends StatelessWidget {
   Widget build(BuildContext context) => Padding(
         padding: padding,
         child: Row(children: [
-          Container(width: 4, height: 16, decoration: BoxDecoration(gradient: context.aura.brand, borderRadius: BorderRadius.circular(4))),
-          const SizedBox(width: 10),
-          Expanded(child: Text(text, style: TextStyle(fontFamily: uiFont, fontSize: 14, fontWeight: FontWeight.w700, color: context.aura.text))),
+          Expanded(child: Text(text, style: TextStyle(fontFamily: uiFont, fontSize: 13.5, fontWeight: FontWeight.w700, color: context.aura.muted, letterSpacing: 0.2))),
           ?trailing,
         ]),
       );
@@ -595,29 +592,91 @@ class AuraSearchField extends StatelessWidget {
   }
 }
 
-/// Book cover generated from the title: coloured gradient with a monogram.
+/// Book cover generated from the title, tinted by the book's category.
 class BookCover extends StatelessWidget {
-  const BookCover({super.key, required this.title, required this.seed, this.width = 46, this.height = 60});
+  const BookCover({super.key, required this.title, this.color = AuraHues.violet, this.width = 46, this.height = 60});
   final String title;
-  final int seed;
+  final Color color;
   final double width;
   final double height;
   @override
   Widget build(BuildContext context) {
-    final c1 = AuraHues.at(seed);
-    final c2 = AuraHues.at(seed + 1);
     final letter = title.replaceAll(RegExp(r'[^\p{L}]', unicode: true), '').characters.take(1).toString();
     return Container(
       width: width,
       height: height,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(width * 0.22),
-        gradient: LinearGradient(colors: [c1, c2], begin: Alignment.topLeft, end: Alignment.bottomRight),
-        boxShadow: [BoxShadow(color: c1.withValues(alpha: 0.35), blurRadius: 12, offset: const Offset(0, 6), spreadRadius: -6)],
+        borderRadius: BorderRadius.circular(width * 0.2),
+        gradient: LinearGradient(colors: [color, Color.lerp(color, Colors.white, 0.28)!], begin: Alignment.topRight, end: Alignment.bottomLeft),
       ),
       child: Stack(children: [
-        PositionedDirectional(start: width * 0.12, top: 0, bottom: 0, child: Container(width: 2, color: Colors.white.withValues(alpha: 0.35))),
-        Center(child: Text(letter, style: TextStyle(fontFamily: arabicFont, fontSize: width * 0.5, color: Colors.white, fontWeight: FontWeight.w700, height: 1.3))),
+        PositionedDirectional(start: width * 0.13, top: 0, bottom: 0, child: Container(width: 1.5, color: Colors.white.withValues(alpha: 0.4))),
+        Center(child: Text(letter, style: TextStyle(fontFamily: arabicFont, fontSize: width * 0.46, color: Colors.white, fontWeight: FontWeight.w700, height: 1.3))),
+      ]),
+    );
+  }
+}
+
+/// Tinted feature card (soft colour wash + coloured hairline), as used for
+/// entry points such as "browse categories".
+class FeatureCard extends StatelessWidget {
+  const FeatureCard({super.key, required this.icon, required this.title, required this.color, this.subtitle, this.onTap});
+  final IconData icon;
+  final String title;
+  final String? subtitle;
+  final Color color;
+  final VoidCallback? onTap;
+  @override
+  Widget build(BuildContext context) {
+    final a = context.aura;
+    return Pressable(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: Color.alphaBlend(color.withValues(alpha: a.dark ? 0.12 : 0.06), a.surface),
+          borderRadius: BorderRadius.circular(26),
+          border: Border.all(color: color.withValues(alpha: a.dark ? 0.35 : 0.28), width: 1.2),
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(color: color.withValues(alpha: a.dark ? 0.22 : 0.13), borderRadius: BorderRadius.circular(15)),
+            child: Icon(icon, color: color, size: 24),
+          ),
+          const SizedBox(height: 14),
+          Text(title, style: TextStyle(fontFamily: uiFont, fontSize: 17, fontWeight: FontWeight.w800, color: a.text)),
+          if (subtitle != null) Text(subtitle!, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontFamily: uiFont, fontSize: 12.5, color: a.muted, height: 1.6)),
+        ]),
+      ),
+    );
+  }
+}
+
+/// Solid coloured statistic tile.
+class StatTile extends StatelessWidget {
+  const StatTile({super.key, required this.value, required this.label, required this.icon, required this.color});
+  final String value;
+  final String label;
+  final IconData icon;
+  final Color color;
+  @override
+  Widget build(BuildContext context) {
+    final a = context.aura;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(color: a.surface, borderRadius: BorderRadius.circular(20), border: Border.all(color: a.border)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+        Container(
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(color: color.withValues(alpha: a.dark ? 0.18 : 0.1), borderRadius: BorderRadius.circular(12)),
+          child: Icon(icon, color: color, size: 20),
+        ),
+        const SizedBox(height: 12),
+        FittedBox(fit: BoxFit.scaleDown, child: Text(value, style: TextStyle(fontFamily: uiFont, fontSize: 21, fontWeight: FontWeight.w800, color: a.text, height: 1.2))),
+        Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontFamily: uiFont, fontSize: 12.5, color: a.muted)),
       ]),
     );
   }

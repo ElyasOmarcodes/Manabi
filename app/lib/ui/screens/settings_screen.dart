@@ -20,13 +20,12 @@ class SettingsScreen extends StatelessWidget {
     final l = context.l;
     final a = context.aura;
     final labels = languageLabels(l);
-    return SafeArea(
-      bottom: false,
-      child: ListView(padding: EdgeInsets.fromLTRB(16, 0, 16, MediaQuery.paddingOf(context).bottom + 30), children: [
+    return AuraPage(
+      title: Text(l.settings, style: TextStyle(fontFamily: uiFont, fontSize: 20, fontWeight: FontWeight.w800, color: context.aura.text)),
+      body: ListView(padding: EdgeInsets.fromLTRB(16, 0, 16, MediaQuery.paddingOf(context).bottom + 30), children: [
         ReadingWidth(
           maxWidth: 760,
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            PageHeader(title: l.settings, subtitle: l.appName, icon: Icons.tune_rounded, color: AuraHues.mint),
             SectionLabel(l.theme),
             Row(children: [
               for (final (mode, label, icon) in [

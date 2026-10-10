@@ -216,5 +216,15 @@
   "allCategories": "كل التصنيفات",
   "stageReading": "قراءة الصفحات وانتقاء الأنسب",
   "welcomeQuestion": "عمّ تريد أن تبحث اليوم؟",
-  "options": "خيارات البحث"
+  "options": "خيارات البحث",
+  "today": "اليوم",
+  "yesterday": "أمس",
+  "previous7Days": "الأيام السبعة الماضية",
+  "earlier": "أقدم",
+  "libraryHeroTitle": "مكتبة تراث",
+  "libraryHeroBody": "كتب التفسير والحديث والفقه والعقيدة والتاريخ واللغة — للبحث والنقل والإحالة.",
+  "browseCategories": "تصفّح التصنيفات",
+  "browseCategoriesSub": "العلوم وكتبها",
+  "fullTextSub": "ابحث داخل نصوص الكتب كلها",
+  "allBooks": "كل الكتب"
 }

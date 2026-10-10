@@ -58,7 +58,11 @@ class ScriptedModel implements JsonModel {
   final prompts = <String>[];
   @override
   Future<({Map<String, dynamic> data, String model})> generateJson(
-      {required String system, required String prompt, required Map<String, dynamic> schema, double temperature = 0.2}) async {
+      {required String system,
+      required String prompt,
+      required Map<String, dynamic> schema,
+      double temperature = 0.2,
+      ModelTier tier = ModelTier.main}) async {
     prompts.add(prompt);
     final next = outputs.removeAt(0);
     final data = next is Map<String, dynamic> Function(String) ? next(prompt) : next as Map<String, dynamic>;
@@ -284,5 +288,20 @@ void main() {
     expect(again.sources.single.quotes.single.text, 'q');
     expect(again.sources.single.printedPage, 3);
     expect(again.opinions.single.sources, [1]);
+  });
+
+  test('pipeline adds the continuation page as its own source', () async {
+    var composePromptText = '';
+    final model = ScriptedModel([
+      plan(),
+      (String prompt) => {'selected': [keyFor(prompt, 5, 'C')], 'coverage': 'full', 'followUpQueries': [], 'followUpBooks': []},
+      (String prompt) {
+        composePromptText = prompt;
+        return {'status': 'insufficient', 'answer': '', 'citations': []};
+      },
+    ]);
+    await AnswerPipeline(model: model, turath: TurathClient(client: turathMock()), catalog: catalog).ask(const AskRequest(question: 'q')).toList();
+    expect(RegExp(r'\[S1\] Book: [^\n]*Page: 5\b').hasMatch(composePromptText), isTrue);
+    expect(RegExp(r'\[S2\] Book: [^\n]*Page: 6\b').hasMatch(composePromptText), isTrue);
   });
 }

@@ -142,3 +142,15 @@ test("input validation", async () => {
   await assert.rejects(pipeline.ask({ question: "  " }), (e) => e.code === "INVALID_ARGUMENT");
   await assert.rejects(pipeline.ask({ question: "x".repeat(2001) }), (e) => e.code === "INVALID_ARGUMENT");
 });
+
+test("the page after a selected source is added as its own source", async () => {
+  let composePrompt = "";
+  const gemini = scriptedGemini(plan(), selectPage(5), (request) => {
+    composePrompt = request.prompt;
+    const key = keyFor(request.prompt, 6, "S");
+    return { status: "insufficient", answer: `${key}`, citations: [] };
+  });
+  await createPipeline({ gemini, turath: fixtureTurath(), catalog }).ask({ question: "q", language: "ar" });
+  assert.match(composePrompt, /\[S1\] Book: [^\n]*Page: 5\b/);
+  assert.match(composePrompt, /\[S2\] Book: [^\n]*Page: 6\b/, "continuation page 6 follows page 5");
+});

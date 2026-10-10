@@ -15,26 +15,21 @@ class SavedScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final favorites = context.watch<ChatController>().favorites;
     final l = context.l;
-    return SafeArea(
-      bottom: false,
-      child: Column(children: [
-        ReadingWidth(child: PageHeader(title: l.navFavorites, subtitle: l.answers, icon: Icons.bookmark_rounded, color: AuraHues.pink)),
-        Expanded(
-          child: favorites.isEmpty
+    return AuraPage(
+      title: Text(l.navFavorites, style: TextStyle(fontFamily: uiFont, fontSize: 20, fontWeight: FontWeight.w800, color: context.aura.text)),
+      body: favorites.isEmpty
               ? EmptyState(icon: Icons.bookmark_add_outlined, text: l.noFavorites, color: AuraHues.pink)
               : ListView.builder(
-                  padding: EdgeInsets.fromLTRB(16, 6, 16, MediaQuery.paddingOf(context).bottom + 24),
+                  padding: EdgeInsets.fromLTRB(16, 10, 16, MediaQuery.paddingOf(context).bottom + 24),
                   itemCount: favorites.length,
                   itemBuilder: (context, i) {
                     final (chat, turn) = favorites[i];
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 14),
-                      child: ReadingWidth(child: Reveal(delay: (i % 8) * 50, child: _SavedTile(chat: chat, turn: turn, color: AuraHues.at(i)))),
+                      child: ReadingWidth(child: Reveal(delay: (i % 8) * 50, child: _SavedTile(chat: chat, turn: turn, color: AuraHues.rose))),
                     );
                   },
                 ),
-        ),
-      ]),
     );
   }
 }

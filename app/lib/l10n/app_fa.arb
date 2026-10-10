@@ -216,5 +216,15 @@
   "allCategories": "همهٔ دسته‌ها",
   "stageReading": "خواندن و گزینش صفحه‌ها",
   "welcomeQuestion": "امروز دربارهٔ چه می‌خواهید پژوهش کنید؟",
-  "options": "گزینه‌های جست‌وجو"
+  "options": "گزینه‌های جست‌وجو",
+  "today": "امروز",
+  "yesterday": "دیروز",
+  "previous7Days": "هفتهٔ گذشته",
+  "earlier": "پیش‌تر",
+  "libraryHeroTitle": "کتابخانهٔ تراث",
+  "libraryHeroBody": "کتاب‌های کلاسیک تفسیر، حدیث، فقه، عقیده، تاریخ و زبان — قابل جست‌وجو و استناد.",
+  "browseCategories": "مرور دسته‌ها",
+  "browseCategoriesSub": "علوم و کتاب‌هایشان",
+  "fullTextSub": "جست‌وجو در متن همهٔ کتاب‌ها",
+  "allBooks": "همهٔ کتاب‌ها"
 }

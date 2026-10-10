@@ -39,7 +39,7 @@ Chat with live progress steps · scope to a **book**, **author** or **category**
 
 The key is stored as the repository secret **`GEMINI_API_KEY`** (the older name `GEMINI_API_KYA` is accepted too). It is used only:
 
-1. in CI, by the live tests and the screenshot job (passed as an environment variable to the server process), and
+1. in CI, by the live tests and the live-answer screenshots, which run once a day and on manual runs (*Actions → CI → Run workflow*) so they don't use up the key's quota, and
 2. by a deployed **Manabi server** (`server/`), as an environment variable.
 
 It is **never compiled into the apps.** The repository is public, and a key inside an APK/EXE/web bundle can be extracted by anyone. Apps therefore connect in one of two ways (Settings → Connection):
@@ -57,7 +57,11 @@ GEMINI_API_KEY=... npm start            # http://localhost:8787/api/health
 docker build -t manabi-server server && docker run -p 8787:8787 -e GEMINI_API_KEY=... manabi-server
 ```
 
-Optional env: `GEMINI_MODEL` (default: newest available Gemini Flash), `ALLOWED_ORIGINS`, `ASK_LIMIT`/`ASK_WINDOW_MIN` (rate limit), `TRUST_PROXY=1`, `ACCESS_TOKEN`. Any Docker/Node host works (Cloud Run, Fly.io, Render, a VPS). Then set `MANABI_SERVER_URL` in *Settings → Secrets and variables → Actions → Variables*.
+### Gemini quota
+
+Each answer takes 3–4 Gemini calls: planning and ranking go to the light model (Flash-Lite), writing the answer goes to the main model (Flash). Each model has its own daily quota. When one model's quota runs out, the server (and the app in direct mode) moves on to the next model automatically. The free tier allows only about 20 requests per model per day, so a public deployment needs billing enabled on the Google AI project.
+
+Optional env: `GEMINI_MODEL` (pins one model and turns off the fallback; default: the newest available Flash / Flash-Lite), `ALLOWED_ORIGINS`, `ASK_LIMIT`/`ASK_WINDOW_MIN` (rate limit), `TRUST_PROXY=1`, `ACCESS_TOKEN`. Any Docker/Node host works (Cloud Run, Fly.io, Render, a VPS). Then set `MANABI_SERVER_URL` in *Settings → Secrets and variables → Actions → Variables*.
 
 API: `POST /api/ask` (JSON or SSE stream), `GET /api/search`, `/api/books/:id`, `/api/authors/:id`, `/api/pages/:bookId/:pageId`, `/api/catalog/{books,authors,categories}`, `/api/health`.
 

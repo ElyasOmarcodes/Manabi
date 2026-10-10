@@ -47,7 +47,6 @@ class _BookScreenState extends State<BookScreen> {
           final title = details?.title ?? entry?.title ?? l.book;
           final author = catalog.author(details?.authorId ?? entry?.authorId);
           final category = catalog.category(details?.categoryId ?? entry?.categoryId);
-          final seed = int.tryParse(category?.id ?? '') ?? title.length;
           return ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 120), children: [
             ReadingWidth(
               child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -56,7 +55,7 @@ class _BookScreenState extends State<BookScreen> {
                     padding: const EdgeInsets.all(20),
                     gradientBorder: true,
                     child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      BookCover(title: title, seed: seed, width: 92, height: 124),
+                      BookCover(title: title, color: AuraHues.category(category?.id), width: 92, height: 124),
                       const SizedBox(width: 18),
                       Expanded(
                         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

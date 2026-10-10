@@ -6,23 +6,40 @@ import 'package:flutter/material.dart';
 const uiFont = 'Vazirmatn';
 const arabicFont = 'NotoNaskhArabic';
 
-/// Restrained brand palette: one violet with an orchid companion for the
-/// signature gradient. Everything else is neutral. Named "hues" are kept so
-/// call sites read well, but they all map onto the brand pair; red is
-/// reserved for destructive actions and errors.
+/// Manabi palette: one brand violet plus a small set of supporting accents.
+/// The accents are semantic – each one belongs to a feature or a kind of
+/// content – and are never cycled decoratively.
 class AuraHues {
-  static const violet = Color(0xFF6A5AE0);
-  static const orchid = Color(0xFFB44CD6);
-  static const blue = violet;
-  static const cyan = violet;
-  static const mint = violet;
-  static const amber = violet;
-  static const pink = orchid;
-  static const orange = orchid;
-  static const rose = Color(0xFFE5484D);
+  static const violet = Color(0xFF6C5CE7); // brand
+  static const orchid = Color(0xFF8E7FF3); // lighter brand, for the brand gradient
+  static const teal = Color(0xFF14A1C1); // library, Qur'an sciences
+  static const amber = Color(0xFFE39A27); // history, hadith
+  static const rose = Color(0xFFE0456B); // saved, destructive
+  static const green = Color(0xFF1FA978); // fiqh, success
+  static const blue = Color(0xFF3B7CF0); // history & biography books, links
 
-  static const all = [violet];
+  // Legacy aliases used across the code base.
+  static const cyan = teal;
+  static const mint = green;
+  static const pink = rose;
+  static const orange = amber;
+
   static Color at(int i) => violet;
+
+  /// Accent for a Turath category: groups of sciences share one colour.
+  static Color category(String? id) {
+    final n = int.tryParse(id ?? '') ?? 0;
+    return switch (n) {
+      1 || 2 => violet, // aqidah
+      3 || 4 || 5 => teal, // Qur'an, tafsir
+      >= 6 && <= 10 => amber, // hadith
+      >= 11 && <= 22 => green, // fiqh
+      23 => rose, // ethics
+      >= 24 && <= 28 => blue, // seerah, history, biographies
+      >= 29 && <= 35 => rose, // language & literature
+      _ => violet,
+    };
+  }
 }
 
 class Aura extends ThemeExtension<Aura> {
@@ -58,7 +75,7 @@ class Aura extends ThemeExtension<Aura> {
   final Color danger;
   final Color shadow;
 
-  LinearGradient get brand => const LinearGradient(colors: [AuraHues.violet, AuraHues.orchid], begin: Alignment.topLeft, end: Alignment.bottomRight);
+  LinearGradient get brand => const LinearGradient(colors: [AuraHues.violet, AuraHues.orchid], begin: Alignment.topRight, end: Alignment.bottomLeft);
   LinearGradient get warm => brand;
 
   /// Very light brand tint used behind quotes and info boxes.
@@ -67,15 +84,15 @@ class Aura extends ThemeExtension<Aura> {
 
   static const light = Aura(
     dark: false,
-    bg: Color(0xFFFFFFFF),
+    bg: Color(0xFFF6F6FA),
     surface: Color(0xFFFFFFFF),
-    surfaceAlt: Color(0xFFF3F3F7),
-    glass: Color(0xF2FFFFFF),
-    border: Color(0xFFE8E8EF),
-    text: Color(0xFF16161D),
-    muted: Color(0xFF6B6B7B),
-    faint: Color(0xFFA6A6B4),
-    accent: Color(0xFF6A5AE0),
+    surfaceAlt: Color(0xFFEFEFF5),
+    glass: Color(0xF7FFFFFF),
+    border: Color(0xFFE7E7EF),
+    text: Color(0xFF15151C),
+    muted: Color(0xFF686878),
+    faint: Color(0xFFA3A3B2),
+    accent: Color(0xFF6C5CE7),
     success: Color(0xFF12A673),
     warning: Color(0xFFE08A00),
     danger: Color(0xFFE5484D),
@@ -84,15 +101,15 @@ class Aura extends ThemeExtension<Aura> {
 
   static const night = Aura(
     dark: true,
-    bg: Color(0xFF111114),
-    surface: Color(0xFF1A1A1F),
-    surfaceAlt: Color(0xFF232329),
-    glass: Color(0xF21A1A1F),
-    border: Color(0xFF2C2C33),
+    bg: Color(0xFF0F0F14),
+    surface: Color(0xFF1A1A22),
+    surfaceAlt: Color(0xFF24242D),
+    glass: Color(0xF71A1A22),
+    border: Color(0xFF2D2D37),
     text: Color(0xFFEDEDF2),
     muted: Color(0xFF9D9DAB),
     faint: Color(0xFF63636F),
-    accent: Color(0xFF9A8CFF),
+    accent: Color(0xFF9D90FF),
     success: Color(0xFF3DD9A0),
     warning: Color(0xFFFFC266),
     danger: Color(0xFFFF6B70),

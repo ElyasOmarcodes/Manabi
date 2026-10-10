@@ -135,6 +135,7 @@ class TurathClient implements PassageSearch {
     );
   }
 
+  @override
   Future<PagePassage> getPage(String bookId, int page) {
     final key = '$bookId:$page';
     return _pageCache[key] ??= () async {

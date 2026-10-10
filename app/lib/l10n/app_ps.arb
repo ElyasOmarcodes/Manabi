@@ -216,5 +216,15 @@
   "allCategories": "ټولې ډلې",
   "stageReading": "د مخونو لوستل او غوره کول",
   "welcomeQuestion": "نن د څه په اړه څېړنه کوئ؟",
-  "options": "د لټون اختیارونه"
+  "options": "د لټون اختیارونه",
+  "today": "نن",
+  "yesterday": "پرون",
+  "previous7Days": "تېره اونۍ",
+  "earlier": "مخکې",
+  "libraryHeroTitle": "د تراث کتابتون",
+  "libraryHeroBody": "د تفسیر، حدیث، فقهې، عقیدې، تاریخ او ژبې کلاسیک کتابونه — د لټون او حوالې وړ.",
+  "browseCategories": "ډلې وګورئ",
+  "browseCategoriesSub": "علوم او د هغوی کتابونه",
+  "fullTextSub": "د ټولو کتابونو په متن کې لټون",
+  "allBooks": "ټول کتابونه"
 }

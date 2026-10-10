@@ -539,4 +539,35 @@ class AppLocalizationsPs extends AppLocalizations {
 
   @override
   String get options => 'د لټون اختیارونه';
+
+  @override
+  String get today => 'نن';
+
+  @override
+  String get yesterday => 'پرون';
+
+  @override
+  String get previous7Days => 'تېره اونۍ';
+
+  @override
+  String get earlier => 'مخکې';
+
+  @override
+  String get libraryHeroTitle => 'د تراث کتابتون';
+
+  @override
+  String get libraryHeroBody =>
+      'د تفسیر، حدیث، فقهې، عقیدې، تاریخ او ژبې کلاسیک کتابونه — د لټون او حوالې وړ.';
+
+  @override
+  String get browseCategories => 'ډلې وګورئ';
+
+  @override
+  String get browseCategoriesSub => 'علوم او د هغوی کتابونه';
+
+  @override
+  String get fullTextSub => 'د ټولو کتابونو په متن کې لټون';
+
+  @override
+  String get allBooks => 'ټول کتابونه';
 }

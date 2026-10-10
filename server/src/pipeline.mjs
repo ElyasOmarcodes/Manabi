@@ -48,6 +48,29 @@ export const LIMITS = {
   excerptChars: 650,
   sourceChars: 2400,
   maxSelected: 14,
+  continuationPages: 6,
+};
+
+/**
+ * Rulings often continue on the next page. For the strongest selected pages,
+ * fetch the following page and add it as its own source (with its own page
+ * number), so quotes from it are cited correctly.
+ */
+export const addContinuations = async ({ turath, catalog, selected, limit = LIMITS.continuationPages }) => {
+  const have = new Set(selected.map((c) => c.id));
+  const targets = selected.filter((c) => c.internalPage !== undefined).slice(0, limit);
+  const settled = await settleAll(targets.map((c) => () => turath.getPage(c.bookId, c.internalPage + 1)));
+  const out = [];
+  for (const c of selected) {
+    out.push(c);
+    const i = targets.indexOf(c);
+    if (i < 0 || !settled[i]?.ok) continue;
+    const next = toCandidate(settled[i].value, catalog);
+    if (have.has(next.id) || !next.text.trim()) continue;
+    have.add(next.id);
+    out.push({ ...next, text: boundText(settled[i].value.text, 1600).text, continuationOf: c.id });
+  }
+  return out;
 };
 
 const clampInt = (value, min, max, fallback) => {
@@ -335,6 +358,7 @@ export const createPipeline = ({ gemini, turath, catalog }) => {
       prompt: planPrompt({ question, history, scopeLabel: scopeLabel(scope, catalog) }),
       schema: PLAN_SCHEMA,
       temperature: 0.1,
+      tier: "fast",
     });
     const p = plan.data ?? {};
     const queries = cleanQueries(p.queries);
@@ -372,6 +396,7 @@ export const createPipeline = ({ gemini, turath, catalog }) => {
           prompt: rerankPrompt({ question: standalone, candidates: pool, queries: usedQueries }),
           schema: RERANK_SCHEMA,
           temperature: 0.1,
+          tier: "fast",
         })
       ).data ?? {};
     let usedQueries = [...queries];
@@ -410,7 +435,8 @@ export const createPipeline = ({ gemini, turath, catalog }) => {
     if (!selected.length) {
       return done(finalize({ composed: { status: "insufficient" }, sources: candidates.slice(0, 6).map((c, i) => ({ ...c, key: `S${i + 1}` })), language }), { totalMatches });
     }
-    const sources = selected.map((c, i) => ({ ...c, key: `S${i + 1}` }));
+    const expanded = typeof turath.getPage === "function" ? await addContinuations({ turath, catalog, selected }) : selected;
+    const sources = expanded.map((c, i) => ({ ...c, key: `S${i + 1}` }));
 
     // 4. compose
     onEvent("stage", { stage: "composing" });

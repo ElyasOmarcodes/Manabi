@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/models/chat.dart';
@@ -7,129 +6,222 @@ import '../../state/chat_controller.dart';
 import '../../state/nav_controller.dart';
 import '../../state/settings_controller.dart';
 import '../export/export_actions.dart';
+import '../home_shell.dart';
 import '../theme.dart';
 import 'common.dart';
 
-class ChatList extends StatefulWidget {
-  const ChatList({super.key, this.inDrawer = false});
+/// The app menu: new chat, search, quick links, chats by date, settings.
+class Sidebar extends StatefulWidget {
+  const Sidebar({super.key, this.inDrawer = false});
   final bool inDrawer;
 
   @override
-  State<ChatList> createState() => _ChatListState();
+  State<Sidebar> createState() => _SidebarState();
 }
 
-class _ChatListState extends State<ChatList> {
+class _SidebarState extends State<Sidebar> {
   String _query = '';
 
-  void _close() {
+  void _closeDrawer() {
     if (widget.inDrawer) Navigator.of(context).maybePop();
+  }
+
+  void _open(Section s) {
+    _closeDrawer();
+    openSection(context, s);
   }
 
   @override
   Widget build(BuildContext context) {
     final chats = context.watch<ChatController>();
-    final nav = context.read<NavController>();
+    final settings = context.watch<SettingsController>();
     final l = context.l;
     final a = context.aura;
     final q = _query.trim().toLowerCase();
     final list = chats.sortedChats.where((c) => q.isEmpty || c.title.toLowerCase().contains(q) || c.turns.any((t) => t.question.toLowerCase().contains(q))).toList();
-    final pinned = list.where((c) => c.pinned).toList();
-    final recent = list.where((c) => !c.pinned).toList();
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    String bucket(Chat c) {
+      if (c.pinned) return l.pinned;
+      final d = DateTime(c.updatedAt.year, c.updatedAt.month, c.updatedAt.day);
+      final days = today.difference(d).inDays;
+      if (days <= 0) return l.today;
+      if (days == 1) return l.yesterday;
+      if (days < 7) return l.previous7Days;
+      return l.earlier;
+    }
+
+    final groups = <String, List<Chat>>{};
+    for (final c in list) {
+      groups.putIfAbsent(bucket(c), () => []).add(c);
+    }
 
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Padding(
-        padding: const EdgeInsets.fromLTRB(18, 20, 18, 14),
+        padding: const EdgeInsets.fromLTRB(16, 14, 10, 8),
         child: Row(children: [
-          const ManabiMark(size: 42),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              GradientText(l.appName, style: const TextStyle(fontFamily: uiFont, fontSize: 22, fontWeight: FontWeight.w800, height: 1.2)),
-              Text('Manabi · منابع', style: TextStyle(fontFamily: uiFont, fontSize: 11.5, color: a.muted)),
-            ]),
+          const ManabiMark(size: 34),
+          const SizedBox(width: 10),
+          Expanded(child: Text(l.appName, style: TextStyle(fontFamily: uiFont, fontSize: 19, fontWeight: FontWeight.w800, color: a.text))),
+          AuraIconButton(
+            icon: Icons.edit_square,
+            tooltip: l.newChat,
+            filled: false,
+            onTap: () {
+              chats.newChat();
+              _closeDrawer();
+              Navigator.of(context).popUntil((r) => r.isFirst);
+            },
           ),
         ]),
       ),
       Padding(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-        child: GradientButton(
-          label: l.newChat,
-          icon: Icons.add_rounded,
-          expand: true,
-          height: 48,
-          onTap: () {
-            chats.newChat();
-            nav.go(Section.chat);
-            _close();
-          },
+        padding: const EdgeInsets.fromLTRB(14, 4, 14, 12),
+        child: Container(
+          decoration: BoxDecoration(color: a.surfaceAlt, borderRadius: BorderRadius.circular(16)),
+          child: TextField(
+            onChanged: (v) => setState(() => _query = v),
+            style: TextStyle(fontFamily: uiFont, color: a.text, fontSize: 14.5),
+            decoration: InputDecoration(
+              isDense: true,
+              hintText: l.searchChats,
+              filled: false,
+              border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
+              prefixIcon: Icon(Icons.search_rounded, color: a.muted, size: 20),
+              contentPadding: const EdgeInsets.symmetric(vertical: 12),
+            ),
+          ),
         ),
       ),
       Padding(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
-        child: AuraSearchField(hint: l.searchChats, onChanged: (v) => setState(() => _query = v)),
+        padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+        child: Row(children: [
+          Expanded(child: _QuickLink(icon: Icons.auto_stories_rounded, label: l.navLibrary, color: AuraHues.teal, onTap: () => _open(Section.library))),
+          const SizedBox(width: 8),
+          Expanded(child: _QuickLink(icon: Icons.bookmark_rounded, label: l.navFavorites, color: AuraHues.rose, onTap: () => _open(Section.saved))),
+          const SizedBox(width: 8),
+          Expanded(child: _QuickLink(icon: Icons.history_rounded, label: l.navHistory, color: AuraHues.amber, onTap: () => _open(Section.history))),
+        ]),
       ),
       Expanded(
         child: list.isEmpty
             ? Center(
                 child: Padding(
                   padding: const EdgeInsets.all(28),
-                  child: Column(mainAxisSize: MainAxisSize.min, children: [
-                    Icon(Icons.forum_outlined, size: 34, color: a.faint),
-                    const SizedBox(height: 10),
-                    Text(l.noChats, textAlign: TextAlign.center, style: TextStyle(fontFamily: uiFont, color: a.muted, height: 1.6)),
-                  ]),
+                  child: Text(l.noChats, textAlign: TextAlign.center, style: TextStyle(fontFamily: uiFont, color: a.faint, height: 1.6)),
                 ),
               )
-            : ListView(padding: const EdgeInsets.fromLTRB(10, 4, 10, 10), children: [
-                if (pinned.isNotEmpty) _header(context, l.pinned),
-                for (final c in pinned) _tile(context, c, chats, nav),
-                if (recent.isNotEmpty) _header(context, l.recent),
-                for (final c in recent) _tile(context, c, chats, nav),
+            : ListView(padding: const EdgeInsets.fromLTRB(8, 4, 8, 8), children: [
+                for (final e in groups.entries) ...[
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 14, 12, 4),
+                    child: Text(e.key, style: TextStyle(fontFamily: uiFont, fontSize: 12, fontWeight: FontWeight.w700, color: a.faint)),
+                  ),
+                  for (final c in e.value) _ChatRow(chat: c, selected: chats.currentId == c.id, onOpen: _closeDrawer),
+                ],
               ]),
+      ),
+      Divider(color: a.border, height: 1),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
+        child: Row(children: [
+          Expanded(
+            child: InkWell(
+              borderRadius: BorderRadius.circular(16),
+              onTap: () => _open(Section.settings),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                child: Row(children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(color: a.surfaceAlt, borderRadius: BorderRadius.circular(12)),
+                    child: Icon(Icons.settings_rounded, size: 20, color: a.muted),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(l.navSettings, style: TextStyle(fontFamily: uiFont, fontWeight: FontWeight.w600, color: a.text)),
+                ]),
+              ),
+            ),
+          ),
+          AuraIconButton(
+            icon: a.dark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
+            tooltip: a.dark ? l.themeLight : l.themeDark,
+            filled: false,
+            color: a.muted,
+            onTap: () => settings.setThemeMode(a.dark ? ThemeMode.light : ThemeMode.dark),
+          ),
+        ]),
       ),
     ]);
   }
+}
 
-  Widget _header(BuildContext context, String text) => Padding(
-        padding: const EdgeInsets.fromLTRB(12, 14, 12, 6),
-        child: Text(text.toUpperCase(), style: TextStyle(fontFamily: uiFont, fontSize: 11.5, letterSpacing: 0.6, fontWeight: FontWeight.w700, color: context.aura.faint)),
-      );
+class _QuickLink extends StatelessWidget {
+  const _QuickLink({required this.icon, required this.label, required this.color, required this.onTap});
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) {
+    final a = context.aura;
+    return Pressable(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
+        decoration: BoxDecoration(
+          color: Color.alphaBlend(color.withValues(alpha: a.dark ? 0.12 : 0.07), a.surface),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: color.withValues(alpha: a.dark ? 0.3 : 0.22)),
+        ),
+        child: Column(children: [
+          Icon(icon, color: color, size: 22),
+          const SizedBox(height: 6),
+          Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontFamily: uiFont, fontSize: 12.5, fontWeight: FontWeight.w700, color: a.text)),
+        ]),
+      ),
+    );
+  }
+}
 
-  Widget _tile(BuildContext context, Chat c, ChatController chats, NavController nav) {
+class _ChatRow extends StatelessWidget {
+  const _ChatRow({required this.chat, required this.selected, required this.onOpen});
+  final Chat chat;
+  final bool selected;
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final chats = context.read<ChatController>();
     final l = context.l;
     final a = context.aura;
-    final selected = chats.currentId == c.id;
-    final date = DateFormat.MMMd(Localizations.localeOf(context).toLanguageTag()).format(c.updatedAt);
-    final hue = AuraHues.at(c.id.hashCode);
+    final c = chat;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
+      padding: const EdgeInsets.symmetric(vertical: 1),
       child: Material(
-        color: selected ? a.accent.withValues(alpha: a.dark ? 0.18 : 0.09) : Colors.transparent,
-        borderRadius: BorderRadius.circular(18),
+        color: selected ? a.surfaceAlt : Colors.transparent,
+        borderRadius: BorderRadius.circular(14),
         child: InkWell(
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(14),
           onTap: () {
             chats.open(c.id);
-            nav.go(Section.chat);
-            _close();
+            onOpen();
+            Navigator.of(context).popUntil((r) => r.isFirst);
           },
           child: Padding(
-            padding: const EdgeInsetsDirectional.fromSTEB(10, 8, 2, 8),
+            padding: const EdgeInsetsDirectional.fromSTEB(12, 2, 0, 2),
             child: Row(children: [
-              Container(
-                width: 10,
-                height: 10,
-                decoration: BoxDecoration(shape: BoxShape.circle, color: c.pinned ? AuraHues.amber : hue, boxShadow: [BoxShadow(color: hue.withValues(alpha: 0.5), blurRadius: 8)]),
-              ),
-              const SizedBox(width: 12),
+              if (c.pinned) ...[Icon(Icons.push_pin_rounded, size: 14, color: a.accent), const SizedBox(width: 6)],
               Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(c.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontFamily: uiFont, fontWeight: selected ? FontWeight.w700 : FontWeight.w500, color: a.text, fontSize: 14)),
-                  Text('$date · ${c.turns.length}', style: TextStyle(fontFamily: uiFont, color: a.faint, fontSize: 11.5)),
-                ]),
+                child: Text(c.title,
+                    maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontFamily: uiFont, fontSize: 14, fontWeight: selected ? FontWeight.w700 : FontWeight.w500, color: a.text)),
               ),
               PopupMenuButton<String>(
-                icon: Icon(Icons.more_horiz_rounded, size: 20, color: a.faint),
+                icon: Icon(Icons.more_horiz_rounded, size: 19, color: a.faint),
                 onSelected: (v) async {
                   switch (v) {
                     case 'rename':
@@ -140,8 +232,7 @@ class _ChatListState extends State<ChatList> {
                     case 'export':
                       if (context.mounted) await showExportSheet(context, title: c.title, turns: c.turns, uiLanguage: context.read<SettingsController>().uiLanguage);
                     case 'delete':
-                      final ok = await confirmDialog(context, l.deleteChatConfirm);
-                      if (ok) chats.delete(c);
+                      if (await confirmDialog(context, l.deleteChatConfirm)) chats.delete(c);
                   }
                 },
                 itemBuilder: (_) => [
@@ -172,7 +263,7 @@ class _ChatListState extends State<ChatList> {
         content: TextField(controller: controller, autofocus: true, onSubmitted: (v) => Navigator.pop(ctx, v)),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: Text(ctx.l.cancel)),
-          GradientButton(label: ctx.l.ok, height: 42, onTap: () => Navigator.pop(ctx, controller.text)),
+          TextButton(onPressed: () => Navigator.pop(ctx, controller.text), child: Text(ctx.l.ok)),
         ],
       ),
     );
@@ -183,12 +274,12 @@ Future<bool> confirmDialog(BuildContext context, String message) async =>
     await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        icon: IconTile(icon: Icons.delete_outline_rounded, color: AuraHues.rose, size: 52, gradient: true),
+        icon: const Icon(Icons.delete_outline_rounded, color: AuraHues.rose, size: 32),
         content: Text(message, textAlign: TextAlign.center, style: const TextStyle(fontFamily: uiFont, fontSize: 15, height: 1.6)),
         actionsAlignment: MainAxisAlignment.center,
         actions: [
-          SoftButton(label: ctx.l.cancel, color: ctx.aura.muted, onTap: () => Navigator.pop(ctx, false)),
-          GradientButton(label: ctx.l.delete, height: 44, gradient: const LinearGradient(colors: [AuraHues.rose, AuraHues.pink]), onTap: () => Navigator.pop(ctx, true)),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(ctx.l.cancel)),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(ctx.l.delete, style: const TextStyle(color: AuraHues.rose, fontWeight: FontWeight.w700))),
         ],
       ),
     ) ??

@@ -33,10 +33,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
       groups.putIfAbsent(day.format(it.$2.askedAt), () => []).add(it);
     }
 
-    return SafeArea(
-      bottom: false,
-      child: Column(children: [
-        ReadingWidth(child: PageHeader(title: l.history, subtitle: l.searchHistory, icon: Icons.history_rounded, color: AuraHues.amber)),
+    return AuraPage(
+      title: Text(l.history, style: TextStyle(fontFamily: uiFont, fontSize: 20, fontWeight: FontWeight.w800, color: context.aura.text)),
+      body: Column(children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
           child: ReadingWidth(child: AuraSearchField(hint: l.searchHistory, onChanged: (v) => setState(() => _q = v))),

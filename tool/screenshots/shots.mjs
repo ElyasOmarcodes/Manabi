@@ -61,8 +61,24 @@ const run = async (name, fn) => {
   }
 };
 
+const desktop = { width: 1440, height: 900 };
+const phone = { width: 390, height: 844 };
+
+// Opens a fresh app, enables semantics and optionally opens a menu page.
+const section = async (opts, label, menu = false) => {
+  const { ctx, page } = await open(opts);
+  await page.waitForTimeout(4000);
+  await semantics(page);
+  if (menu) await tap(page, menu === true ? "چټونه" : menu, { exact: true });
+  if (label) {
+    await tap(page, label, { exact: true });
+    await page.waitForTimeout(800);
+  }
+  return { ctx, page };
+};
+
 await run("01", async () => {
-  const { ctx, page } = await open({ width: 1440, height: 900 });
+  const { ctx, page } = await open(desktop);
   await page.waitForTimeout(1500);
   await shot(page, "01-splash");
   await page.waitForTimeout(3500);
@@ -86,56 +102,65 @@ await run("01", async () => {
 });
 
 await run("06", async () => {
-  const { ctx, page } = await open({ width: 1440, height: 900 });
-  await page.waitForTimeout(4000);
-  await semantics(page);
-  await tap(page, "کتابتون", { exact: true });
-  await page.waitForTimeout(800);
-  await shot(page, "06-library-books");
+  const { ctx, page } = await section(desktop, "کتابتون");
+  await shot(page, "06-library-home");
   await tap(page, "مؤلفین", { exact: true });
   await shot(page, "07-library-authors");
   await tap(page, "ډلې", { exact: true });
   await shot(page, "08-library-categories");
-  await tap(page, "تنظیمات", { exact: true });
+  await ctx.close();
+});
+
+await run("09", async () => {
+  const { ctx, page } = await section(desktop, "تنظیمات");
   await shot(page, "09-settings");
+  await page.mouse.move(720, 500);
   await page.mouse.wheel(0, 900);
   await page.waitForTimeout(700);
   await shot(page, "10-settings-connection");
-  await tap(page, "خوندي", { exact: true });
-  await shot(page, "11-saved-empty");
   await ctx.close();
 });
 
-await run("12", async () => {
-  const { ctx, page } = await open({ width: 1440, height: 900, theme: "dark" });
-  await page.waitForTimeout(4000);
-  await shot(page, "12-chat-welcome-dark");
-  await semantics(page);
-  await tap(page, "کتابتون", { exact: true });
-  await shot(page, "13-library-dark");
+await run("11", async () => {
+  const { ctx, page } = await section(desktop, "خوندي");
+  await shot(page, "11-saved");
   await ctx.close();
+  const h = await section(desktop, "تاریخچه");
+  await shot(h.page, "12-history");
+  await h.ctx.close();
 });
 
-await run("14", async () => {
-  const { ctx, page } = await open({ width: 390, height: 844 });
-  await page.waitForTimeout(4000);
-  await shot(page, "14-phone-chat");
-  await semantics(page);
-  await tap(page, "کتابتون", { exact: true });
-  await shot(page, "15-phone-library");
-  await tap(page, "تنظیمات", { exact: true });
-  await shot(page, "16-phone-settings");
+await run("13", async () => {
+  const dark = { ...desktop, theme: "dark" };
+  const { ctx, page } = await section(dark);
+  await shot(page, "13-chat-welcome-dark");
   await ctx.close();
+  const l = await section(dark, "کتابتون");
+  await shot(l.page, "14-library-dark");
+  await l.ctx.close();
 });
 
-await run("17", async () => {
-  const { ctx, page } = await open({ width: 390, height: 844, theme: "dark", lang: "en" });
-  await page.waitForTimeout(4000);
-  await shot(page, "17-phone-dark-english");
-  await semantics(page);
-  await page.getByRole("button", { name: "Chats" }).click().catch(() => tap(page, "Chats"));
-  await page.waitForTimeout(900);
-  await shot(page, "18-phone-chat-list-drawer");
+await run("15", async () => {
+  const { ctx, page } = await section(phone);
+  await shot(page, "15-phone-chat");
+  await tap(page, "چټونه", { exact: true });
+  await page.waitForTimeout(700);
+  await shot(page, "16-phone-menu");
+  await ctx.close();
+  const l = await section(phone, "کتابتون", true);
+  await shot(l.page, "17-phone-library");
+  await l.ctx.close();
+  const s = await section(phone, "تنظیمات", true);
+  await shot(s.page, "18-phone-settings");
+  await s.ctx.close();
+});
+
+await run("19", async () => {
+  const { ctx, page } = await section({ ...phone, theme: "dark", lang: "en" });
+  await shot(page, "19-phone-dark-english");
+  await tap(page, "Chats", { exact: true });
+  await page.waitForTimeout(700);
+  await shot(page, "20-phone-dark-menu");
   await ctx.close();
 });
 
@@ -154,7 +179,7 @@ const waitForAnswer = async (page, labels, timeout = 240_000) => {
 
 // Real end-to-end answers: the app talks to a Manabi server that has the
 // Gemini key and reaches Turath. Nothing here is mocked.
-const ask = async (name, { lang, question, width = 1440, height = 900, theme = "light", done }) => {
+const ask = async (name, { lang, question, width = 1440, height = 900, theme = "light", done, sources }) => {
   await run(name, async () => {
     const { ctx, page } = await open({ width, height, lang, theme, prefs: { serverUrl: process.env.MANABI_SERVER_URL ?? "http://localhost:8787", mode: "server" } });
     await page.waitForTimeout(4000);
@@ -174,12 +199,17 @@ const ask = async (name, { lang, question, width = 1440, height = 900, theme = "
       await page.waitForTimeout(900);
       await shot(page, `${name}-answer-${i}`);
     }
+    if (sources) {
+      await tap(page, sources).catch(() => undefined);
+      await page.waitForTimeout(1200);
+      await shot(page, `${name}-sources`);
+    }
     await ctx.close();
   });
 };
 
-await ask("live-1-ps", { lang: "ps", question: "د «إنما الأعمال بالنيات» حدیث چا روایت کړی دی؟", done: ["مستند ځواب", "په نیمګړي ډول مستند", "مستند ځواب ونه موندل شو"] });
+await ask("live-1-ps", { lang: "ps", question: "د «إنما الأعمال بالنيات» حدیث چا روایت کړی دی؟", done: ["مستند ځواب", "په نیمګړي ډول مستند", "مستند ځواب ونه موندل شو"], sources: "منابع" });
 await ask("live-2-ar", { lang: "ar", question: "ماذا تقول كتب الفقه في مس الذكر ونقض الوضوء؟", done: ["جواب موثق", "موثق جزئيًا", "لم يوجد جواب موثق"] });
-await ask("live-3-en-phone", { lang: "en", theme: "dark", width: 390, height: 844, question: "What is the meaning of Ihsan in the hadith of Jibril?", done: ["Documented answer", "Partly documented", "No documented answer found"] });
+await ask("live-3-en-phone", { lang: "en", theme: "dark", width: 390, height: 844, question: "What is the meaning of Ihsan in the hadith of Jibril?", done: ["Documented answer", "Partly documented", "No documented answer found"], sources: "Sources" });
 
 await browser.close();

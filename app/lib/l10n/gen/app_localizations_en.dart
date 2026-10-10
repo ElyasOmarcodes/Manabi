@@ -543,4 +543,35 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get options => 'Search options';
+
+  @override
+  String get today => 'Today';
+
+  @override
+  String get yesterday => 'Yesterday';
+
+  @override
+  String get previous7Days => 'Previous 7 days';
+
+  @override
+  String get earlier => 'Earlier';
+
+  @override
+  String get libraryHeroTitle => 'The Turath library';
+
+  @override
+  String get libraryHeroBody =>
+      'Classical books of tafsir, hadith, fiqh, creed, history and language – searchable and quotable.';
+
+  @override
+  String get browseCategories => 'Browse categories';
+
+  @override
+  String get browseCategoriesSub => 'Sciences and their books';
+
+  @override
+  String get fullTextSub => 'Search inside the text of every book';
+
+  @override
+  String get allBooks => 'All books';
 }

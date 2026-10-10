@@ -91,7 +91,7 @@ class BookTile extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         child: Row(children: [
-          BookCover(title: book.title, seed: int.tryParse(book.categoryId) ?? book.title.length),
+          BookCover(title: book.title, color: AuraHues.category(book.categoryId)),
           const SizedBox(width: 14),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
