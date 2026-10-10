@@ -147,6 +147,20 @@ jobs:
         env:
           MANABI_SERVER_URL: http://localhost:8787
         run: node shots.mjs http://localhost:8080/ "$GITHUB_WORKSPACE/screenshots" live
+      - name: Print live screenshots for remote review (small JPEG, base64)
+        if: always() && env.LIVE_RUN == 'true'
+        run: |
+          pip install --quiet pillow
+          python3 - <<'PY'
+          import base64, glob, io, os
+          from PIL import Image
+          for path in sorted(glob.glob("screenshots/live-*.png")):
+              im = Image.open(path).convert("RGB")
+              im.thumbnail((560, 1400))
+              buf = io.BytesIO()
+              im.save(buf, "JPEG", quality=62, optimize=True)
+              print("SHOT", os.path.basename(path), base64.b64encode(buf.getvalue()).decode())
+          PY
       - name: Server log
         if: always()
         run: tail -n 100 server.log || true

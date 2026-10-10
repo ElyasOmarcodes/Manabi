@@ -1,0 +1,47 @@
+name: Diagnose (live Gemini + Turath)
+
+# Manual only: spends a few Gemini requests from the shared key.
+on:
+  workflow_dispatch:
+    inputs:
+      question:
+        description: Question to run through the pipeline (blank = the reported Hanafi question)
+        required: false
+        default: ""
+      depth:
+        description: quick, standard or deep
+        required: false
+        default: quick
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    env:
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || secrets.GEMINI_API_KYA }}
+      DIAG_QUESTION: ${{ github.event.inputs.question }}
+      DIAG_DEPTH: ${{ github.event.inputs.depth }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Server pipeline, model list and latency
+        working-directory: server
+        run: |
+          npm ci
+          node scripts/diagnose.mjs
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.47.7"
+          channel: stable
+          cache: true
+      - name: App direct mode (the phone's own pipeline)
+        working-directory: app
+        env:
+          MANABI_LIVE: "1"
+        run: |
+          flutter pub get
+          flutter test test/live_direct_test.dart --reporter expanded
