@@ -1,0 +1,306 @@
+name: Build & Release
+
+# Builds every platform on each push. Outputs are kept as workflow artifacts
+# and published as a GitHub Release:
+#   - tags v*            → a normal release named after the tag
+#   - pushes to branches → the rolling "nightly" pre-release (replaced each time)
+#
+# The Gemini key (GEMINI_API_KYA) is NEVER put into app binaries – the
+# repository is public and anyone could extract it. Apps reach Gemini through
+# the Manabi server (MANABI_SERVER_URL repository variable) or a key the user
+# enters on their own device.
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["v*"]
+  workflow_dispatch:
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  FLUTTER_VERSION: "3.47.7"
+  SERVER_URL: ${{ vars.MANABI_SERVER_URL }}
+
+jobs:
+  android:
+    name: Android (APK + AAB)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - name: Release keystore (optional)
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > android/app/release.jks
+            printf "storeFile=release.jks\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n" "$KEYSTORE_PASSWORD" "$KEY_ALIAS" "$KEY_PASSWORD" > android/key.properties
+            echo "Signing with the release keystore"
+          else
+            echo "::notice::ANDROID_KEYSTORE_BASE64 not set – APK/AAB are signed with the debug key (fine for side-loading, not for Google Play)"
+          fi
+      - run: flutter pub get
+      - run: flutter build apk --release --dart-define=MANABI_SERVER_URL=${{ env.SERVER_URL }}
+      - run: flutter build apk --release --split-per-abi --dart-define=MANABI_SERVER_URL=${{ env.SERVER_URL }}
+      - run: flutter build appbundle --release --dart-define=MANABI_SERVER_URL=${{ env.SERVER_URL }}
+      - name: Collect
+        run: |
+          mkdir -p ../dist
+          cp build/app/outputs/flutter-apk/app-release.apk ../dist/Manabi-android-universal.apk
+          for abi in arm64-v8a armeabi-v7a x86_64; do
+            cp build/app/outputs/flutter-apk/app-$abi-release.apk ../dist/Manabi-android-$abi.apk
+          done
+          cp build/app/outputs/bundle/release/app-release.aab ../dist/Manabi-android.aab
+      - uses: actions/upload-artifact@v4
+        with:
+          name: manabi-android
+          path: dist/
+
+  web:
+    name: Web
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: Build (relative base href so it works under any path, e.g. GitHub Pages)
+        run: flutter build web --release --no-web-resources-cdn --no-wasm-dry-run --base-href "/${{ github.event.repository.name }}/" --dart-define=MANABI_SERVER_URL=${{ env.SERVER_URL }}
+      - name: Collect
+        run: |
+          mkdir -p ../dist
+          cp -r build/web ../dist/web
+          (cd build/web && zip -qr ../../../dist/Manabi-web.zip .)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: manabi-web
+          path: dist/Manabi-web.zip
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist/web
+
+  windows:
+    name: Windows (EXE installer + portable)
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter build windows --release --dart-define=MANABI_SERVER_URL=${{ env.SERVER_URL }}
+      - name: Installer (Inno Setup)
+        shell: pwsh
+        run: |
+          if (-not (Get-Command iscc -ErrorAction SilentlyContinue)) {
+            $default = "${env:ProgramFiles(x86)}\Inno Setup 6"
+            if (-not (Test-Path "$default\ISCC.exe")) { choco install innosetup -y --no-progress }
+            $env:PATH += ";$default"
+          }
+          $version = (Select-String -Path pubspec.yaml -Pattern '^version:\s*([0-9.]+)').Matches[0].Groups[1].Value
+          iscc /DAppVersion=$version /DSourceDir="$PWD\build\windows\x64\runner\Release" /DOutputDir="$PWD\..\dist" ..\installers\windows\manabi.iss
+      - name: Portable zip
+        shell: pwsh
+        run: Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath ..\dist\Manabi-windows-x64-portable.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: manabi-windows
+          path: dist/
+
+  linux:
+    name: Linux (tar.gz)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libstdc++-12-dev libsecret-1-dev libjsoncpp-dev
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter build linux --release --dart-define=MANABI_SERVER_URL=${{ env.SERVER_URL }}
+      - name: Collect
+        run: |
+          mkdir -p ../dist
+          tar -C build/linux/x64/release/bundle -czf ../dist/Manabi-linux-x64.tar.gz .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: manabi-linux
+          path: dist/
+
+  macos:
+    name: macOS (unsigned .app / .dmg)
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter build macos --release --dart-define=MANABI_SERVER_URL=${{ env.SERVER_URL }}
+      - name: Collect
+        run: |
+          mkdir -p ../dist
+          APP=build/macos/Build/Products/Release/Manabi.app
+          ditto -c -k --keepParent "$APP" ../dist/Manabi-macos.zip
+          hdiutil create -volname Manabi -srcfolder "$APP" -ov -format UDZO ../dist/Manabi-macos.dmg
+      - uses: actions/upload-artifact@v4
+        with:
+          name: manabi-macos
+          path: dist/
+
+  ios:
+    name: iOS (unsigned .ipa)
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter build ios --release --no-codesign --dart-define=MANABI_SERVER_URL=${{ env.SERVER_URL }}
+      - name: Package unsigned IPA
+        run: |
+          mkdir -p ../dist Payload
+          cp -R build/ios/iphoneos/Runner.app Payload/
+          zip -qr ../dist/Manabi-ios-unsigned.ipa Payload
+      - uses: actions/upload-artifact@v4
+        with:
+          name: manabi-ios
+          path: dist/
+
+  server:
+    name: Server bundle
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Package
+        run: |
+          mkdir -p dist
+          tar -czf dist/Manabi-server.tar.gz --exclude=node_modules --exclude=test server
+      - uses: actions/upload-artifact@v4
+        with:
+          name: manabi-server
+          path: dist/
+
+  release:
+    name: Publish GitHub Release
+    needs: [android, web, windows, linux, macos, ios, server]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: manabi-*
+          merge-multiple: true
+      - name: Checksums
+        run: |
+          cd artifacts
+          sha256sum * > SHA256SUMS.txt
+          ls -la
+      - name: Release metadata
+        id: meta
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "tag=$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
+            echo "name=Manabi $GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=nightly" >> "$GITHUB_OUTPUT"
+            echo "name=Manabi nightly ($GITHUB_REF_NAME @ ${GITHUB_SHA::7})" >> "$GITHUB_OUTPUT"
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+            # Move the rolling tag to this commit and drop the previous nightly.
+            git tag -f nightly "$GITHUB_SHA"
+            git push -f origin refs/tags/nightly
+            gh release delete nightly --yes 2>/dev/null || true
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: ${{ steps.meta.outputs.name }}
+          prerelease: ${{ steps.meta.outputs.prerelease }}
+          files: artifacts/*
+          body: |
+            Automated build of `${{ github.sha }}` from `${{ github.ref_name }}`.
+
+            | Platform | File |
+            | --- | --- |
+            | Android | `Manabi-android-universal.apk` (or the per-ABI APKs), `Manabi-android.aab` |
+            | Windows | `Manabi-windows-x64-setup.exe` (installer), `Manabi-windows-x64-portable.zip` |
+            | macOS | `Manabi-macos.dmg` / `.zip` (unsigned) |
+            | Linux | `Manabi-linux-x64.tar.gz` |
+            | iOS | `Manabi-ios-unsigned.ipa` (needs re-signing) |
+            | Web | `Manabi-web.zip` |
+            | Server | `Manabi-server.tar.gz` (Node.js 20+, set `GEMINI_API_KYA`) |
+
+            **Signing:** Android files are signed with the release keystore only if the `ANDROID_KEYSTORE_*` secrets are set (otherwise debug-signed, fine for side-loading). iOS and macOS builds are unsigned: installing on iPhone/iPad or distributing through the App Store / notarization requires an Apple Developer account, certificates and provisioning profiles. Windows binaries are not code-signed (SmartScreen may warn).
+
+  pages:
+    name: Deploy web to GitHub Pages
+    needs: web
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4
