@@ -120,7 +120,7 @@ class AnswerMarkdown extends StatelessWidget {
       children: [
         for (final b in blocks)
           Padding(
-            padding: EdgeInsets.only(top: b.kind == BlockKind.heading ? 10 : 0, bottom: b.kind == BlockKind.heading ? 4 : 10),
+            padding: EdgeInsets.only(top: b.kind == BlockKind.heading ? 12 : 0, bottom: b.kind == BlockKind.heading ? 4 : 12),
             child: _block(context, b, base),
           ),
       ],
@@ -130,7 +130,7 @@ class AnswerMarkdown extends StatelessWidget {
   Widget _block(BuildContext context, MdBlock b, TextStyle base) {
     switch (b.kind) {
       case BlockKind.heading:
-        return Text.rich(_spans(context, b.text, base.copyWith(fontWeight: FontWeight.w700, fontSize: base.fontSize! + (b.level <= 2 ? 3 : 1))));
+        return Text.rich(_spans(context, b.text, base.copyWith(fontWeight: FontWeight.w800, fontSize: base.fontSize! + (b.level <= 2 ? 2.5 : 1), height: 1.6)));
       case BlockKind.bullet:
       case BlockKind.numbered:
         return Padding(
@@ -149,27 +149,33 @@ class AnswerMarkdown extends StatelessWidget {
           ]),
         );
       case BlockKind.quote:
-        // Verified Arabic source text: right-to-left, classical font, brand bar.
+        // Verified Arabic source text: right-to-left, classical font, accent rail.
         final arabic = _isArabic(b.text);
+        final a = context.aura;
         return Container(
-          margin: const EdgeInsets.symmetric(vertical: 4),
-          padding: const EdgeInsetsDirectional.fromSTEB(16, 10, 16, 10),
-          decoration: BoxDecoration(
-            color: context.aura.accentTint,
-            borderRadius: BorderRadius.circular(14),
-          ),
+          margin: const EdgeInsets.symmetric(vertical: 6),
+          decoration: BoxDecoration(color: a.accentTint, borderRadius: BorderRadius.circular(16)),
+          clipBehavior: Clip.antiAlias,
           child: Directionality(
             textDirection: arabic ? TextDirection.rtl : Directionality.of(context),
-            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Container(width: 3, height: 26, margin: const EdgeInsetsDirectional.only(end: 12, top: 6), decoration: BoxDecoration(color: context.aura.accent, borderRadius: BorderRadius.circular(3))),
-              Expanded(
-                child: Text.rich(_spans(
-                  context,
-                  b.text,
-                  arabic ? arabicStyle(context, size: (base.fontSize ?? 16) + 2.5, scale: quoteScale) : base.copyWith(fontStyle: FontStyle.italic),
-                )),
-              ),
-            ]),
+            child: IntrinsicHeight(
+              child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                Container(width: 4, color: a.accent.withValues(alpha: 0.75)),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsetsDirectional.fromSTEB(14, 10, 16, 12),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Icon(Icons.format_quote_rounded, size: 18, color: a.accent.withValues(alpha: 0.6)),
+                      Text.rich(_spans(
+                        context,
+                        b.text,
+                        arabic ? arabicStyle(context, size: (base.fontSize ?? 16) + 2.5, scale: quoteScale).copyWith(height: 2.0) : base.copyWith(fontStyle: FontStyle.italic),
+                      )),
+                    ]),
+                  ),
+                ),
+              ]),
+            ),
           ),
         );
       case BlockKind.paragraph:

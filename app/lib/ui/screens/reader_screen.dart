@@ -252,7 +252,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
               ),
             ),
           ),
-          // Bottom bar: page slider and navigation.
+          // Bottom bar: page slider and navigation (chevrons mirror in RTL, so
+          // "previous" on the right points outward to the right).
           Container(
             color: c.bar,
             padding: EdgeInsets.fromLTRB(8, 4, 8, MediaQuery.paddingOf(context).bottom + 6),
@@ -271,7 +272,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                     ),
                   ),
                 Row(children: [
-                  RoundIconButton(icon: Icons.chevron_right_rounded, tooltip: l.previousPage, filled: false, color: c.text, onTap: _page > 1 ? () => _jump(_page - 1) : null),
+                  RoundIconButton(icon: Icons.chevron_left_rounded, tooltip: l.previousPage, filled: false, color: c.text, onTap: _page > 1 ? () => _jump(_page - 1) : null),
                   Expanded(
                     child: Pressable(
                       onTap: _openGoTo,
@@ -283,7 +284,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                     ),
                   ),
                   RoundIconButton(
-                    icon: Icons.chevron_left_rounded,
+                    icon: Icons.chevron_right_rounded,
                     tooltip: l.nextPage,
                     filled: false,
                     color: c.text,

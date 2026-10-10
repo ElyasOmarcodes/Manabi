@@ -4,7 +4,7 @@ import { chromium } from "playwright";
 
 // Usage: node shots.mjs <app-url> <out-dir> [ui|live|<prefix>]
 const [, , url = "http://localhost:8080/", out = "shots", only = "ui"] = process.argv;
-const LIVE = only === "live";
+const LIVE = only === "live" || only.startsWith("live-");
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined, args: ["--no-sandbox"] });
 
 const open = async ({ width, height, lang = "ps", theme = "light", prefs = {} }) => {
@@ -52,7 +52,7 @@ const shot = async (page, name) => {
 
 const run = async (name, fn) => {
   if (name.startsWith("live") !== LIVE) return;
-  if (!LIVE && only !== "ui" && !name.startsWith(only)) return;
+  if (only !== "ui" && only !== "live" && !name.startsWith(only)) return;
   try {
     await fn();
   } catch (e) {
@@ -227,6 +227,36 @@ const ask = async (name, { lang, question, width = 1440, height = 900, theme = "
 
 await ask("live-1-ps", { lang: "ps", question: "د «إنما الأعمال بالنيات» حدیث چا روایت کړی دی؟", done: ["منابع (", "په نیمګړي ډول مستند", "مستند ځواب ونه موندل شو"], sources: "منابع (" });
 await ask("live-2-ar", { lang: "ar", question: "ماذا تقول كتب الفقه في مس الذكر ونقض الوضوء؟", done: ["المصادر (", "موثق جزئيًا", "لم يوجد جواب موثق"], sources: "المصادر (" });
-await ask("live-3-en-phone", { lang: "en", theme: "dark", width: 390, height: 844, question: "What is the meaning of Ihsan in the hadith of Jibril?", done: ["Sources (", "Partly documented", "No documented answer found"], sources: "Sources (" });
+await ask("live-3-en-phone", { lang: "en", theme: "dark", width: 390, height: 844, question: "Who narrated the hadith «إنما الأعمال بالنيات»?", done: ["Sources (", "Partly documented", "No documented answer found"], sources: "Sources (" });
+
+// Library and reader (needs a server: demo-server.mjs offline, or the real one).
+await run("live-4-reader", async () => {
+  const { ctx, page } = await open({ ...phone, prefs: { serverUrl: process.env.MANABI_SERVER_URL ?? "http://localhost:8787", mode: "server" } });
+  await page.waitForTimeout(4000);
+  await semantics(page);
+  // Ask, open the sources, then read the cited page.
+  await tap(page, "د «إنما الأعمال بالنيات» حدیث چا روایت کړی دی؟");
+  await page.waitForTimeout(500);
+  await page.keyboard.press("Enter");
+  await waitForAnswer(page, ["منابع ("]);
+  await page.waitForTimeout(1200);
+  await tap(page, "منابع (");
+  await page.waitForTimeout(1200);
+  await tap(page, "مخ لوستل");
+  await page.waitForTimeout(3000);
+  await shot(page, "live-4-reader");
+  await tap(page, "په کتاب کې لټون");
+  await page.waitForTimeout(800);
+  await page.keyboard.type("النيات");
+  await page.keyboard.press("Enter");
+  await page.waitForTimeout(2500);
+  await shot(page, "live-4-reader-search");
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(600);
+  await tap(page, "فهرست", { exact: true });
+  await page.waitForTimeout(900);
+  await shot(page, "live-4-reader-toc");
+  await ctx.close();
+});
 
 await browser.close();
