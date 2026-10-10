@@ -177,6 +177,7 @@ const waitForAnswer = async (page, labels, timeout = 240_000) => {
   throw new Error("answer did not arrive");
 };
 
+// A documented answer shows its "Sources (n)" button; other outcomes show a status pill.
 // Real end-to-end answers: the app talks to a Manabi server that has the
 // Gemini key and reaches Turath. Nothing here is mocked.
 const ask = async (name, { lang, question, width = 1440, height = 900, theme = "light", done, sources }) => {
@@ -208,8 +209,8 @@ const ask = async (name, { lang, question, width = 1440, height = 900, theme = "
   });
 };
 
-await ask("live-1-ps", { lang: "ps", question: "د «إنما الأعمال بالنيات» حدیث چا روایت کړی دی؟", done: ["مستند ځواب", "په نیمګړي ډول مستند", "مستند ځواب ونه موندل شو"], sources: "منابع" });
-await ask("live-2-ar", { lang: "ar", question: "ماذا تقول كتب الفقه في مس الذكر ونقض الوضوء؟", done: ["جواب موثق", "موثق جزئيًا", "لم يوجد جواب موثق"] });
-await ask("live-3-en-phone", { lang: "en", theme: "dark", width: 390, height: 844, question: "What is the meaning of Ihsan in the hadith of Jibril?", done: ["Documented answer", "Partly documented", "No documented answer found"], sources: "Sources" });
+await ask("live-1-ps", { lang: "ps", question: "د «إنما الأعمال بالنيات» حدیث چا روایت کړی دی؟", done: ["منابع (", "په نیمګړي ډول مستند", "مستند ځواب ونه موندل شو"], sources: "منابع (" });
+await ask("live-2-ar", { lang: "ar", question: "ماذا تقول كتب الفقه في مس الذكر ونقض الوضوء؟", done: ["المصادر (", "موثق جزئيًا", "لم يوجد جواب موثق"], sources: "المصادر (" });
+await ask("live-3-en-phone", { lang: "en", theme: "dark", width: 390, height: 844, question: "What is the meaning of Ihsan in the hadith of Jibril?", done: ["Sources (", "Partly documented", "No documented answer found"], sources: "Sources (" });
 
 await browser.close();
