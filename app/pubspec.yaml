@@ -59,13 +59,13 @@ flutter_launcher_icons:
   android: true
   ios: true
   remove_alpha_ios: true
-  adaptive_icon_background: "#0E3B36"
+  adaptive_icon_background: "#5B6CFF"
   adaptive_icon_foreground: assets/images/icon_foreground.png
   web:
     generate: true
     image_path: assets/images/icon.png
-    background_color: "#0E3B36"
-    theme_color: "#0E3B36"
+    background_color: "#F6F7FC"
+    theme_color: "#7357FF"
   windows:
     generate: true
     image_path: assets/images/icon.png
@@ -75,12 +75,12 @@ flutter_launcher_icons:
     image_path: assets/images/icon.png
 
 flutter_native_splash:
-  color: "#F6F3EC"
+  color: "#F6F7FC"
   image: assets/images/splash_logo.png
-  color_dark: "#0B1513"
+  color_dark: "#070811"
   image_dark: assets/images/splash_logo.png
   android_12:
-    color: "#F6F3EC"
-    color_dark: "#0B1513"
+    color: "#F6F7FC"
+    color_dark: "#070811"
     image: assets/images/splash_logo.png
   web: true

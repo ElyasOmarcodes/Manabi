@@ -21,8 +21,8 @@ const _contentWidth = 483.0; // A4 width (595) minus 2 × 56pt margins
 const _scale = 3.0;
 const _ink = Color(0xFF1B2724);
 const _muted = Color(0xFF5C6B66);
-const _emerald = Color(0xFF0F5C52);
-const _gold = Color(0xFFB08A3E);
+const _emerald = Color(0xFF6650F5); // Aura violet
+const _gold = Color(0xFF3B82F6); // Aura blue
 
 class _Painter {
   _Painter(this.rtl);
@@ -96,7 +96,7 @@ Future<Uint8List> buildPdf({required String title, required List<ChatTurn> turns
   body.add(await p.text(TextSpan(text: title, style: _ui(19, weight: FontWeight.w700, color: _emerald))));
   body.add(await p.text(TextSpan(text: '${l.appName} · ${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}', style: _ui(9, color: _muted))));
   body.add(pw.SizedBox(height: 10));
-  body.add(pw.Divider(color: PdfColor.fromInt(0xFFE2DCCD), thickness: 0.8));
+  body.add(pw.Divider(color: PdfColor.fromInt(0xFFE5E8F3), thickness: 0.8));
 
   for (final t in turns) {
     final r = t.result;
@@ -139,7 +139,7 @@ Future<Uint8List> buildPdf({required String title, required List<ChatTurn> turns
       }
     }
     body.add(pw.SizedBox(height: 8));
-    body.add(pw.Divider(color: PdfColor.fromInt(0xFFE2DCCD), thickness: 0.6));
+    body.add(pw.Divider(color: PdfColor.fromInt(0xFFE5E8F3), thickness: 0.6));
   }
   body.add(await p.text(TextSpan(text: '${l.generatedBy}. ${l.disclaimer}', style: _ui(8.5, color: _muted))));
 
@@ -178,15 +178,15 @@ Future<pw.Widget> _source(_Painter p, AnswerSource s, AppLocalizations l) async 
       margin: const pw.EdgeInsets.only(top: 3, bottom: 3),
       padding: const pw.EdgeInsets.fromLTRB(8, 4, 8, 4),
       decoration: pw.BoxDecoration(
-        color: PdfColor.fromInt(0xFFFAF5E8),
-        border: pw.Border(right: pw.BorderSide(color: PdfColor.fromInt(0xFFB08A3E), width: 2)),
+        color: PdfColor.fromInt(0xFFF1EEFF),
+        border: pw.Border(right: pw.BorderSide(color: PdfColor.fromInt(0xFF7357FF), width: 2)),
       ),
       child: await p.text(TextSpan(text: q.text, style: _arabic(12.5)), rtlOverride: true, indent: 16),
     ));
   }
   children.add(pw.UrlLink(
     destination: s.url,
-    child: pw.Text(s.url, style: pw.TextStyle(fontSize: 8.5, color: PdfColor.fromInt(0xFF0F5C52), decoration: pw.TextDecoration.underline)),
+    child: pw.Text(s.url, style: pw.TextStyle(fontSize: 8.5, color: PdfColor.fromInt(0xFF3B82F6), decoration: pw.TextDecoration.underline)),
   ));
   return pw.Padding(
     padding: const pw.EdgeInsets.only(bottom: 8),

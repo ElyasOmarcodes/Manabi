@@ -103,7 +103,7 @@ void main() {
       addTearDown(tester.view.reset);
       final s = await tester.runAsync(services);
       await tester.pumpWidget(ManabiApp(services: Future.value(s)));
-      await tester.pumpAndSettle();
+      await tester.pump(const Duration(seconds: 2));
       expect(find.text('Assalamu alaikum'), findsOneWidget);
       expect(find.text('Set up a connection'), findsOneWidget);
       // Asking without a server configured fails gracefully with a setup hint.
@@ -111,14 +111,14 @@ void main() {
       await tester.pump();
       await tester.tap(find.byTooltip('Send'));
       await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 300)));
-      await tester.pumpAndSettle();
+      await tester.pump(const Duration(seconds: 1));
       expect(find.text('No Manabi server is set. Add the server address in Settings.'), findsOneWidget);
       // Library tab shows the offline catalog.
       await tester.tap(find.text('Library').first);
-      await tester.pumpAndSettle();
+      await tester.pump(const Duration(seconds: 1));
       expect(find.text('Books'), findsWidgets);
       await tester.tap(find.text('Settings').first);
-      await tester.pumpAndSettle();
+      await tester.pump(const Duration(seconds: 1));
       expect(find.text('Test connection'), findsOneWidget);
     });
 
@@ -130,14 +130,11 @@ void main() {
         SharedPreferences.setMockInitialValues({'uiLanguage': lang, 'themeMode': 'dark', 'mode': 'server', 'serverUrl': ''});
         final s = await tester.runAsync(services);
         await tester.pumpWidget(ManabiApp(services: Future.value(s)));
-        await tester.pumpAndSettle();
-        expect(find.byType(NavigationBar), findsOneWidget);
-        for (var i = 1; i < 5; i++) {
-          await tester.tap(find.byType(NavigationDestination).at(i));
-          await tester.pumpAndSettle();
+        await tester.pump(const Duration(seconds: 2));
+        for (final icon in [Icons.auto_stories_outlined, Icons.bookmark_outline_rounded, Icons.history_rounded, Icons.tune_rounded, Icons.chat_bubble_outline_rounded]) {
+          await tester.tap(find.byIcon(icon).last);
+          await tester.pump(const Duration(milliseconds: 600));
         }
-        await tester.tap(find.byType(NavigationDestination).at(0));
-        await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
       });
     }

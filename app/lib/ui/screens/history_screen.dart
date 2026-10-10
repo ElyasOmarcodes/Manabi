@@ -8,7 +8,6 @@ import '../../state/chat_controller.dart';
 import '../home_shell.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
-import 'saved_screen.dart';
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
@@ -23,49 +22,76 @@ class _HistoryScreenState extends State<HistoryScreen> {
   Widget build(BuildContext context) {
     final items = context.watch<ChatController>().searchHistory(_q);
     final l = context.l;
-    final fmt = DateFormat.yMMMd(Localizations.localeOf(context).toLanguageTag()).add_Hm();
+    final a = context.aura;
+    final locale = Localizations.localeOf(context).toLanguageTag();
+    final day = DateFormat.yMMMMd(locale);
+    final time = DateFormat.Hm(locale);
+
+    // Group by calendar day for a timeline look.
+    final groups = <String, List<(Chat, ChatTurn)>>{};
+    for (final it in items) {
+      groups.putIfAbsent(day.format(it.$2.askedAt), () => []).add(it);
+    }
+
     return SafeArea(
       bottom: false,
       child: Column(children: [
-        ScreenHeader(icon: Icons.history_rounded, title: l.history),
+        ReadingWidth(child: PageHeader(title: l.history, subtitle: l.searchHistory, icon: Icons.history_rounded, color: AuraHues.amber)),
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-          child: ReadingWidth(
-            child: TextField(
-              onChanged: (v) => setState(() => _q = v),
-              decoration: InputDecoration(hintText: l.searchHistory, prefixIcon: const Icon(Icons.search_rounded)),
-            ),
-          ),
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+          child: ReadingWidth(child: AuraSearchField(hint: l.searchHistory, onChanged: (v) => setState(() => _q = v))),
         ),
         Expanded(
           child: items.isEmpty
-              ? EmptyState(icon: Icons.history_toggle_off_rounded, text: _q.isEmpty ? l.noHistory : l.noResults)
-              : ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
-                  itemCount: items.length,
-                  itemBuilder: (context, i) {
-                    final (Chat chat, ChatTurn turn) = items[i];
-                    final status = turn.result?.status;
-                    return ReadingWidth(
-                      child: ListTile(
-                        leading: Icon(
-                          turn.state == MessageState.failed
-                              ? Icons.error_outline_rounded
-                              : status == AnswerStatus.insufficient
-                                  ? Icons.search_off_rounded
-                                  : Icons.verified_outlined,
-                          color: turn.state == MessageState.failed ? context.cs.error : status == AnswerStatus.insufficient ? context.cs.onSurfaceVariant : context.mc.success,
+              ? EmptyState(icon: Icons.history_toggle_off_rounded, text: _q.isEmpty ? l.noHistory : l.noResults, color: AuraHues.amber)
+              : ListView(padding: EdgeInsets.fromLTRB(16, 4, 16, MediaQuery.paddingOf(context).bottom + 24), children: [
+                  for (final e in groups.entries)
+                    ReadingWidth(
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                        SectionLabel(e.key),
+                        AuraCard(
+                          padding: const EdgeInsets.symmetric(vertical: 6),
+                          child: Column(children: [
+                            for (final (chat, turn) in e.value)
+                              InkWell(
+                                onTap: () => openChat(context, chat.id),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                  child: Row(children: [
+                                    _StatusDot(turn: turn),
+                                    const SizedBox(width: 14),
+                                    Expanded(
+                                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                        Text(turn.question, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontFamily: uiFont, fontWeight: FontWeight.w600, color: a.text, height: 1.5)),
+                                        Text('${time.format(turn.askedAt)} · ${chat.title}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontFamily: uiFont, fontSize: 12, color: a.faint)),
+                                      ]),
+                                    ),
+                                    if (turn.favorite) const Icon(Icons.bookmark_rounded, color: AuraHues.pink, size: 19),
+                                  ]),
+                                ),
+                              ),
+                          ]),
                         ),
-                        title: Text(turn.question, maxLines: 2, overflow: TextOverflow.ellipsis),
-                        subtitle: Text('${fmt.format(turn.askedAt)} · ${chat.title}', maxLines: 1, overflow: TextOverflow.ellipsis),
-                        trailing: turn.favorite ? Icon(Icons.bookmark_rounded, color: context.mc.gold, size: 20) : null,
-                        onTap: () => openChat(context, chat.id),
-                      ),
-                    );
-                  },
-                ),
+                      ]),
+                    ),
+                ]),
         ),
       ]),
     );
+  }
+}
+
+class _StatusDot extends StatelessWidget {
+  const _StatusDot({required this.turn});
+  final ChatTurn turn;
+  @override
+  Widget build(BuildContext context) {
+    final a = context.aura;
+    final (icon, color) = turn.state == MessageState.failed
+        ? (Icons.priority_high_rounded, a.danger)
+        : turn.result?.status == AnswerStatus.insufficient
+            ? (Icons.search_off_rounded, a.muted)
+            : (Icons.check_rounded, a.success);
+    return IconTile(icon: icon, color: color, size: 36);
   }
 }

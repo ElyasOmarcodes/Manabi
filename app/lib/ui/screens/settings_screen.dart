@@ -7,10 +7,9 @@ import '../../core/catalog/catalog_service.dart';
 import '../../state/chat_controller.dart';
 import '../../state/settings_controller.dart';
 import '../theme.dart';
-import '../widgets/chat_list.dart';
+import '../widgets/chat_list.dart' show confirmDialog;
 import '../widgets/common.dart';
 import 'chat_screen.dart' show languageLabels;
-import 'saved_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -19,77 +18,143 @@ class SettingsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = context.watch<SettingsController>();
     final l = context.l;
+    final a = context.aura;
     final labels = languageLabels(l);
     return SafeArea(
       bottom: false,
-      child: ListView(padding: const EdgeInsets.fromLTRB(16, 0, 16, 40), children: [
+      child: ListView(padding: EdgeInsets.fromLTRB(16, 0, 16, MediaQuery.paddingOf(context).bottom + 30), children: [
         ReadingWidth(
           maxWidth: 760,
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            ScreenHeader(icon: Icons.tune_rounded, title: l.settings),
-            SectionTitle(l.appearance),
-            SoftCard(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                Text(l.theme, style: const TextStyle(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 10),
-                SegmentedButton<ThemeMode>(
-                  segments: [
-                    ButtonSegment(value: ThemeMode.system, icon: const Icon(Icons.brightness_auto_outlined), label: Text(l.themeSystem)),
-                    ButtonSegment(value: ThemeMode.light, icon: const Icon(Icons.light_mode_outlined), label: Text(l.themeLight)),
-                    ButtonSegment(value: ThemeMode.dark, icon: const Icon(Icons.dark_mode_outlined), label: Text(l.themeDark)),
-                  ],
-                  selected: {s.themeMode},
-                  onSelectionChanged: (v) => s.setThemeMode(v.first),
+            PageHeader(title: l.settings, subtitle: l.appName, icon: Icons.tune_rounded, color: AuraHues.mint),
+            SectionLabel(l.theme),
+            Row(children: [
+              for (final (mode, label, icon) in [
+                (ThemeMode.system, l.themeSystem, Icons.brightness_auto_rounded),
+                (ThemeMode.light, l.themeLight, Icons.light_mode_rounded),
+                (ThemeMode.dark, l.themeDark, Icons.dark_mode_rounded),
+              ])
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 5),
+                    child: _ThemeCard(mode: mode, label: label, icon: icon, selected: s.themeMode == mode, onTap: () => s.setThemeMode(mode)),
+                  ),
                 ),
-                const SizedBox(height: 18),
-                Text(l.interfaceLanguage, style: const TextStyle(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 10),
-                Wrap(spacing: 8, runSpacing: 8, children: [
-                  for (final code in supportedUiLanguages)
-                    ChoiceChip(label: Text(labels[code]!), selected: s.uiLanguage == code, onSelected: (_) => s.setUiLanguage(code)),
+            ]),
+            SectionLabel(l.interfaceLanguage),
+            Wrap(spacing: 8, runSpacing: 8, children: [
+              for (final code in supportedUiLanguages) AuraChip(label: labels[code]!, selected: s.uiLanguage == code, onTap: () => s.setUiLanguage(code)),
+            ]),
+            SectionLabel(l.answers),
+            AuraCard(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                Row(children: [
+                  const IconTile(icon: Icons.translate_rounded, color: AuraHues.orange),
+                  const SizedBox(width: 12),
+                  Expanded(child: Text(l.defaultAnswerLanguage, style: TextStyle(fontFamily: uiFont, fontWeight: FontWeight.w700, color: a.text))),
                 ]),
-                const SizedBox(height: 18),
-                Text(l.arabicTextSize, style: const TextStyle(fontWeight: FontWeight.w600)),
-                Slider(value: s.arabicScale, min: 0.85, max: 1.5, divisions: 13, label: '${(s.arabicScale * 100).round()}%', onChanged: s.setArabicScale),
-                Directionality(
-                  textDirection: TextDirection.rtl,
-                  child: Text('إِنَّمَا الْأَعْمَالُ بِالنِّيَّاتِ', textAlign: TextAlign.center, style: arabicStyle(context, size: 19, scale: s.arabicScale)),
+                const SizedBox(height: 12),
+                Wrap(spacing: 8, runSpacing: 8, children: [
+                  for (final e in labels.entries) AuraChip(label: e.value, selected: s.answerLanguage == e.key, onTap: () => s.setAnswerLanguage(e.key)),
+                ]),
+                const SizedBox(height: 20),
+                Row(children: [
+                  const IconTile(icon: Icons.library_books_rounded, color: AuraHues.blue),
+                  const SizedBox(width: 12),
+                  Expanded(child: Text(l.maxSources, style: TextStyle(fontFamily: uiFont, fontWeight: FontWeight.w700, color: a.text))),
+                  GradientText('${s.maxSources}', style: const TextStyle(fontFamily: uiFont, fontSize: 20, fontWeight: FontWeight.w800)),
+                ]),
+                Slider(value: s.maxSources.toDouble(), min: 4, max: 16, divisions: 12, onChanged: (v) => s.setMaxSources(v.round())),
+                Row(children: [
+                  const IconTile(icon: Icons.text_fields_rounded, color: AuraHues.violet),
+                  const SizedBox(width: 12),
+                  Expanded(child: Text(l.arabicTextSize, style: TextStyle(fontFamily: uiFont, fontWeight: FontWeight.w700, color: a.text))),
+                  Text('${(s.arabicScale * 100).round()}%', style: TextStyle(fontFamily: uiFont, fontWeight: FontWeight.w700, color: a.accent)),
+                ]),
+                Slider(value: s.arabicScale, min: 0.85, max: 1.5, divisions: 13, onChanged: s.setArabicScale),
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  decoration: BoxDecoration(gradient: a.soft, borderRadius: BorderRadius.circular(18)),
+                  child: Text('إِنَّمَا الْأَعْمَالُ بِالنِّيَّاتِ', textAlign: TextAlign.center, textDirection: TextDirection.rtl, style: arabicStyle(context, size: 19, scale: s.arabicScale)),
                 ),
               ]),
             ),
-            SectionTitle(l.answers),
-            SoftCard(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                Text(l.defaultAnswerLanguage, style: const TextStyle(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 10),
-                Wrap(spacing: 8, runSpacing: 8, children: [
-                  for (final e in labels.entries) ChoiceChip(label: Text(e.value), selected: s.answerLanguage == e.key, onSelected: (_) => s.setAnswerLanguage(e.key)),
-                ]),
-                const SizedBox(height: 18),
-                Text('${l.maxSources}: ${s.maxSources}', style: const TextStyle(fontWeight: FontWeight.w600)),
-                Slider(value: s.maxSources.toDouble(), min: 4, max: 16, divisions: 12, label: '${s.maxSources}', onChanged: (v) => s.setMaxSources(v.round())),
-              ]),
-            ),
-            SectionTitle(l.connection),
+            SectionLabel(l.connection),
             const _ConnectionCard(),
-            SectionTitle(l.data),
-            SoftCard(
-              padding: const EdgeInsets.symmetric(vertical: 6),
-              child: ListTile(
-                leading: Icon(Icons.delete_sweep_outlined, color: context.cs.error),
-                title: Text(l.clearHistory),
+            SectionLabel(l.data),
+            TileGroup(children: [
+              AuraTile(
+                icon: Icons.delete_sweep_rounded,
+                color: AuraHues.rose,
+                title: l.clearHistory,
+                titleStyle: TextStyle(fontFamily: uiFont, fontSize: 15, fontWeight: FontWeight.w600, color: a.danger),
                 onTap: () async {
                   if (await confirmDialog(context, l.clearHistoryConfirm) && context.mounted) {
                     await context.read<ChatController>().clearAll();
                   }
                 },
               ),
-            ),
-            SectionTitle(l.about),
+            ]),
+            SectionLabel(l.about),
             const _AboutCard(),
           ]),
         ),
       ]),
+    );
+  }
+}
+
+/// Mini mock-up preview of a theme.
+class _ThemeCard extends StatelessWidget {
+  const _ThemeCard({required this.mode, required this.label, required this.icon, required this.selected, required this.onTap});
+  final ThemeMode mode;
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final a = context.aura;
+    Widget mock(Aura t) => Container(
+          decoration: BoxDecoration(color: t.bg, borderRadius: BorderRadius.circular(12)),
+          padding: const EdgeInsets.all(8),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+            Container(height: 10, width: 46, decoration: BoxDecoration(gradient: a.brand, borderRadius: BorderRadius.circular(6))),
+            const SizedBox(height: 6),
+            Container(height: 22, decoration: BoxDecoration(color: t.surface, borderRadius: BorderRadius.circular(7), border: Border.all(color: t.border))),
+            const SizedBox(height: 6),
+            Container(height: 8, width: 60, decoration: BoxDecoration(color: t.border, borderRadius: BorderRadius.circular(4))),
+          ]),
+        );
+    return Pressable(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 260),
+        padding: const EdgeInsets.all(2),
+        decoration: BoxDecoration(borderRadius: BorderRadius.circular(24), gradient: selected ? a.brand : LinearGradient(colors: [a.border, a.border])),
+        child: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(color: a.surface, borderRadius: BorderRadius.circular(22)),
+          child: Column(children: [
+            SizedBox(
+              height: 74,
+              child: mode == ThemeMode.system
+                  ? ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Row(children: [Expanded(child: mock(Aura.light)), Expanded(child: mock(Aura.night))]),
+                    )
+                  : mock(mode == ThemeMode.dark ? Aura.night : Aura.light),
+            ),
+            const SizedBox(height: 10),
+            Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+              Icon(icon, size: 16, color: selected ? a.accent : a.muted),
+              const SizedBox(width: 6),
+              Flexible(child: Text(label, overflow: TextOverflow.ellipsis, style: TextStyle(fontFamily: uiFont, fontWeight: FontWeight.w700, fontSize: 13, color: selected ? a.accent : a.text))),
+            ]),
+          ]),
+        ),
+      ),
     );
   }
 }
@@ -154,80 +219,81 @@ class _ConnectionCardState extends State<_ConnectionCard> {
     }
   }
 
+  Widget _field(TextEditingController c, String label, IconData icon, Color color, {bool obscure = false, String? helper, Widget? suffix, String? hint}) => Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: TextField(
+          controller: c,
+          obscureText: obscure,
+          autocorrect: false,
+          enableSuggestions: false,
+          textDirection: TextDirection.ltr,
+          onSubmitted: (_) => _save(),
+          style: const TextStyle(fontFamily: uiFont),
+          decoration: InputDecoration(
+            labelText: label,
+            hintText: hint,
+            helperText: helper,
+            prefixIcon: Padding(padding: const EdgeInsets.all(8), child: IconTile(icon: icon, color: color, size: 32)),
+            suffixIcon: suffix,
+          ),
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
     final s = context.watch<SettingsController>();
     final l = context.l;
+    final a = context.aura;
     final server = s.mode == ConnectionMode.server;
-    return SoftCard(
+    return AuraCard(
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        SegmentedButton<ConnectionMode>(
-          segments: [
-            ButtonSegment(value: ConnectionMode.server, icon: const Icon(Icons.dns_outlined), label: Text(l.modeServer)),
-            ButtonSegment(value: ConnectionMode.direct, icon: const Icon(Icons.key_outlined), label: Text(l.modeDirect), enabled: s.directAvailable),
-          ],
-          selected: {s.mode},
-          onSelectionChanged: (v) {
-            s.setMode(v.first);
+        SegmentedPills<ConnectionMode>(
+          values: const [ConnectionMode.server, ConnectionMode.direct],
+          labels: [l.modeServer, l.modeDirect],
+          icons: const [Icons.dns_rounded, Icons.key_rounded],
+          enabled: [true, s.directAvailable],
+          value: s.mode,
+          onChanged: (v) {
+            s.setMode(v);
             setState(() => _result = null);
           },
         ),
-        const SizedBox(height: 10),
-        Text(server ? l.modeServerInfo : l.modeDirectInfo, style: context.tt.bodySmall?.copyWith(color: context.cs.onSurfaceVariant)),
-        const SizedBox(height: 14),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(gradient: a.soft, borderRadius: BorderRadius.circular(16)),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Icon(server ? Icons.shield_rounded : Icons.lock_rounded, size: 18, color: a.accent),
+            const SizedBox(width: 8),
+            Expanded(child: Text(server ? l.modeServerInfo : l.modeDirectInfo, style: TextStyle(fontFamily: uiFont, fontSize: 12.5, color: a.muted, height: 1.6))),
+          ]),
+        ),
+        const SizedBox(height: 16),
         if (server) ...[
-          TextField(
-            controller: _url,
-            keyboardType: TextInputType.url,
-            textDirection: TextDirection.ltr,
-            decoration: InputDecoration(labelText: l.serverUrl, hintText: 'https://manabi.example.org', prefixIcon: const Icon(Icons.link_rounded)),
-            onSubmitted: (_) => _save(),
-          ),
-          const SizedBox(height: 10),
-          TextField(
-            controller: _token,
-            obscureText: true,
-            textDirection: TextDirection.ltr,
-            decoration: InputDecoration(labelText: l.accessToken, prefixIcon: const Icon(Icons.vpn_key_outlined)),
-            onSubmitted: (_) => _save(),
-          ),
+          _field(_url, l.serverUrl, Icons.link_rounded, AuraHues.blue, hint: 'https://manabi.example.org'),
+          _field(_token, l.accessToken, Icons.vpn_key_rounded, AuraHues.amber, obscure: true),
         ] else ...[
-          TextField(
-            controller: _key,
-            obscureText: !_showKey,
-            textDirection: TextDirection.ltr,
-            autocorrect: false,
-            enableSuggestions: false,
-            decoration: InputDecoration(
-              labelText: l.geminiKey,
-              helperText: l.geminiKeyHint,
-              prefixIcon: const Icon(Icons.key_rounded),
-              suffixIcon: IconButton(icon: Icon(_showKey ? Icons.visibility_off_outlined : Icons.visibility_outlined), onPressed: () => setState(() => _showKey = !_showKey)),
-            ),
-            onSubmitted: (_) => _save(),
-          ),
-          const SizedBox(height: 10),
-          TextField(
-            controller: _model,
-            textDirection: TextDirection.ltr,
-            decoration: InputDecoration(labelText: l.modelOverride, helperText: l.modelOverrideHint, prefixIcon: const Icon(Icons.memory_rounded)),
-            onSubmitted: (_) => _save(),
-          ),
+          _field(_key, l.geminiKey, Icons.key_rounded, AuraHues.violet,
+              obscure: !_showKey,
+              helper: l.geminiKeyHint,
+              suffix: IconButton(icon: Icon(_showKey ? Icons.visibility_off_rounded : Icons.visibility_rounded, color: a.muted), onPressed: () => setState(() => _showKey = !_showKey))),
+          _field(_model, l.modelOverride, Icons.memory_rounded, AuraHues.cyan, helper: l.modelOverrideHint),
         ],
-        const SizedBox(height: 14),
         Row(children: [
-          FilledButton.icon(
-            onPressed: _testing ? null : _test,
-            icon: _testing ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.wifi_tethering_rounded),
-            label: Text(l.testConnection),
+          GradientButton(
+            onTap: _testing ? null : _test,
+            icon: Icons.bolt_rounded,
+            label: l.testConnection,
+            height: 46,
           ),
           const SizedBox(width: 12),
+          if (_testing) const TypingDots(),
           if (_result != null)
             Expanded(
               child: Row(children: [
-                Icon(_ok ? Icons.check_circle_rounded : Icons.error_outline_rounded, size: 18, color: _ok ? context.mc.success : context.cs.error),
+                Icon(_ok ? Icons.check_circle_rounded : Icons.error_rounded, size: 18, color: _ok ? a.success : a.danger),
                 const SizedBox(width: 6),
-                Expanded(child: Text(_result!, style: TextStyle(color: _ok ? context.mc.success : context.cs.error))),
+                Expanded(child: Text(_result!, style: TextStyle(fontFamily: uiFont, fontSize: 13, color: _ok ? a.success : a.danger))),
               ]),
             ),
         ]),
@@ -241,34 +307,36 @@ class _AboutCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = context.l;
+    final a = context.aura;
     final catalog = context.read<CatalogService>();
-    return SoftCard(
+    return AuraCard(
+      gradientBorder: true,
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Row(children: [
-          const ManabiLogo(size: 48),
+          const ManabiMark(size: 54),
           const SizedBox(width: 14),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(l.appName, style: context.tt.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+              GradientText(l.appName, style: const TextStyle(fontFamily: uiFont, fontSize: 22, fontWeight: FontWeight.w800, height: 1.3)),
               FutureBuilder<PackageInfo>(
                 future: PackageInfo.fromPlatform(),
-                builder: (context, snap) => Text(l.version(snap.data?.version ?? '…'), style: context.tt.labelSmall),
+                builder: (context, snap) => Text(l.version(snap.data?.version ?? '…'), style: TextStyle(fontFamily: uiFont, fontSize: 12, color: a.muted)),
               ),
             ]),
           ),
         ]),
-        const SizedBox(height: 12),
-        Text(l.aboutBody, style: context.tt.bodyMedium),
-        const SizedBox(height: 8),
-        Text(l.catalogInfo(catalog.books.length, catalog.authors.length, catalog.scannedAt), style: context.tt.labelSmall?.copyWith(color: context.cs.onSurfaceVariant)),
-        const SizedBox(height: 8),
-        Wrap(spacing: 4, children: [
-          TextButton.icon(onPressed: () => openUrl('https://app.turath.io'), icon: const Icon(Icons.public_rounded, size: 18), label: const Text('turath.io')),
-          TextButton.icon(onPressed: () => openUrl('https://github.com/mwijanarko1/nusus'), icon: const Icon(Icons.code_rounded, size: 18), label: const Text('Nusus SDK')),
-          TextButton.icon(onPressed: () => openUrl('https://github.com/ElyasOmarcodes/Manabi'), icon: const Icon(Icons.source_outlined, size: 18), label: const Text('GitHub')),
+        const SizedBox(height: 14),
+        Text(l.aboutBody, style: TextStyle(fontFamily: uiFont, fontSize: 14, height: 1.8, color: a.text)),
+        const SizedBox(height: 10),
+        StatusBadge(icon: Icons.inventory_2_rounded, color: AuraHues.cyan, label: l.catalogInfo(catalog.books.length, catalog.authors.length, catalog.scannedAt)),
+        const SizedBox(height: 14),
+        Wrap(spacing: 8, runSpacing: 8, children: [
+          SoftButton(dense: true, icon: Icons.public_rounded, label: 'turath.io', color: AuraHues.blue, onTap: () => openUrl('https://app.turath.io')),
+          SoftButton(dense: true, icon: Icons.code_rounded, label: 'Nusus SDK', color: AuraHues.violet, onTap: () => openUrl('https://github.com/mwijanarko1/nusus')),
+          SoftButton(dense: true, icon: Icons.source_rounded, label: 'GitHub', color: AuraHues.pink, onTap: () => openUrl('https://github.com/ElyasOmarcodes/Manabi')),
         ]),
-        const SizedBox(height: 6),
-        Text(l.disclaimer, style: context.tt.labelSmall?.copyWith(color: context.cs.onSurfaceVariant)),
+        const SizedBox(height: 12),
+        Text(l.disclaimer, style: TextStyle(fontFamily: uiFont, fontSize: 12, color: a.faint, height: 1.6)),
       ]),
     );
   }

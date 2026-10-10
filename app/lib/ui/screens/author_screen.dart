@@ -11,8 +11,7 @@ import '../widgets/common.dart';
 import '../widgets/scope_picker.dart';
 import 'book_screen.dart';
 
-void openAuthor(BuildContext context, String id) =>
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => AuthorScreen(authorId: id)));
+void openAuthor(BuildContext context, String id) => Navigator.of(context).push(MaterialPageRoute(builder: (_) => AuthorScreen(authorId: id)));
 
 class AuthorScreen extends StatefulWidget {
   const AuthorScreen({super.key, required this.authorId});
@@ -30,49 +29,61 @@ class _AuthorScreenState extends State<AuthorScreen> {
     final entry = catalog.author(widget.authorId);
     final books = catalog.booksByAuthor(widget.authorId);
     final l = context.l;
-    return Scaffold(
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
+    final a = context.aura;
+    final seed = int.tryParse(widget.authorId) ?? 0;
+    final name = entry?.name ?? l.author;
+    return AuraPage(
+      floating: GradientButton(
+        icon: Icons.auto_awesome_rounded,
+        label: l.askThisAuthor,
+        onTap: () {
           context.read<NavController>().askWithin(SearchScope.all.withAuthor(widget.authorId, entry?.name));
           Navigator.of(context).popUntil((r) => r.isFirst);
         },
-        icon: const Icon(Icons.chat_bubble_outline_rounded),
-        label: Text(l.askThisAuthor),
       ),
-      body: AmbientBackground(
-        child: CustomScrollView(slivers: [
-          SliverAppBar.large(title: Text(entry?.name ?? l.author, style: arabicStyle(context, size: 22, weight: FontWeight.w700).copyWith(height: 1.4))),
-          SliverToBoxAdapter(
-            child: ReadingWidth(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: FutureBuilder<AuthorDetails>(
-                  future: _future,
-                  builder: (context, snap) {
-                    if (snap.connectionState != ConnectionState.done) return const Padding(padding: EdgeInsets.all(24), child: Center(child: TypingDots()));
-                    final bio = snap.data?.biography?.trim();
-                    if (bio == null || bio.isEmpty) return const SizedBox.shrink();
-                    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                      SectionTitle(l.biography),
-                      SoftCard(child: _ExpandableText(bio)),
-                    ]);
-                  },
+      body: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 120), children: [
+        ReadingWidth(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Reveal(
+              child: Column(children: [
+                Container(
+                  width: 104,
+                  height: 104,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(colors: [AuraHues.at(seed), AuraHues.at(seed + 2)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+                    boxShadow: [BoxShadow(color: AuraHues.at(seed).withValues(alpha: 0.4), blurRadius: 30, offset: const Offset(0, 12), spreadRadius: -8)],
+                  ),
+                  child: Text(name.characters.first, style: const TextStyle(fontFamily: arabicFont, fontSize: 46, color: Colors.white, fontWeight: FontWeight.w700, height: 1.3)),
                 ),
-              ),
+                const SizedBox(height: 14),
+                Text(name, textAlign: TextAlign.center, style: arabicStyle(context, size: 26, weight: FontWeight.w700).copyWith(height: 1.5)),
+                const SizedBox(height: 6),
+                StatusBadge(label: l.booksCount(books.length), color: AuraHues.blue, icon: Icons.auto_stories_rounded),
+              ]),
             ),
-          ),
-          SliverToBoxAdapter(
-            child: ReadingWidth(
-              child: Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: SectionTitle('${l.authorBooks} · ${l.booksCount(books.length)}')),
+            FutureBuilder<AuthorDetails>(
+              future: _future,
+              builder: (context, snap) {
+                if (snap.connectionState != ConnectionState.done) return const Padding(padding: EdgeInsets.all(28), child: Center(child: TypingDots()));
+                final bio = snap.data?.biography?.trim();
+                if (bio == null || bio.isEmpty) return const SizedBox(height: 8);
+                return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                  SectionLabel(l.biography),
+                  Reveal(child: AuraCard(child: _ExpandableText(bio))),
+                ]);
+              },
             ),
-          ),
-          SliverList.builder(
-            itemCount: books.length,
-            itemBuilder: (context, i) => ReadingWidth(child: BookTile(book: books[i], onTap: () => openBook(context, books[i].id))),
-          ),
-          const SliverToBoxAdapter(child: SizedBox(height: 100)),
-        ]),
-      ),
+            SectionLabel(l.authorBooks),
+            AuraCard(
+              padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+              child: Column(children: [for (final b in books) BookTile(book: b, onTap: () => openBook(context, b.id))]),
+            ),
+            if (books.isEmpty) Padding(padding: const EdgeInsets.all(16), child: Text(l.noResults, style: TextStyle(color: a.muted))),
+          ]),
+        ),
+      ]),
     );
   }
 }
@@ -89,7 +100,8 @@ class _ExpandableTextState extends State<_ExpandableText> {
   @override
   Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         AnimatedSize(
-          duration: const Duration(milliseconds: 300),
+          duration: const Duration(milliseconds: 350),
+          curve: Curves.easeOutCubic,
           alignment: Alignment.topCenter,
           child: Text(
             widget.text,
@@ -102,10 +114,7 @@ class _ExpandableTextState extends State<_ExpandableText> {
         if (widget.text.length > 400)
           Align(
             alignment: AlignmentDirectional.centerEnd,
-            child: IconButton(
-              onPressed: () => setState(() => _open = !_open),
-              icon: Icon(_open ? Icons.expand_less_rounded : Icons.expand_more_rounded),
-            ),
+            child: AuraIconButton(icon: _open ? Icons.expand_less_rounded : Icons.expand_more_rounded, size: 36, onTap: () => setState(() => _open = !_open)),
           ),
       ]);
 }

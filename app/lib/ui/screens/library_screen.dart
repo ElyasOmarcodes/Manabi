@@ -8,67 +8,59 @@ import '../../core/models/scope.dart';
 import '../../state/nav_controller.dart';
 import '../../state/settings_controller.dart';
 import '../theme.dart';
+import '../widgets/answer_card.dart' show QueryChip;
 import '../widgets/common.dart';
 import '../widgets/scope_picker.dart';
 import 'author_screen.dart';
 import 'book_screen.dart';
 import 'reader_screen.dart';
 
-class LibraryScreen extends StatelessWidget {
+class LibraryScreen extends StatefulWidget {
   const LibraryScreen({super.key});
+  @override
+  State<LibraryScreen> createState() => _LibraryScreenState();
+}
+
+class _LibraryScreenState extends State<LibraryScreen> {
+  int _tab = 0;
 
   @override
   Widget build(BuildContext context) {
     final l = context.l;
-    return DefaultTabController(
-      length: 4,
-      child: SafeArea(
-        bottom: false,
-        child: Column(children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 14, 20, 4),
-            child: Row(children: [
-              Icon(Icons.local_library_rounded, color: context.cs.primary),
-              const SizedBox(width: 10),
-              Flexible(child: Text(l.library, style: context.tt.titleLarge?.copyWith(fontWeight: FontWeight.w800), overflow: TextOverflow.ellipsis)),
-            ]),
+    final catalog = context.read<CatalogService>();
+    return SafeArea(
+      bottom: false,
+      child: Column(children: [
+        ReadingWidth(
+          maxWidth: 900,
+          child: PageHeader(
+            title: l.library,
+            subtitle: '${l.booksCount(catalog.books.length)} · ${catalog.authors.length} ${l.authors}',
+            icon: Icons.auto_stories_rounded,
+            color: AuraHues.blue,
           ),
-          TabBar(
-            isScrollable: true,
-            tabAlignment: TabAlignment.start,
-            dividerColor: Colors.transparent,
-            indicatorSize: TabBarIndicatorSize.label,
-            labelStyle: const TextStyle(fontFamily: uiFont, fontWeight: FontWeight.w700),
-            unselectedLabelStyle: const TextStyle(fontFamily: uiFont),
-            tabs: [Tab(text: l.books), Tab(text: l.authors), Tab(text: l.categories), Tab(text: l.fullTextSearch)],
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
+          child: ReadingWidth(
+            maxWidth: 900,
+            child: SegmentedPills<int>(
+              values: const [0, 1, 2, 3],
+              labels: [l.books, l.authors, l.categories, l.fullTextSearch],
+              value: _tab,
+              onChanged: (v) => setState(() => _tab = v),
+            ),
           ),
-          const Expanded(child: TabBarView(children: [_BooksTab(), _AuthorsTab(), _CategoriesTab(), _FullTextTab()])),
-        ]),
-      ),
+        ),
+        Expanded(
+          child: IndexedStack(index: _tab, children: const [_BooksTab(), _AuthorsTab(), _CategoriesTab(), _FullTextTab()]),
+        ),
+      ]),
     );
   }
 }
 
-class _SearchField extends StatelessWidget {
-  const _SearchField({required this.hint, required this.onChanged, this.onSubmitted, this.rtl = false});
-  final String hint;
-  final ValueChanged<String> onChanged;
-  final ValueChanged<String>? onSubmitted;
-  final bool rtl;
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
-        child: ReadingWidth(
-          child: TextField(
-            onChanged: onChanged,
-            onSubmitted: onSubmitted,
-            textDirection: rtl ? TextDirection.rtl : null,
-            textInputAction: TextInputAction.search,
-            decoration: InputDecoration(hintText: hint, prefixIcon: const Icon(Icons.search_rounded)),
-          ),
-        ),
-      );
-}
+EdgeInsets _listPadding(BuildContext context) => EdgeInsets.fromLTRB(10, 4, 10, MediaQuery.paddingOf(context).bottom + 24);
 
 class _BooksTab extends StatefulWidget {
   const _BooksTab();
@@ -76,45 +68,44 @@ class _BooksTab extends StatefulWidget {
   State<_BooksTab> createState() => _BooksTabState();
 }
 
-class _BooksTabState extends State<_BooksTab> with AutomaticKeepAliveClientMixin {
+class _BooksTabState extends State<_BooksTab> {
   String _q = '';
   CatalogCategory? _category;
 
   @override
-  bool get wantKeepAlive => true;
-
-  @override
   Widget build(BuildContext context) {
-    super.build(context);
     final catalog = context.read<CatalogService>();
     final l = context.l;
     final books = catalog.findBooks(_q, categoryId: _category?.id, limit: 200);
     return Column(children: [
-      _SearchField(hint: l.searchBooks, onChanged: (v) => setState(() => _q = v)),
       Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
         child: ReadingWidth(
-          child: Align(
-            alignment: AlignmentDirectional.centerStart,
-            child: InputChip(
-              avatar: const Icon(Icons.category_outlined, size: 17),
-              label: Text(_category?.title ?? l.allCategories),
-              onPressed: () async {
+          maxWidth: 900,
+          child: Row(children: [
+            Expanded(child: AuraSearchField(hint: l.searchBooks, onChanged: (v) => setState(() => _q = v))),
+            const SizedBox(width: 10),
+            AuraChip(
+              icon: Icons.tune_rounded,
+              color: AuraHues.mint,
+              label: _category?.title ?? l.allCategories,
+              selected: _category != null,
+              onTap: () async {
                 final c = await pickFromCatalog<CatalogCategory>(context, PickKind.category);
                 if (c != null) setState(() => _category = c);
               },
-              onDeleted: _category == null ? null : () => setState(() => _category = null),
+              onClear: () => setState(() => _category = null),
             ),
-          ),
+          ]),
         ),
       ),
       Expanded(
         child: books.isEmpty
             ? EmptyState(icon: Icons.search_off_rounded, text: l.noResults)
             : ListView.builder(
-                padding: const EdgeInsets.fromLTRB(8, 4, 8, 24),
+                padding: _listPadding(context),
                 itemCount: books.length,
-                itemBuilder: (context, i) => ReadingWidth(child: BookTile(book: books[i], onTap: () => openBook(context, books[i].id))),
+                itemBuilder: (context, i) => ReadingWidth(maxWidth: 900, child: BookTile(book: books[i], onTap: () => openBook(context, books[i].id))),
               ),
       ),
     ]);
@@ -127,40 +118,26 @@ class _AuthorsTab extends StatefulWidget {
   State<_AuthorsTab> createState() => _AuthorsTabState();
 }
 
-class _AuthorsTabState extends State<_AuthorsTab> with AutomaticKeepAliveClientMixin {
+class _AuthorsTabState extends State<_AuthorsTab> {
   String _q = '';
-  @override
-  bool get wantKeepAlive => true;
 
   @override
   Widget build(BuildContext context) {
-    super.build(context);
     final catalog = context.read<CatalogService>();
     final l = context.l;
     final authors = catalog.findAuthors(_q, limit: 200);
     return Column(children: [
-      _SearchField(hint: l.searchAuthors, onChanged: (v) => setState(() => _q = v)),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
+        child: ReadingWidth(maxWidth: 900, child: AuraSearchField(hint: l.searchAuthors, onChanged: (v) => setState(() => _q = v))),
+      ),
       Expanded(
         child: authors.isEmpty
-            ? EmptyState(icon: Icons.search_off_rounded, text: l.noResults)
+            ? EmptyState(icon: Icons.search_off_rounded, text: l.noResults, color: AuraHues.pink)
             : ListView.builder(
-                padding: const EdgeInsets.fromLTRB(8, 4, 8, 24),
+                padding: _listPadding(context),
                 itemCount: authors.length,
-                itemBuilder: (context, i) {
-                  final a = authors[i];
-                  return ReadingWidth(
-                    child: ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor: context.mc.glow,
-                        child: Text(a.name.characters.first, style: arabicStyle(context, size: 18).copyWith(height: 1.2, color: context.cs.primary)),
-                      ),
-                      title: Text(a.name, textDirection: TextDirection.rtl, style: arabicStyle(context, size: 17, weight: FontWeight.w700).copyWith(height: 1.5)),
-                      subtitle: Text(l.booksCount(a.bookCount)),
-                      trailing: const Icon(Icons.chevron_right_rounded),
-                      onTap: () => openAuthor(context, a.id),
-                    ),
-                  );
-                },
+                itemBuilder: (context, i) => ReadingWidth(maxWidth: 900, child: AuthorTile(author: authors[i], onTap: () => openAuthor(context, authors[i].id))),
               ),
       ),
     ]);
@@ -173,32 +150,36 @@ class _CategoriesTab extends StatelessWidget {
   Widget build(BuildContext context) {
     final catalog = context.read<CatalogService>();
     final l = context.l;
+    final a = context.aura;
     return LayoutBuilder(builder: (context, c) {
-      final columns = (c.maxWidth / 260).floor().clamp(1, 4);
+      final columns = (c.maxWidth / 250).floor().clamp(2, 4);
       return GridView.builder(
-        padding: const EdgeInsets.all(16),
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: columns, mainAxisExtent: 92, crossAxisSpacing: 12, mainAxisSpacing: 12),
+        padding: EdgeInsets.fromLTRB(16, 12, 16, MediaQuery.paddingOf(context).bottom + 24),
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: columns, mainAxisExtent: 128, crossAxisSpacing: 12, mainAxisSpacing: 12),
         itemCount: catalog.categories.length,
         itemBuilder: (context, i) {
           final cat = catalog.categories[i];
-          return SoftCard(
-            padding: const EdgeInsets.all(14),
-            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => _CategoryBooks(category: cat))),
-            child: Row(children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(color: context.mc.glow, borderRadius: BorderRadius.circular(14)),
-                child: Icon(Icons.auto_stories_outlined, color: context.cs.primary, size: 21),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(cat.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: arabicStyle(context, size: 16.5, weight: FontWeight.w700).copyWith(height: 1.5)),
-                  Text(l.booksCount(cat.bookCount), style: context.tt.labelSmall?.copyWith(color: context.cs.onSurfaceVariant)),
+          final hue = AuraHues.at(i);
+          return Reveal(
+            delay: (i % 12) * 30,
+            child: AuraCard(
+              padding: const EdgeInsets.all(14),
+              onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => _CategoryBooks(category: cat, color: hue))),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(children: [
+                  IconTile(icon: categoryIcon(cat.id), color: hue, size: 40, gradient: true),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(color: hue.withValues(alpha: a.dark ? 0.18 : 0.1), borderRadius: BorderRadius.circular(20)),
+                    child: Text('${cat.bookCount}', style: TextStyle(fontFamily: uiFont, fontSize: 12, fontWeight: FontWeight.w800, color: hue)),
+                  ),
                 ]),
-              ),
-            ]),
+                const Spacer(),
+                Text(cat.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: arabicStyle(context, size: 16, weight: FontWeight.w700).copyWith(height: 1.5)),
+                Text(l.booksCount(cat.bookCount), style: TextStyle(fontFamily: uiFont, fontSize: 11.5, color: a.muted)),
+              ]),
+            ),
           );
         },
       );
@@ -207,26 +188,31 @@ class _CategoriesTab extends StatelessWidget {
 }
 
 class _CategoryBooks extends StatelessWidget {
-  const _CategoryBooks({required this.category});
+  const _CategoryBooks({required this.category, required this.color});
   final CatalogCategory category;
+  final Color color;
   @override
   Widget build(BuildContext context) {
     final books = context.read<CatalogService>().findBooks('', categoryId: category.id, limit: 5000);
     final l = context.l;
-    return Scaffold(
-      appBar: AppBar(title: Text(category.title, style: arabicStyle(context, size: 19, weight: FontWeight.w700).copyWith(height: 1.4))),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
+    return AuraPage(
+      title: Row(children: [
+        IconTile(icon: categoryIcon(category.id), color: color, size: 38, gradient: true),
+        const SizedBox(width: 10),
+        Expanded(child: Text(category.title, overflow: TextOverflow.ellipsis, style: arabicStyle(context, size: 19, weight: FontWeight.w700).copyWith(height: 1.4))),
+      ]),
+      floating: GradientButton(
+        icon: Icons.auto_awesome_rounded,
+        label: l.askInCategory,
+        onTap: () {
           context.read<NavController>().askWithin(SearchScope.all.withCategory(category.id, category.title));
           Navigator.of(context).popUntil((r) => r.isFirst);
         },
-        icon: const Icon(Icons.chat_bubble_outline_rounded),
-        label: Text(l.askInCategory),
       ),
       body: ListView.builder(
-        padding: const EdgeInsets.fromLTRB(8, 0, 8, 96),
+        padding: const EdgeInsets.fromLTRB(10, 6, 10, 110),
         itemCount: books.length,
-        itemBuilder: (context, i) => ReadingWidth(child: BookTile(book: books[i], onTap: () => openBook(context, books[i].id))),
+        itemBuilder: (context, i) => ReadingWidth(maxWidth: 900, child: BookTile(book: books[i], onTap: () => openBook(context, books[i].id))),
       ),
     );
   }
@@ -239,16 +225,13 @@ class _FullTextTab extends StatefulWidget {
   State<_FullTextTab> createState() => _FullTextTabState();
 }
 
-class _FullTextTabState extends State<_FullTextTab> with AutomaticKeepAliveClientMixin {
+class _FullTextTabState extends State<_FullTextTab> {
   String _q = '';
   final List<PagePassage> _items = [];
   int _total = 0;
   int _page = 0;
   bool _loading = false;
   String? _error;
-
-  @override
-  bool get wantKeepAlive => true;
 
   Future<void> _search({bool more = false}) async {
     if (_q.trim().isEmpty || _loading) return;
@@ -277,45 +260,67 @@ class _FullTextTabState extends State<_FullTextTab> with AutomaticKeepAliveClien
 
   @override
   Widget build(BuildContext context) {
-    super.build(context);
     final l = context.l;
+    final a = context.aura;
     return Column(children: [
-      _SearchField(hint: l.searchInText, rtl: true, onChanged: (v) => _q = v, onSubmitted: (_) => _search()),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
+        child: ReadingWidth(
+          maxWidth: 900,
+          child: Row(children: [
+            Expanded(child: AuraSearchField(hint: l.searchInText, rtl: true, onChanged: (v) => _q = v, onSubmitted: (_) => _search())),
+            const SizedBox(width: 10),
+            AuraIconButton(icon: Icons.arrow_upward_rounded, onTap: _search, tooltip: l.fullTextSearch),
+          ]),
+        ),
+      ),
       if (_items.isNotEmpty)
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-          child: ReadingWidth(child: Align(alignment: AlignmentDirectional.centerStart, child: Text(l.matches(_total), style: context.tt.labelMedium))),
+        ReadingWidth(
+          maxWidth: 900,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 4),
+            child: Align(alignment: AlignmentDirectional.centerStart, child: StatusBadge(label: l.matches(_total), color: AuraHues.cyan, icon: Icons.manage_search_rounded)),
+          ),
         ),
       Expanded(
         child: _error != null && _items.isEmpty
             ? ErrorPanel(code: _error, onRetry: _search)
             : _items.isEmpty
-                ? (_loading ? const Center(child: TypingDots()) : EmptyState(icon: Icons.manage_search_rounded, text: l.searchInText))
+                ? (_loading ? const Center(child: AuraOrb(size: 80)) : EmptyState(icon: Icons.travel_explore_rounded, text: l.searchInText, color: AuraHues.cyan))
                 : ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+                    padding: EdgeInsets.fromLTRB(16, 6, 16, MediaQuery.paddingOf(context).bottom + 24),
                     itemCount: _items.length + (_items.length < _total ? 1 : 0),
                     itemBuilder: (context, i) {
                       if (i == _items.length) {
                         return Padding(
                           padding: const EdgeInsets.all(12),
-                          child: Center(
-                            child: _loading ? const TypingDots() : OutlinedButton(onPressed: () => _search(more: true), child: Text(l.loadMore)),
-                          ),
+                          child: Center(child: _loading ? const TypingDots() : SoftButton(onTap: () => _search(more: true), label: l.loadMore, icon: Icons.expand_more_rounded)),
                         );
                       }
                       final p = _items[i];
                       return Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
+                        padding: const EdgeInsets.only(bottom: 12),
                         child: ReadingWidth(
-                          child: SoftCard(
+                          maxWidth: 900,
+                          child: AuraCard(
+                            padding: const EdgeInsets.all(16),
                             onTap: p.internalPage == null ? () => openUrl(p.url) : () => openReader(context, p.bookId, p.internalPage!, title: p.bookTitle),
                             child: Directionality(
                               textDirection: TextDirection.rtl,
                               child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                                Text(p.bookTitle, style: arabicStyle(context, size: 16.5, weight: FontWeight.w700).copyWith(height: 1.5)),
-                                Text(p.citation ?? '', style: context.tt.labelSmall?.copyWith(color: context.cs.onSurfaceVariant)),
-                                const SizedBox(height: 6),
-                                Text(p.snippet ?? p.text, maxLines: 4, overflow: TextOverflow.ellipsis, style: arabicStyle(context, size: 16).copyWith(height: 1.9)),
+                                Row(children: [
+                                  BookCover(title: p.bookTitle, seed: int.tryParse(p.categoryId ?? '') ?? i, width: 34, height: 44),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                      Text(p.bookTitle, style: arabicStyle(context, size: 16, weight: FontWeight.w700).copyWith(height: 1.5)),
+                                      Text(p.citation ?? '', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontFamily: uiFont, fontSize: 11.5, color: a.muted)),
+                                    ]),
+                                  ),
+                                ]),
+                                const SizedBox(height: 8),
+                                Text(p.snippet ?? p.text, maxLines: 4, overflow: TextOverflow.ellipsis, style: arabicStyle(context, size: 16).copyWith(height: 1.95)),
+                                if (p.headings.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 6), child: Align(alignment: AlignmentDirectional.centerStart, child: QueryChip(p.headings.last))),
                               ]),
                             ),
                           ),

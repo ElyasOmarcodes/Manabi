@@ -37,7 +37,7 @@ class _ChatScreenState extends State<ChatScreen> {
   void _scrollToEnd() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_scroll.hasClients) return;
-      _scroll.animateTo(_scroll.position.maxScrollExtent, duration: const Duration(milliseconds: 450), curve: Curves.easeOutCubic);
+      _scroll.animateTo(_scroll.position.maxScrollExtent, duration: const Duration(milliseconds: 500), curve: Curves.easeOutCubic);
     });
   }
 
@@ -50,23 +50,33 @@ class _ChatScreenState extends State<ChatScreen> {
     if (chat?.id != _lastChatId || (chat?.turns.length ?? 0) > _lastTurnCount) _scrollToEnd();
     _lastChatId = chat?.id;
     _lastTurnCount = chat?.turns.length ?? 0;
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
 
     return SafeArea(
       bottom: false,
       child: Column(children: [
         _TopBar(chat: chat, wide: wide),
         Expanded(
-          child: chat == null || chat.turns.isEmpty
-              ? _Welcome(configured: settings.isConfigured)
-              : ListView.builder(
-                  controller: _scroll,
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                  itemCount: chat.turns.length,
-                  itemBuilder: (context, i) => ReadingWidth(child: _TurnView(turn: chat.turns[i], progress: chats.progress[chat.turns[i].id])),
-                ),
+          child: ShaderMask(
+            blendMode: BlendMode.dstIn,
+            shaderCallback: (r) => const LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Colors.transparent, Colors.black, Colors.black, Colors.transparent],
+              stops: [0, 0.03, 0.95, 1],
+            ).createShader(r),
+            child: chat == null || chat.turns.isEmpty
+                ? _Welcome(configured: settings.isConfigured)
+                : ListView.builder(
+                    controller: _scroll,
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
+                    itemCount: chat.turns.length,
+                    itemBuilder: (context, i) => ReadingWidth(child: _TurnView(turn: chat.turns[i], progress: chats.progress[chat.turns[i].id])),
+                  ),
+          ),
         ),
         const _Composer(),
-        if (wide) SizedBox(height: 6 + MediaQuery.paddingOf(context).bottom),
+        SizedBox(height: wide ? 14 : bottomInset + 4),
       ]),
     );
   }
@@ -79,28 +89,34 @@ class _TopBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = context.l;
+    final a = context.aura;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 6, 8, 2),
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 4),
       child: Row(children: [
-        if (!wide)
-          IconButton(icon: const Icon(Icons.menu_rounded), tooltip: l.chats, onPressed: () => Scaffold.of(context).openDrawer())
-        else
+        if (!wide) ...[
+          AuraIconButton(icon: Icons.notes_rounded, tooltip: l.chats, onTap: () => Scaffold.of(context).openDrawer()),
           const SizedBox(width: 12),
-        if (!wide) ...[const ManabiLogo(size: 30), const SizedBox(width: 10)],
+        ] else
+          const SizedBox(width: 8),
         Expanded(
-          child: Text(chat?.title ?? l.newChat, maxLines: 1, overflow: TextOverflow.ellipsis, style: context.tt.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-        ),
-        if (chat != null && chat!.turns.isNotEmpty)
-          IconButton(
-            tooltip: l.exportChat,
-            icon: const Icon(Icons.file_download_outlined),
-            onPressed: () => showExportSheet(context, title: chat!.title, turns: chat!.turns, uiLanguage: context.read<SettingsController>().uiLanguage),
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 250),
+            child: Text(chat?.title ?? l.newChat,
+                key: ValueKey(chat?.id),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontFamily: uiFont, fontSize: 17, fontWeight: FontWeight.w800, color: a.text)),
           ),
-        IconButton(
-          tooltip: l.newChat,
-          icon: const Icon(Icons.edit_square),
-          onPressed: () => context.read<ChatController>().newChat(),
         ),
+        if (chat != null && chat!.turns.isNotEmpty) ...[
+          AuraIconButton(
+            tooltip: l.exportChat,
+            icon: Icons.ios_share_rounded,
+            onTap: () => showExportSheet(context, title: chat!.title, turns: chat!.turns, uiLanguage: context.read<SettingsController>().uiLanguage),
+          ),
+          const SizedBox(width: 8),
+        ],
+        AuraIconButton(tooltip: l.newChat, icon: Icons.add_rounded, onTap: () => context.read<ChatController>().newChat()),
       ]),
     );
   }
@@ -112,67 +128,66 @@ class _Welcome extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = context.l;
+    final a = context.aura;
     final nav = context.read<NavController>();
     final suggestions = [
-      (Icons.format_quote_rounded, l.suggestion1),
-      (Icons.balance_rounded, l.suggestion2),
-      (Icons.auto_awesome_outlined, l.suggestion3),
-      (Icons.school_outlined, l.suggestion4),
+      (Icons.format_quote_rounded, l.suggestion1, AuraHues.violet),
+      (Icons.balance_rounded, l.suggestion2, AuraHues.cyan),
+      (Icons.auto_awesome_rounded, l.suggestion3, AuraHues.pink),
+      (Icons.school_rounded, l.suggestion4, AuraHues.amber),
     ];
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
       child: ReadingWidth(
         maxWidth: 760,
         child: Column(children: [
-          const SizedBox(height: 12),
-          TweenAnimationBuilder<double>(
-            tween: Tween(begin: 0.85, end: 1),
-            duration: const Duration(milliseconds: 700),
-            curve: Curves.easeOutBack,
-            builder: (_, v, child) => Transform.scale(scale: v, child: child),
-            child: Container(
-              decoration: BoxDecoration(shape: BoxShape.circle, boxShadow: [BoxShadow(color: context.cs.primary.withValues(alpha: 0.18), blurRadius: 40, spreadRadius: 4)]),
-              child: const ManabiLogo(size: 84),
-            ),
-          ),
-          const SizedBox(height: 18),
-          Text(l.welcomeTitle, style: context.tt.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
+          const Reveal(child: AuraOrb(size: 150, child: ManabiMark(size: 58))),
           const SizedBox(height: 10),
-          Text(l.welcomeBody, textAlign: TextAlign.center, style: context.tt.bodyLarge?.copyWith(color: context.cs.onSurfaceVariant)),
-          const SizedBox(height: 22),
+          Reveal(
+            delay: 80,
+            child: GradientText(l.welcomeTitle, textAlign: TextAlign.center, style: const TextStyle(fontFamily: uiFont, fontSize: 32, fontWeight: FontWeight.w800, height: 1.4)),
+          ),
+          const SizedBox(height: 8),
+          Reveal(
+            delay: 140,
+            child: Text(l.welcomeBody, textAlign: TextAlign.center, style: TextStyle(fontFamily: uiFont, fontSize: 15, height: 1.85, color: a.muted)),
+          ),
+          const SizedBox(height: 24),
           if (!configured)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 18),
-              child: SoftCard(
-                color: context.mc.warning.withValues(alpha: 0.08),
-                borderColor: context.mc.warning.withValues(alpha: 0.4),
-                child: Row(children: [
-                  Icon(Icons.link_off_rounded, color: context.mc.warning),
-                  const SizedBox(width: 12),
-                  Expanded(child: Text(l.notConfiguredTitle, style: const TextStyle(fontWeight: FontWeight.w600))),
-                  FilledButton.tonal(onPressed: () => nav.go(Section.settings), child: Text(l.openSettings)),
-                ]),
+            Reveal(
+              delay: 180,
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: AuraCard(
+                  padding: const EdgeInsets.all(14),
+                  gradientBorder: true,
+                  child: Row(children: [
+                    const IconTile(icon: Icons.link_rounded, color: AuraHues.orange, gradient: true),
+                    const SizedBox(width: 12),
+                    Expanded(child: Text(l.notConfiguredTitle, style: TextStyle(fontFamily: uiFont, fontWeight: FontWeight.w700, color: a.text))),
+                    Flexible(child: GradientButton(label: l.openSettings, height: 40, gradient: a.warm, onTap: () => nav.go(Section.settings))),
+                  ]),
+                ),
               ),
             ),
           LayoutBuilder(builder: (context, c) {
             final two = c.maxWidth > 560;
             return Wrap(spacing: 12, runSpacing: 12, children: [
-              for (final (icon, text) in suggestions)
+              for (final (i, (icon, text, color)) in suggestions.indexed)
                 SizedBox(
                   width: two ? (c.maxWidth - 12) / 2 : c.maxWidth,
-                  child: SoftCard(
-                    padding: const EdgeInsets.all(16),
-                    onTap: () => nav.prefill(text),
-                    child: Row(children: [
-                      Container(
-                        width: 38,
-                        height: 38,
-                        decoration: BoxDecoration(color: context.mc.glow, borderRadius: BorderRadius.circular(12)),
-                        child: Icon(icon, size: 20, color: context.cs.primary),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(child: Text(text, style: context.tt.bodyMedium?.copyWith(height: 1.55))),
-                    ]),
+                  child: Reveal(
+                    delay: 220 + i * 70,
+                    child: AuraCard(
+                      padding: const EdgeInsets.all(16),
+                      onTap: () => nav.prefill(text),
+                      child: Row(children: [
+                        IconTile(icon: icon, color: color, size: 44),
+                        const SizedBox(width: 14),
+                        Expanded(child: Text(text, style: TextStyle(fontFamily: uiFont, fontSize: 14, height: 1.6, color: a.text, fontWeight: FontWeight.w500))),
+                        Icon(Icons.north_east_rounded, size: 18, color: a.faint),
+                      ]),
+                    ),
                   ),
                 ),
             ]);
@@ -194,16 +209,16 @@ class _TurnView extends StatelessWidget {
     final settings = context.read<SettingsController>();
     void retry() => chats.retry(turn, fallbackLanguage: settings.uiLanguage, maxSources: settings.maxSources);
     return Padding(
-      padding: const EdgeInsets.only(bottom: 18),
+      padding: const EdgeInsets.only(bottom: 26),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        _UserBubble(turn: turn),
-        const SizedBox(height: 12),
+        Reveal(child: _UserBubble(turn: turn)),
+        const SizedBox(height: 16),
         AnimatedSwitcher(
-          duration: const Duration(milliseconds: 380),
+          duration: const Duration(milliseconds: 450),
           switchInCurve: Curves.easeOutCubic,
           transitionBuilder: (child, a) => FadeTransition(
             opacity: a,
-            child: SizeTransition(sizeFactor: a, alignment: Alignment.topCenter, child: child),
+            child: SlideTransition(position: Tween(begin: const Offset(0, 0.03), end: Offset.zero).animate(a), child: child),
           ),
           child: switch (turn.state) {
             MessageState.pending => StageTimeline(key: const ValueKey('p'), progress: progress ?? AskProgress(), onCancel: () => chats.cancel(turn)),
@@ -221,34 +236,36 @@ class _UserBubble extends StatelessWidget {
   final ChatTurn turn;
   @override
   Widget build(BuildContext context) {
+    final a = context.aura;
     final scope = turn.scope;
     final label = [?scope.bookTitle, ?scope.authorName, ?scope.categoryTitle].join(' · ');
+    final dir = Directionality.of(context);
     return Align(
       alignment: AlignmentDirectional.centerEnd,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 620),
+        constraints: const BoxConstraints(maxWidth: 600),
         child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 13),
             decoration: BoxDecoration(
-              color: context.mc.userBubble,
+              gradient: a.brand,
               borderRadius: const BorderRadiusDirectional.only(
-                topStart: Radius.circular(22),
-                topEnd: Radius.circular(22),
-                bottomStart: Radius.circular(22),
-                bottomEnd: Radius.circular(6),
-              ).resolve(Directionality.of(context)),
-              boxShadow: [BoxShadow(color: context.mc.userBubble.withValues(alpha: 0.25), blurRadius: 18, offset: const Offset(0, 6))],
+                topStart: Radius.circular(24),
+                topEnd: Radius.circular(24),
+                bottomStart: Radius.circular(24),
+                bottomEnd: Radius.circular(8),
+              ).resolve(dir),
+              boxShadow: [BoxShadow(color: AuraHues.violet.withValues(alpha: 0.35), blurRadius: 24, offset: const Offset(0, 10), spreadRadius: -10)],
             ),
-            child: SelectableText(turn.question, style: context.tt.bodyLarge?.copyWith(color: context.mc.onUserBubble, height: 1.6)),
+            child: SelectableText(turn.question, style: const TextStyle(fontFamily: uiFont, color: Colors.white, fontSize: 15.5, height: 1.65, fontWeight: FontWeight.w500)),
           ),
           if (label.isNotEmpty)
             Padding(
-              padding: const EdgeInsets.only(top: 6),
+              padding: const EdgeInsets.only(top: 7),
               child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(Icons.filter_alt_outlined, size: 14, color: context.cs.onSurfaceVariant),
+                Icon(Icons.filter_alt_rounded, size: 14, color: a.accent),
                 const SizedBox(width: 4),
-                Flexible(child: Text(label, style: context.tt.labelSmall?.copyWith(color: context.cs.onSurfaceVariant), overflow: TextOverflow.ellipsis)),
+                Flexible(child: Text(label, overflow: TextOverflow.ellipsis, style: TextStyle(fontFamily: uiFont, fontSize: 12, color: a.accent, fontWeight: FontWeight.w600))),
               ]),
             ),
         ]),
@@ -264,23 +281,25 @@ class _ErrorCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = context.l;
-    return SoftCard(
-      color: context.cs.errorContainer.withValues(alpha: 0.35),
-      borderColor: context.cs.error.withValues(alpha: 0.25),
+    final a = context.aura;
+    return AuraCard(
+      padding: const EdgeInsets.all(16),
+      color: Color.alphaBlend(a.danger.withValues(alpha: 0.06), a.surface),
       child: Row(children: [
-        Icon(Icons.error_outline_rounded, color: context.cs.error),
+        IconTile(icon: Icons.error_outline_rounded, color: a.danger),
         const SizedBox(width: 12),
-        Expanded(child: Text(errorText(l, code))),
+        Expanded(child: Text(errorText(l, code), style: TextStyle(fontFamily: uiFont, color: a.text, height: 1.6))),
+        const SizedBox(width: 8),
         if (isSetupError(code))
-          TextButton(onPressed: () => context.read<NavController>().go(Section.settings), child: Text(l.openSettings))
+          SoftButton(dense: true, label: l.openSettings, icon: Icons.tune_rounded, onTap: () => context.read<NavController>().go(Section.settings))
         else
-          TextButton.icon(onPressed: onRetry, icon: const Icon(Icons.refresh_rounded, size: 18), label: Text(l.retry)),
+          SoftButton(dense: true, label: l.retry, icon: Icons.refresh_rounded, onTap: onRetry),
       ]),
     );
   }
 }
 
-/// Input area: scope chips, answer language and the message field.
+/// Input area: scope chips, answer language and the glass message capsule.
 class _Composer extends StatefulWidget {
   const _Composer();
   @override
@@ -295,16 +314,7 @@ class _ComposerState extends State<_Composer> {
   void initState() {
     super.initState();
     _controller.addListener(() => setState(() {}));
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final draft = context.read<NavController>().takeDraft();
-    if (draft != null) {
-      _controller.text = draft;
-      _focus.requestFocus();
-    }
+    _focus.addListener(() => setState(() {}));
   }
 
   @override
@@ -333,8 +343,7 @@ class _ComposerState extends State<_Composer> {
   Widget build(BuildContext context) {
     final nav = context.watch<NavController>();
     final settings = context.watch<SettingsController>();
-    final draft = nav.draft;
-    if (draft != null) {
+    if (nav.draft != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         final d = nav.takeDraft();
         if (d != null) {
@@ -344,69 +353,89 @@ class _ComposerState extends State<_Composer> {
       });
     }
     final l = context.l;
+    final a = context.aura;
     final canSend = _controller.text.trim().isNotEmpty;
+    final focused = _focus.hasFocus;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 4, 12, 10),
+      padding: const EdgeInsets.fromLTRB(14, 4, 14, 6),
       child: ReadingWidth(
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.only(bottom: 10),
             child: Row(children: [
               _ScopeChips(scope: nav.scope),
-              const SizedBox(width: 6),
               _LanguageChip(value: settings.answerLanguage),
             ]),
           ),
-          DecoratedBox(
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
+            padding: const EdgeInsets.all(1.6),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(28),
-              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: Theme.of(context).brightness == Brightness.dark ? 0.3 : 0.07), blurRadius: 30, offset: const Offset(0, 10))],
+              borderRadius: BorderRadius.circular(32),
+              gradient: focused ? a.brand : LinearGradient(colors: [a.border, a.border]),
+              boxShadow: [
+                BoxShadow(
+                  color: focused ? AuraHues.violet.withValues(alpha: 0.28) : a.shadow,
+                  blurRadius: focused ? 34 : 28,
+                  offset: const Offset(0, 12),
+                  spreadRadius: -12,
+                ),
+              ],
             ),
-            child: Material(
-              color: context.cs.surfaceContainerLowest,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28), side: BorderSide(color: context.cs.outlineVariant.withValues(alpha: 0.8))),
-              child: Padding(
-                padding: const EdgeInsetsDirectional.fromSTEB(18, 4, 6, 4),
-                child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                  Expanded(
-                    child: CallbackShortcuts(
-                      bindings: {const SingleActivator(LogicalKeyboardKey.enter): _send},
-                      child: TextField(
-                        controller: _controller,
-                        focusNode: _focus,
-                        minLines: 1,
-                        maxLines: 6,
-                        maxLength: 2000,
-                        textInputAction: TextInputAction.newline,
-                        style: context.tt.bodyLarge?.copyWith(height: 1.55),
-                        decoration: InputDecoration(
-                          hintText: l.askPlaceholder,
-                          border: InputBorder.none,
-                          enabledBorder: InputBorder.none,
-                          focusedBorder: InputBorder.none,
-                          filled: false,
-                          counterText: '',
-                          contentPadding: const EdgeInsets.symmetric(vertical: 12),
+            child: Glass(
+              radius: 30,
+              shadow: false,
+              border: false,
+              color: a.surface.withValues(alpha: a.dark ? 0.9 : 0.96),
+              padding: const EdgeInsetsDirectional.fromSTEB(20, 4, 6, 4),
+              child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                Expanded(
+                  child: CallbackShortcuts(
+                    bindings: {const SingleActivator(LogicalKeyboardKey.enter): _send},
+                    child: TextField(
+                      controller: _controller,
+                      focusNode: _focus,
+                      minLines: 1,
+                      maxLines: 6,
+                      maxLength: 2000,
+                      textInputAction: TextInputAction.newline,
+                      style: TextStyle(fontFamily: uiFont, fontSize: 15.5, height: 1.6, color: a.text),
+                      decoration: InputDecoration(
+                        hintText: l.askPlaceholder,
+                        filled: false,
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        counterText: '',
+                        contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 5),
+                  child: Tooltip(
+                    message: l.send,
+                    child: Pressable(
+                      onTap: canSend ? _send : null,
+                      scale: 0.88,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 250),
+                        width: 46,
+                        height: 46,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: canSend ? a.brand : null,
+                          color: canSend ? null : a.surfaceAlt,
+                          boxShadow: canSend ? [BoxShadow(color: AuraHues.violet.withValues(alpha: 0.4), blurRadius: 16, offset: const Offset(0, 6), spreadRadius: -4)] : null,
                         ),
+                        child: Icon(Icons.arrow_upward_rounded, color: canSend ? Colors.white : a.faint),
                       ),
                     ),
                   ),
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: AnimatedScale(
-                      duration: const Duration(milliseconds: 200),
-                      scale: canSend ? 1 : 0.9,
-                      child: IconButton.filled(
-                        tooltip: l.send,
-                        onPressed: canSend ? _send : null,
-                        style: IconButton.styleFrom(minimumSize: const Size(46, 46)),
-                        icon: const Icon(Icons.arrow_upward_rounded),
-                      ),
-                    ),
-                  ),
-                ]),
-              ),
+                ),
+              ]),
             ),
           ),
         ]),
@@ -424,53 +453,42 @@ class _ScopeChips extends StatelessWidget {
     final nav = context.read<NavController>();
     final catalog = context.read<CatalogService>();
     final l = context.l;
-    Widget chip({required IconData icon, required String label, required bool active, required VoidCallback onTap, VoidCallback? onClear}) => Padding(
-          padding: const EdgeInsetsDirectional.only(end: 6),
-          child: InputChip(
-            avatar: Icon(icon, size: 17, color: active ? context.cs.onPrimary : context.cs.primary),
-            label: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 220), child: Text(label, overflow: TextOverflow.ellipsis)),
-            selected: active,
-            showCheckmark: false,
-            selectedColor: context.cs.primary,
-            labelStyle: TextStyle(color: active ? context.cs.onPrimary : context.cs.onSurface, fontFamily: uiFont, fontSize: 13),
-            onPressed: onTap,
-            onDeleted: active ? onClear : null,
-            deleteIconColor: context.cs.onPrimary,
-          ),
-        );
-
+    Widget gap(Widget w) => Padding(padding: const EdgeInsetsDirectional.only(end: 8), child: w);
     return Row(children: [
-      chip(icon: Icons.all_inclusive_rounded, label: l.scopeAll, active: scope.isAll, onTap: () => nav.setScope(SearchScope.all)),
-      chip(
-        icon: Icons.category_outlined,
+      gap(AuraChip(icon: Icons.all_inclusive_rounded, label: l.scopeAll, selected: scope.isAll, onTap: () => nav.setScope(SearchScope.all))),
+      gap(AuraChip(
+        icon: Icons.category_rounded,
+        color: AuraHues.mint,
         label: scope.categoryTitle ?? l.scopeCategory,
-        active: scope.categoryId != null,
+        selected: scope.categoryId != null,
         onTap: () async {
           final c = await pickFromCatalog<CatalogCategory>(context, PickKind.category);
           if (c != null) nav.setScope(scope.withCategory(c.id, c.title));
         },
         onClear: () => nav.setScope(scope.withCategory(null, null)),
-      ),
-      chip(
-        icon: Icons.person_outline_rounded,
+      )),
+      gap(AuraChip(
+        icon: Icons.person_rounded,
+        color: AuraHues.pink,
         label: scope.authorName ?? l.scopeAuthor,
-        active: scope.authorId != null,
+        selected: scope.authorId != null,
         onTap: () async {
-          final a = await pickFromCatalog<CatalogAuthor>(context, PickKind.author);
-          if (a != null) nav.setScope(scope.withAuthor(a.id, a.name));
+          final x = await pickFromCatalog<CatalogAuthor>(context, PickKind.author);
+          if (x != null) nav.setScope(scope.withAuthor(x.id, x.name));
         },
         onClear: () => nav.setScope(scope.withAuthor(null, null)),
-      ),
-      chip(
-        icon: Icons.menu_book_outlined,
+      )),
+      gap(AuraChip(
+        icon: Icons.menu_book_rounded,
+        color: AuraHues.blue,
         label: scope.bookTitle ?? l.scopeBook,
-        active: scope.bookId != null,
+        selected: scope.bookId != null,
         onTap: () async {
           final b = await pickFromCatalog<CatalogBook>(context, PickKind.book, authorId: scope.authorId, categoryId: scope.categoryId);
           if (b != null) nav.setScope(scope.withBook(b.id, b.title).withAuthor(b.authorId, catalog.author(b.authorId)?.name));
         },
         onClear: () => nav.setScope(scope.withBook(null, null)),
-      ),
+      )),
     ]);
   }
 }
@@ -487,10 +505,7 @@ class _LanguageChip extends StatelessWidget {
       initialValue: value,
       onSelected: (v) => context.read<SettingsController>().setAnswerLanguage(v),
       itemBuilder: (_) => [for (final e in labels.entries) PopupMenuItem(value: e.key, child: Text(e.value))],
-      child: Chip(
-        avatar: Icon(Icons.translate_rounded, size: 17, color: context.cs.primary),
-        label: Text('${l.answerLanguage}: ${labels[value] ?? value}'),
-      ),
+      child: IgnorePointer(child: AuraChip(icon: Icons.translate_rounded, color: AuraHues.orange, label: '${l.answerLanguage}: ${labels[value] ?? value}')),
     );
   }
 }

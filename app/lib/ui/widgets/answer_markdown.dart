@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme.dart';
+import 'aura.dart';
 
 /// Minimal Markdown model used by the answer view and by the exporters.
 enum BlockKind { paragraph, heading, bullet, numbered, quote }
@@ -133,9 +134,9 @@ class AnswerMarkdown extends StatelessWidget {
               child: b.kind == BlockKind.bullet
                   ? Padding(
                       padding: EdgeInsets.only(top: (base.fontSize! * (base.height ?? 1.5)) / 2 - 3),
-                      child: Container(width: 6, height: 6, decoration: BoxDecoration(color: context.mc.gold, shape: BoxShape.circle)),
+                      child: Container(width: 6, height: 6, decoration: BoxDecoration(gradient: context.aura.brand, shape: BoxShape.circle)),
                     )
-                  : Text('${b.number}.', style: base.copyWith(fontWeight: FontWeight.w600, color: context.mc.gold)),
+                  : Text('${b.number}.', style: base.copyWith(fontWeight: FontWeight.w600, color: context.aura.accent)),
             ),
             Expanded(child: Text.rich(_spans(context, b.text, base))),
           ]),
@@ -143,7 +144,7 @@ class AnswerMarkdown extends StatelessWidget {
       case BlockKind.quote:
         return Container(
           padding: const EdgeInsetsDirectional.only(start: 14, top: 4, bottom: 4),
-          decoration: BoxDecoration(border: BorderDirectional(start: BorderSide(color: context.mc.gold, width: 3))),
+          decoration: BoxDecoration(border: BorderDirectional(start: BorderSide(color: context.aura.accent, width: 3))),
           child: Text.rich(_spans(context, b.text, base.copyWith(fontStyle: FontStyle.italic))),
         );
       case BlockKind.paragraph:
@@ -159,7 +160,7 @@ class AnswerMarkdown extends StatelessWidget {
               InlineKind.text => TextSpan(text: i.text),
               InlineKind.bold => TextSpan(text: i.text, style: const TextStyle(fontWeight: FontWeight.w700)),
               InlineKind.italic => TextSpan(text: i.text, style: const TextStyle(fontStyle: FontStyle.italic)),
-              InlineKind.code => TextSpan(text: i.text, style: TextStyle(backgroundColor: context.cs.surfaceContainer)),
+              InlineKind.code => TextSpan(text: i.text, style: TextStyle(backgroundColor: context.aura.surfaceAlt)),
               InlineKind.cite => WidgetSpan(alignment: PlaceholderAlignment.middle, child: CiteChip(n: i.cite!, onTap: onCite)),
             },
         ],
@@ -174,16 +175,18 @@ class CiteChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.symmetric(horizontal: 2),
-        child: Material(
-          color: context.mc.gold.withValues(alpha: 0.16),
-          shape: const StadiumBorder(),
-          child: InkWell(
-            customBorder: const StadiumBorder(),
-            onTap: onTap == null ? null : () => onTap!(n),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
-              child: Text('$n', style: TextStyle(fontFamily: uiFont, fontSize: 12, fontWeight: FontWeight.w700, color: context.mc.gold, height: 1.4)),
+        child: Pressable(
+          onTap: onTap == null ? null : () => onTap!(n),
+          scale: 0.85,
+          child: Container(
+            constraints: const BoxConstraints(minWidth: 22),
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
+            decoration: BoxDecoration(
+              gradient: context.aura.brand,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [BoxShadow(color: AuraHues.violet.withValues(alpha: 0.3), blurRadius: 8, offset: const Offset(0, 3), spreadRadius: -3)],
             ),
+            child: Text('$n', textAlign: TextAlign.center, style: const TextStyle(fontFamily: uiFont, fontSize: 11.5, fontWeight: FontWeight.w800, color: Colors.white, height: 1.5)),
           ),
         ),
       );

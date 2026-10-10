@@ -6,6 +6,9 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../l10n/gen/app_localizations.dart';
 import '../theme.dart';
+import 'aura.dart';
+
+export 'aura.dart';
 
 extension L10nX on BuildContext {
   AppLocalizations get l => AppLocalizations.of(this);
@@ -30,90 +33,9 @@ String errorText(AppLocalizations l, String? code) => switch (code) {
 
 bool isSetupError(String? code) => const {'SERVER_NOT_CONFIGURED', 'NO_API_KEY', 'DIRECT_NOT_ON_WEB', 'GEMINI_AUTH', 'UNAUTHORIZED'}.contains(code);
 
-/// Soft, low-contrast card with a hairline border and a diffuse shadow.
-class SoftCard extends StatelessWidget {
-  const SoftCard({super.key, required this.child, this.padding = const EdgeInsets.all(18), this.onTap, this.color, this.radius = 22, this.borderColor});
-  final Widget child;
-  final EdgeInsetsGeometry padding;
-  final VoidCallback? onTap;
-  final Color? color;
-  final double radius;
-  final Color? borderColor;
-
-  @override
-  Widget build(BuildContext context) {
-    final br = BorderRadius.circular(radius);
-    final dark = Theme.of(context).brightness == Brightness.dark;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        borderRadius: br,
-        boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: dark ? 0.22 : 0.045), blurRadius: 28, offset: const Offset(0, 10)),
-        ],
-      ),
-      child: Material(
-        color: color ?? context.cs.surfaceContainerLowest,
-        shape: RoundedRectangleBorder(borderRadius: br, side: BorderSide(color: borderColor ?? context.cs.outlineVariant.withValues(alpha: 0.55))),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(onTap: onTap, child: Padding(padding: padding, child: child)),
-      ),
-    );
-  }
-}
-
-/// Very soft ambient background with two blurred colour fields.
-class AmbientBackground extends StatelessWidget {
-  const AmbientBackground({super.key, required this.child});
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    final dark = Theme.of(context).brightness == Brightness.dark;
-    return Stack(children: [
-      Positioned.fill(child: ColoredBox(color: context.cs.surface)),
-      Positioned(
-        top: -160,
-        right: -120,
-        child: _Blob(size: 420, color: (dark ? const Color(0xFF1C5A4F) : const Color(0xFFCFE8DF)).withValues(alpha: dark ? 0.35 : 0.55)),
-      ),
-      Positioned(
-        bottom: -200,
-        left: -140,
-        child: _Blob(size: 460, color: (dark ? const Color(0xFF4A3D1F) : const Color(0xFFF2E3C2)).withValues(alpha: dark ? 0.25 : 0.5)),
-      ),
-      Positioned.fill(child: child),
-    ]);
-  }
-}
-
-class _Blob extends StatelessWidget {
-  const _Blob({required this.size, required this.color});
-  final double size;
-  final Color color;
-  @override
-  Widget build(BuildContext context) => IgnorePointer(
-        child: Container(
-          width: size,
-          height: size,
-          decoration: BoxDecoration(shape: BoxShape.circle, gradient: RadialGradient(colors: [color, color.withValues(alpha: 0)])),
-        ),
-      );
-}
-
-class ManabiLogo extends StatelessWidget {
-  const ManabiLogo({super.key, this.size = 44});
-  final double size;
-  @override
-  Widget build(BuildContext context) => ClipRRect(
-        borderRadius: BorderRadius.circular(size * 0.23),
-        child: Image.asset('assets/images/logo.png', width: size, height: size, filterQuality: FilterQuality.medium),
-      );
-}
-
-/// Three softly pulsing dots.
+/// Three dots breathing through the brand gradient.
 class TypingDots extends StatefulWidget {
-  const TypingDots({super.key, this.color, this.size = 7});
-  final Color? color;
+  const TypingDots({super.key, this.size = 8});
   final double size;
   @override
   State<TypingDots> createState() => _TypingDotsState();
@@ -129,44 +51,53 @@ class _TypingDotsState extends State<TypingDots> with SingleTickerProviderStateM
   }
 
   @override
-  Widget build(BuildContext context) {
-    final color = widget.color ?? context.cs.primary;
-    return AnimatedBuilder(
-      animation: _c,
-      builder: (context, _) => Row(mainAxisSize: MainAxisSize.min, children: [
-        for (var i = 0; i < 3; i++)
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: widget.size * 0.28),
-            child: Opacity(
-              opacity: 0.3 + 0.7 * ((math.sin((_c.value * 2 * math.pi) - i * 0.9) + 1) / 2),
-              child: Container(width: widget.size, height: widget.size, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+  Widget build(BuildContext context) => AnimatedBuilder(
+        animation: _c,
+        builder: (context, _) => Row(mainAxisSize: MainAxisSize.min, children: [
+          for (var i = 0; i < 3; i++)
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: widget.size * 0.3),
+              child: Transform.translate(
+                offset: Offset(0, -3 * math.max(0, math.sin(_c.value * 2 * math.pi - i * 0.8))),
+                child: Container(
+                  width: widget.size,
+                  height: widget.size,
+                  decoration: BoxDecoration(shape: BoxShape.circle, color: [AuraHues.violet, AuraHues.blue, AuraHues.cyan][i]),
+                ),
+              ),
             ),
-          ),
-      ]),
-    );
-  }
+        ]),
+      );
 }
 
 class EmptyState extends StatelessWidget {
-  const EmptyState({super.key, required this.icon, required this.text, this.action});
+  const EmptyState({super.key, required this.icon, required this.text, this.action, this.color = AuraHues.violet});
   final IconData icon;
   final String text;
   final Widget? action;
+  final Color color;
   @override
   Widget build(BuildContext context) => Center(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(32),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Container(
-              width: 76,
-              height: 76,
-              decoration: BoxDecoration(color: context.mc.glow, shape: BoxShape.circle),
-              child: Icon(icon, size: 34, color: context.cs.primary),
-            ),
-            const SizedBox(height: 16),
-            Text(text, textAlign: TextAlign.center, style: context.tt.bodyLarge?.copyWith(color: context.cs.onSurfaceVariant)),
-            if (action != null) ...[const SizedBox(height: 16), action!],
-          ]),
+          child: Reveal(
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Stack(alignment: Alignment.center, children: [
+                Container(
+                  width: 120,
+                  height: 120,
+                  decoration: BoxDecoration(shape: BoxShape.circle, gradient: RadialGradient(colors: [color.withValues(alpha: 0.22), color.withValues(alpha: 0)])),
+                ),
+                IconTile(icon: icon, color: color, size: 64, gradient: true),
+              ]),
+              const SizedBox(height: 12),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 360),
+                child: Text(text, textAlign: TextAlign.center, style: TextStyle(fontFamily: uiFont, fontSize: 15, height: 1.7, color: context.aura.muted)),
+              ),
+              if (action != null) ...[const SizedBox(height: 18), action!],
+            ]),
+          ),
         ),
       );
 }
@@ -178,8 +109,9 @@ class ErrorPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) => EmptyState(
         icon: Icons.cloud_off_rounded,
+        color: AuraHues.rose,
         text: errorText(context.l, code),
-        action: onRetry == null ? null : OutlinedButton.icon(onPressed: onRetry, icon: const Icon(Icons.refresh_rounded), label: Text(context.l.retry)),
+        action: onRetry == null ? null : SoftButton(onTap: onRetry, icon: Icons.refresh_rounded, label: context.l.retry),
       );
 }
 
@@ -209,18 +141,39 @@ class ReadingWidth extends StatelessWidget {
   Widget build(BuildContext context) => Center(child: ConstrainedBox(constraints: BoxConstraints(maxWidth: maxWidth), child: child));
 }
 
-class SectionTitle extends StatelessWidget {
-  const SectionTitle(this.text, {super.key, this.trailing});
-  final String text;
-  final Widget? trailing;
+/// Scaffold for pushed pages: aurora background and a floating back button.
+class AuraPage extends StatelessWidget {
+  const AuraPage({super.key, required this.body, this.title, this.actions = const [], this.floating, this.bottom});
+  final Widget body;
+  final Widget? title;
+  final List<Widget> actions;
+  final Widget? floating;
+  final Widget? bottom;
   @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.fromLTRB(4, 18, 4, 8),
-        child: Row(children: [
-          Expanded(
-            child: Text(text, style: context.tt.titleSmall?.copyWith(color: context.cs.primary, fontWeight: FontWeight.w700, letterSpacing: 0.2)),
+  Widget build(BuildContext context) => Scaffold(
+        floatingActionButton: floating,
+        bottomNavigationBar: bottom,
+        body: AuroraBackground(
+          intensity: 0.8,
+          child: SafeArea(
+            bottom: false,
+            child: Column(children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+                child: Row(children: [
+                  AuraIconButton(
+                    icon: Directionality.of(context) == TextDirection.rtl ? Icons.arrow_forward_rounded : Icons.arrow_back_rounded,
+                    tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+                    onTap: () => Navigator.of(context).maybePop(),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(child: title ?? const SizedBox()),
+                  ...actions,
+                ]),
+              ),
+              Expanded(child: body),
+            ]),
           ),
-          ?trailing,
-        ]),
+        ),
       );
 }

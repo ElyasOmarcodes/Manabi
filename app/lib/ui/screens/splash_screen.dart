@@ -12,13 +12,7 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 1400))..forward();
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    precacheImage(const AssetImage('assets/images/logo.png'), context);
-  }
+  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 1500))..forward();
 
   @override
   void dispose() {
@@ -28,42 +22,34 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
   @override
   Widget build(BuildContext context) {
-    final logo = CurvedAnimation(parent: _c, curve: const Interval(0, 0.65, curve: Curves.easeOutBack));
+    final a = context.aura;
+    final orb = CurvedAnimation(parent: _c, curve: const Interval(0, 0.7, curve: Curves.easeOutBack));
     final text = CurvedAnimation(parent: _c, curve: const Interval(0.35, 1, curve: Curves.easeOutCubic));
     return Scaffold(
-      body: AmbientBackground(
+      body: AuroraBackground(
+        intensity: 1.3,
         child: Center(
           child: Column(mainAxisSize: MainAxisSize.min, children: [
             ScaleTransition(
-              scale: Tween(begin: 0.7, end: 1.0).animate(logo),
-              child: FadeTransition(
-                opacity: logo,
-                child: Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(34),
-                    boxShadow: [BoxShadow(color: Palette.emerald.withValues(alpha: 0.28), blurRadius: 60, spreadRadius: 6, offset: const Offset(0, 18))],
-                  ),
-                  child: const ManabiLogo(size: 128),
-                ),
-              ),
+              scale: Tween(begin: 0.6, end: 1.0).animate(orb),
+              child: FadeTransition(opacity: orb, child: const AuraOrb(size: 190, child: ManabiMark(size: 76))),
             ),
-            const SizedBox(height: 28),
+            const SizedBox(height: 20),
             FadeTransition(
               opacity: text,
               child: SlideTransition(
-                position: Tween(begin: const Offset(0, 0.25), end: Offset.zero).animate(text),
+                position: Tween(begin: const Offset(0, 0.3), end: Offset.zero).animate(text),
                 child: Column(children: [
-                  Text('منابع', style: TextStyle(fontFamily: uiFont, fontSize: 40, fontWeight: FontWeight.w800, color: context.cs.onSurface, height: 1.2)),
-                  const SizedBox(height: 2),
-                  Text('M A N A B I', style: TextStyle(fontFamily: uiFont, fontSize: 13, letterSpacing: 3, color: context.mc.gold, fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 16),
+                  const GradientText('منابع', style: TextStyle(fontFamily: uiFont, fontSize: 50, fontWeight: FontWeight.w800, height: 1.25)),
+                  Text('M A N A B I', style: TextStyle(fontFamily: uiFont, fontSize: 13, letterSpacing: 4, color: a.muted, fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 18),
                   if (widget.tagline != null)
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 32),
-                      child: Text(widget.tagline!, textAlign: TextAlign.center, style: TextStyle(fontFamily: uiFont, fontSize: 15, color: context.cs.onSurfaceVariant)),
+                      padding: const EdgeInsets.symmetric(horizontal: 36),
+                      child: Text(widget.tagline!, textAlign: TextAlign.center, style: TextStyle(fontFamily: uiFont, fontSize: 15, height: 1.7, color: a.muted)),
                     ),
-                  const SizedBox(height: 28),
-                  const TypingDots(),
+                  const SizedBox(height: 30),
+                  const TypingDots(size: 9),
                 ]),
               ),
             ),
