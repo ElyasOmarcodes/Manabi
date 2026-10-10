@@ -43,3 +43,50 @@ test("authentication errors are not retried", async () => {
   await assert.rejects(gemini.generateJson({ system: "s", prompt: "p", schema: {} }), (e) => e.code === "AUTH");
   assert.equal(n, 1);
 });
+
+const listed = (names) => names.map((n) => ({ name: `models/${n}`, supportedGenerationMethods: ["generateContent"] }));
+
+test("quota, retired and overloaded models are skipped until a working one answers", async () => {
+  // The situation seen live: every Flash model out of quota or overloaded, an
+  // old one retired, Flash-Lite still fine. Switching must not run out of attempts.
+  const models = listed(["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-2.5-flash", "gemini-3.5-flash-lite"]);
+  const calls = [];
+  const fetch = async (url) => {
+    if (url.includes("/models?")) return json(200, { models });
+    const name = decodeURIComponent(url.split("/models/")[1].split(":")[0]);
+    calls.push(name);
+    if (name === "gemini-3.6-flash") return json(503, { error: { message: "This model is currently experiencing high demand." } });
+    if (name === "gemini-2.5-flash") return json(404, { error: { message: "This model models/gemini-2.5-flash is no longer available to new users." } });
+    if (name.endsWith("-flash")) return json(429, { error: { message: "You exceeded your current quota" } });
+    return answer({ ok: true });
+  };
+  const gemini = createGemini({ apiKey: "k", fetch });
+  const out = await gemini.generateJson({ system: "s", prompt: "p", schema: {} });
+  assert.equal(out.model, "gemini-3.5-flash-lite");
+  assert.deepEqual(calls, ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-2.5-flash", "gemini-3.5-flash-lite"]);
+  calls.length = 0;
+  await gemini.generateJson({ system: "s", prompt: "p", schema: {} });
+  assert.deepEqual(calls, ["gemini-3.5-flash-lite"], "failed models stay benched");
+});
+
+test("a model that times out is skipped for the next one", async () => {
+  const models = listed(["gemini-3.8-flash", "gemini-3.5-flash-lite"]);
+  const fetch = async (url, init) => {
+    if (url.includes("/models?")) return json(200, { models });
+    if (url.includes("3.8-flash")) {
+      return new Promise((_, reject) => init.signal.addEventListener("abort", () => reject(Object.assign(new Error("aborted"), { name: "AbortError" }))));
+    }
+    return answer({ ok: true });
+  };
+  const gemini = createGemini({ apiKey: "k", fetch, tierLimits: { main: { callMs: 50, totalMs: 5_000 }, fast: { callMs: 50, totalMs: 5_000 } } });
+  const out = await gemini.generateJson({ system: "s", prompt: "p", schema: {} });
+  assert.equal(out.model, "gemini-3.5-flash-lite");
+});
+
+test("when every model is out of quota the quota error is reported", async () => {
+  const models = listed(["gemini-3.8-flash", "gemini-3.5-flash-lite"]);
+  const fetch = async (url) => (url.includes("/models?") ? json(200, { models }) : json(429, { error: { message: "You exceeded your current quota" } }));
+  const gemini = createGemini({ apiKey: "k", fetch });
+  await assert.rejects(gemini.generateJson({ system: "s", prompt: "p", schema: {} }), (e) => e.code === "QUOTA");
+  await assert.rejects(gemini.generateJson({ system: "s", prompt: "p", schema: {} }), (e) => e.code === "QUOTA", "fails fast once everything is benched");
+});

@@ -11,19 +11,40 @@ import '../pipeline/answer_pipeline.dart' show JsonModel, ModelTier;
 const _api = 'https://generativelanguage.googleapis.com/v1beta';
 
 class GeminiException implements Exception {
-  const GeminiException(this.code, this.message, {this.retryable = false});
+  const GeminiException(this.code, this.message, {this.retryable = false, this.status});
 
-  /// AUTH, QUOTA, MODEL_NOT_FOUND, BLOCKED, BAD_OUTPUT, TIMEOUT, NETWORK, HTTP
+  /// AUTH, QUOTA, MODEL_NOT_FOUND, BLOCKED, BAD_OUTPUT, TIMEOUT, NETWORK, HTTP, UNAVAILABLE
   final String code;
   final String message;
   final bool retryable;
+  final int? status;
   @override
   String toString() => 'GeminiException($code): $message';
 }
 
+/// Only used when the model list cannot be read.
 const _fallback = {
-  ModelTier.main: ['gemini-2.5-flash', 'gemini-2.5-flash-lite'],
-  ModelTier.fast: ['gemini-2.5-flash-lite', 'gemini-2.5-flash'],
+  ModelTier.main: ['gemini-flash-latest', 'gemini-flash-lite-latest'],
+  ModelTier.fast: ['gemini-flash-lite-latest', 'gemini-flash-latest'],
+};
+
+/// Per-call time limit and overall budget of one generation, per tier.
+class TierLimits {
+  const TierLimits(this.call, this.total);
+  final Duration call;
+  final Duration total;
+  static const defaults = {
+    ModelTier.fast: TierLimits(Duration(seconds: 45), Duration(seconds: 100)),
+    ModelTier.main: TierLimits(Duration(seconds: 70), Duration(seconds: 200)),
+  };
+}
+
+/// How long a model is skipped after failing in a way another model can avoid.
+const _cooldown = {
+  'QUOTA': Duration(hours: 1),
+  'MODEL_NOT_FOUND': Duration(hours: 24),
+  'OVERLOADED': Duration(minutes: 3),
+  'TIMEOUT': Duration(minutes: 5),
 };
 
 /// Usable models for a tier, newest first, preferred kind first
@@ -53,25 +74,27 @@ String? pickModel(List<Map<String, dynamic>> models) {
 bool _isExhausted(String message) => RegExp('quota|exceeded your current', caseSensitive: false).hasMatch(message);
 
 class GeminiClient implements JsonModel {
-  GeminiClient({required this.apiKey, this.model, http.Client? client, this.timeout = const Duration(seconds: 75)})
-      : _http = client ?? http.Client();
+  GeminiClient({required this.apiKey, this.model, http.Client? client, this.limits = TierLimits.defaults}) : _http = client ?? http.Client();
 
   final String apiKey;
   final String? model;
-  final Duration timeout;
+  final Map<ModelTier, TierLimits> limits;
   final http.Client _http;
   List<Map<String, dynamic>>? _listed;
-  final _exhausted = <String, DateTime>{};
 
-  Future<Map<String, dynamic>> _call(String method, String url, [Object? body]) async {
+  /// Models skipped until a time, with the error that benched them.
+  final _benched = <String, ({DateTime until, GeminiException error})>{};
+
+  bool get _pinned => model != null && model!.isNotEmpty;
+
+  Future<Map<String, dynamic>> _call(String method, String url, {Object? body, Duration timeout = const Duration(seconds: 30)}) async {
     final uri = Uri.parse(url);
     final headers = {'content-type': 'application/json', 'x-goog-api-key': apiKey};
     http.Response res;
     try {
-      res = await (method == 'GET' ? _http.get(uri, headers: headers) : _http.post(uri, headers: headers, body: jsonEncode(body)))
-          .timeout(timeout);
+      res = await (method == 'GET' ? _http.get(uri, headers: headers) : _http.post(uri, headers: headers, body: jsonEncode(body))).timeout(timeout);
     } on TimeoutException {
-      throw const GeminiException('TIMEOUT', 'Gemini request timed out', retryable: true);
+      throw GeminiException('TIMEOUT', 'Gemini did not answer within ${timeout.inSeconds}s', retryable: true);
     } catch (e) {
       throw const GeminiException('NETWORK', 'Could not reach Gemini', retryable: true);
     }
@@ -81,14 +104,15 @@ class GeminiClient implements JsonModel {
     } catch (_) {
       json = const {};
     }
-    if (res.statusCode >= 200 && res.statusCode < 300) return json;
-    final message = (json['error'] as Map?)?['message'] as String? ?? 'Gemini HTTP ${res.statusCode}';
-    if ((res.statusCode == 400 && message.toLowerCase().contains('api key')) || res.statusCode == 401 || res.statusCode == 403) {
-      throw GeminiException('AUTH', message);
+    final status = res.statusCode;
+    if (status >= 200 && status < 300) return json;
+    final message = (json['error'] as Map?)?['message'] as String? ?? 'Gemini HTTP $status';
+    if ((status == 400 && message.toLowerCase().contains('api key')) || status == 401 || status == 403) {
+      throw GeminiException('AUTH', message, status: status);
     }
-    if (res.statusCode == 404) throw GeminiException('MODEL_NOT_FOUND', message);
-    if (res.statusCode == 429) throw GeminiException('QUOTA', message, retryable: !_isExhausted(message));
-    throw GeminiException('HTTP', message, retryable: res.statusCode >= 500);
+    if (status == 404) throw GeminiException('MODEL_NOT_FOUND', message, status: status);
+    if (status == 429) throw GeminiException('QUOTA', message, retryable: !_isExhausted(message), status: status);
+    throw GeminiException('HTTP', message, retryable: status >= 500, status: status);
   }
 
   Future<List<Map<String, dynamic>>> _listModels() async {
@@ -103,16 +127,19 @@ class GeminiClient implements JsonModel {
     return _listed!;
   }
 
-  /// Candidate models for a tier, skipping those whose quota is exhausted.
+  /// Candidate models for a tier, best first, without benched ones.
   Future<List<String>> _candidates(ModelTier tier) async {
-    if (model != null && model!.isNotEmpty) return [model!];
-    final unique = {...rankModels(await _listModels(), tier), ..._fallback[tier]!}.toList();
+    if (_pinned) return [model!];
+    final listed = await _listModels();
+    final unique = {...rankModels(listed, tier), if (listed.isEmpty) ..._fallback[tier]!}.toList();
     final now = DateTime.now();
-    final ready = unique.where((m) => !(_exhausted[m]?.isAfter(now) ?? false)).toList();
-    return ready.isNotEmpty ? ready : unique.take(1).toList();
+    return unique.where((m) => !(_benched[m]?.until.isAfter(now) ?? false)).toList();
   }
 
-  Future<String> resolveModel([ModelTier tier = ModelTier.main]) async => (await _candidates(tier)).first;
+  Future<String> resolveModel([ModelTier tier = ModelTier.main]) async {
+    final c = await _candidates(tier);
+    return c.isNotEmpty ? c.first : _fallback[tier]!.first;
+  }
 
   /// Validates the key with a cheap call (lists models).
   Future<String> check() async {
@@ -120,6 +147,19 @@ class GeminiClient implements JsonModel {
     return resolveModel();
   }
 
+  /// Why a model should be skipped in favour of the next one, or null.
+  static String? _benchReason(GeminiException e) {
+    if (e.code == 'MODEL_NOT_FOUND') return 'MODEL_NOT_FOUND';
+    if (e.code == 'QUOTA' && !e.retryable) return 'QUOTA';
+    if (e.code == 'TIMEOUT') return 'TIMEOUT';
+    if (e.code == 'HTTP' && (e.status ?? 0) >= 500) return 'OVERLOADED';
+    return null;
+  }
+
+  /// Runs one JSON-schema constrained generation. A model that is slow,
+  /// overloaded, out of quota or retired is skipped for a while and the next
+  /// one is tried at once; switching does not use up the retry budget, and
+  /// the whole call has a time limit.
   @override
   Future<({Map<String, dynamic> data, String model})> generateJson({
     required String system,
@@ -128,6 +168,8 @@ class GeminiClient implements JsonModel {
     double temperature = 0.2,
     ModelTier tier = ModelTier.main,
   }) async {
+    final budget = limits[tier] ?? TierLimits.defaults[tier]!;
+    final deadline = DateTime.now().add(budget.total);
     final body = {
       'systemInstruction': {
         'parts': [
@@ -147,11 +189,21 @@ class GeminiClient implements JsonModel {
     GeminiException? last;
     final tried = <String>{};
     var retries = 0;
-    final pinned = model != null && model!.isNotEmpty;
-    for (var attempt = 0; attempt < 6; attempt++) {
-      final name = await resolveModel(tier);
+    while (true) {
+      final name = (await _candidates(tier)).where((m) => !tried.contains(m)).firstOrNull;
+      if (name == null) {
+        // Nothing left: report the most telling reason (quota beats the rest).
+        final stored = [for (final b in _benched.values) b.error];
+        throw stored.where((e) => e.code == 'QUOTA').firstOrNull ??
+            last ??
+            stored.firstOrNull ??
+            const GeminiException('UNAVAILABLE', 'No Gemini model is available right now');
+      }
       try {
-        final result = await _call('POST', '$_api/models/${Uri.encodeComponent(name)}:generateContent', body);
+        final left = deadline.difference(DateTime.now());
+        final remaining = left < const Duration(seconds: 5) ? const Duration(seconds: 5) : left;
+        final timeout = remaining < budget.call ? remaining : budget.call;
+        final result = await _call('POST', '$_api/models/${Uri.encodeComponent(name)}:generateContent', body: body, timeout: timeout);
         final candidates = result['candidates'] as List?;
         if (candidates == null || candidates.isEmpty) {
           final reason = (result['promptFeedback'] as Map?)?['blockReason'];
@@ -166,22 +218,26 @@ class GeminiClient implements JsonModel {
         }
       } on GeminiException catch (raw) {
         // Keep the model name with the error so the UI can show what failed.
-        final e = GeminiException(raw.code, '${raw.message} [$name]', retryable: raw.retryable);
+        final e = GeminiException(raw.code, '${raw.message} [$name]', retryable: raw.retryable, status: raw.status);
         last = e;
-        tried.add(name);
-        if (!pinned && (e.code == 'MODEL_NOT_FOUND' || (e.code == 'QUOTA' && !e.retryable))) {
-          // This model's daily quota is used up (or it is gone): move on to the next one.
-          _exhausted[name] = DateTime.now().add(const Duration(hours: 1));
-          if ((await _candidates(tier)).every(tried.contains)) throw e;
-          continue;
+        final reason = _pinned ? null : _benchReason(raw);
+        if (reason != null) {
+          _benched[name] = (until: DateTime.now().add(_cooldown[reason]!), error: e);
+          tried.add(name);
+        } else if (!raw.retryable) {
+          throw e; // bad key, blocked prompt, invalid request: another model will not help
+        } else if (retries < 2) {
+          retries++;
+          await Future<void>.delayed(Duration(milliseconds: 800 * (1 << retries)));
+        } else if (_pinned || raw.code == 'NETWORK') {
+          throw e; // a pinned model, or no connection at all
+        } else {
+          // The same model kept failing (e.g. malformed output): try the next one.
+          tried.add(name);
+          retries = 0;
         }
-        if (!e.retryable) throw e;
-        // A slow or flaky connection should fail within minutes, not tens of minutes.
-        retries++;
-        if (retries > 2 || (e.code == 'TIMEOUT' && retries > 1)) throw e;
-        await Future<void>.delayed(Duration(milliseconds: 800 * (1 << retries)));
+        if (DateTime.now().isAfter(deadline)) throw e;
       }
     }
-    throw last!;
   }
 }

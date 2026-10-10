@@ -6,7 +6,14 @@
 // model reports an exhausted quota the client moves on to the next one.
 
 const API = "https://generativelanguage.googleapis.com/v1beta";
-const FALLBACK = { main: ["gemini-2.5-flash", "gemini-2.5-flash-lite"], fast: ["gemini-2.5-flash-lite", "gemini-2.5-flash"] };
+// Only used when the model list cannot be read.
+const FALLBACK = { main: ["gemini-flash-latest", "gemini-flash-lite-latest"], fast: ["gemini-flash-lite-latest", "gemini-flash-latest"] };
+
+/** Per-call time limits and the overall budget of one generation, per tier. */
+const TIER_LIMITS = { fast: { callMs: 45_000, totalMs: 100_000 }, main: { callMs: 70_000, totalMs: 200_000 } };
+
+/** How long a model is skipped after it fails in a way another model can avoid. */
+const COOLDOWN_MS = { QUOTA: 60 * 60_000, MODEL_NOT_FOUND: 24 * 60 * 60_000, OVERLOADED: 3 * 60_000, TIMEOUT: 5 * 60_000 };
 
 export class GeminiError extends Error {
   constructor(code, message, { status, retryable = false } = {}) {
@@ -42,14 +49,14 @@ export const pickModel = (models) => rankModels(models, "main")[0];
 /** A 429 that names a daily/plan quota (as opposed to a short burst limit). */
 const isExhausted = (message) => /quota|exceeded your current/i.test(message ?? "");
 
-export const createGemini = ({ apiKey, model, fetch: fetcher = fetch, timeoutMs = 90_000, now = () => Date.now() } = {}) => {
+export const createGemini = ({ apiKey, model, fetch: fetcher = fetch, timeoutMs = 90_000, now = () => Date.now(), tierLimits = TIER_LIMITS } = {}) => {
   if (!apiKey) throw new GeminiError("NO_API_KEY", "Gemini API key is not configured");
   let available; // models listed by the API
-  const exhausted = new Map(); // model → time it may be retried
+  const benched = new Map(); // model → { until, error }: skipped until then
 
-  const call = async (url, init = {}) => {
+  const call = async (url, init = {}, limitMs = timeoutMs) => {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const timer = setTimeout(() => controller.abort(), limitMs);
     try {
       const response = await fetcher(url, {
         ...init,
@@ -93,32 +100,52 @@ export const createGemini = ({ apiKey, model, fetch: fetcher = fetch, timeoutMs 
     return available;
   };
 
-  /** Candidate models for a tier, skipping those whose quota is exhausted. */
+  /** Candidate models for a tier, best first, without benched ones. */
   const candidates = async (tier) => {
     if (model) return [model];
     const listed = await listModels();
-    const ranked = [...rankModels(listed, tier), ...FALLBACK[tier]];
-    const unique = [...new Set(ranked)];
-    const ready = unique.filter((m) => (exhausted.get(m) ?? 0) <= now());
-    return ready.length ? ready : unique.slice(0, 1);
+    const unique = [...new Set([...rankModels(listed, tier), ...(listed.length ? [] : FALLBACK[tier])])];
+    return unique.filter((m) => (benched.get(m)?.until ?? 0) <= now());
   };
 
-  const resolveModel = async (tier = "main") => (await candidates(tier))[0];
+  const resolveModel = async (tier = "main") => (await candidates(tier))[0] ?? FALLBACK[tier][0];
 
-  /** Runs one JSON-schema constrained generation and returns the parsed object. */
+  /** Why a model should be skipped in favour of the next one (or undefined). */
+  const benchReason = (error) => {
+    if (error.code === "MODEL_NOT_FOUND") return "MODEL_NOT_FOUND";
+    if (error.code === "QUOTA" && !error.retryable) return "QUOTA";
+    if (error.code === "TIMEOUT") return "TIMEOUT";
+    if (error.code === "HTTP" && error.status >= 500) return "OVERLOADED";
+    return undefined;
+  };
+
+  /**
+   * Runs one JSON-schema constrained generation and returns the parsed object.
+   * A model that is slow, overloaded, out of quota or retired is skipped for a
+   * while and the next model is tried at once; switching models does not use
+   * up the retry budget, and the whole call has a time limit.
+   */
   const generateJson = async ({ system, prompt, schema, temperature = 0.2, tier = "main" }) => {
+    const limits = tierLimits[tier] ?? tierLimits.main;
+    const deadline = now() + limits.totalMs;
     const body = {
       systemInstruction: { parts: [{ text: system }] },
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       generationConfig: { temperature, responseMimeType: "application/json", responseSchema: schema },
     };
     let lastError;
-    const tried = new Set();
     let retries = 0;
-    for (let attempt = 0; attempt < 6; attempt += 1) {
-      const name = (await candidates(tier)).find((m) => !tried.has(m) || attempt < 2) ?? (await resolveModel(tier));
+    const tried = new Set();
+    for (;;) {
+      const name = (await candidates(tier)).find((m) => !tried.has(m));
+      if (!name) {
+        // Nothing left: report the most telling reason (quota beats the rest).
+        const stored = [...benched.values()].map((b) => b.error);
+        throw stored.find((e) => e.code === "QUOTA") ?? lastError ?? stored[0] ?? new GeminiError("UNAVAILABLE", "No Gemini model is available right now");
+      }
       try {
-        const result = await call(`${API}/models/${encodeURIComponent(name)}:generateContent`, { method: "POST", body: JSON.stringify(body) });
+        const remaining = Math.max(5_000, deadline - now());
+        const result = await call(`${API}/models/${encodeURIComponent(name)}:generateContent`, { method: "POST", body: JSON.stringify(body) }, Math.min(limits.callMs, remaining));
         const candidate = result.candidates?.[0];
         if (!candidate) {
           const reason = result.promptFeedback?.blockReason;
@@ -130,27 +157,28 @@ export const createGemini = ({ apiKey, model, fetch: fetcher = fetch, timeoutMs 
         } catch {
           throw new GeminiError("BAD_OUTPUT", "Gemini returned malformed JSON", { retryable: true });
         }
-      } catch (error) {
+      } catch (raw) {
+        const error = raw instanceof GeminiError ? new GeminiError(raw.code, `${raw.message} [${name}]`, { status: raw.status, retryable: raw.retryable }) : raw;
         lastError = error;
-        tried.add(name);
-        if (model) {
-          if (!error.retryable) throw error;
-        } else if (error.code === "MODEL_NOT_FOUND" || (error.code === "QUOTA" && !error.retryable)) {
-          // Daily quota for this model is used up (or the model is gone): try another model.
-          exhausted.set(name, now() + 60 * 60 * 1000);
-          const rest = (await candidates(tier)).filter((m) => !tried.has(m));
-          if (!rest.length) throw error;
-          continue;
-        } else if (!error.retryable) {
-          throw error;
+        const reason = model ? undefined : benchReason(raw);
+        if (reason) {
+          benched.set(name, { until: now() + COOLDOWN_MS[reason], error });
+          tried.add(name);
+        } else if (!raw.retryable) {
+          throw error; // bad key, blocked prompt, invalid request: another model will not help
+        } else if (retries < 2) {
+          retries += 1;
+          await sleep(800 * 2 ** retries);
+        } else if (model || raw.code === "NETWORK") {
+          throw error; // a pinned model, or no connection at all
+        } else {
+          // Same model kept failing (e.g. malformed output): try the next one.
+          tried.add(name);
+          retries = 0;
         }
-        // A slow or flaky connection should fail within minutes, not tens of minutes.
-        retries += 1;
-        if (retries > 2 || (error.code === "TIMEOUT" && retries > 1)) throw error;
-        await sleep(800 * 2 ** retries);
+        if (now() >= deadline) throw error;
       }
     }
-    throw lastError;
   };
 
   return { generateJson, resolveModel };
