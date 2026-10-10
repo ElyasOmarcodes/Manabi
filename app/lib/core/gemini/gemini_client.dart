@@ -164,19 +164,21 @@ class GeminiClient implements JsonModel {
         } catch (_) {
           throw const GeminiException('BAD_OUTPUT', 'Gemini returned malformed JSON', retryable: true);
         }
-      } on GeminiException catch (e) {
+      } on GeminiException catch (raw) {
+        // Keep the model name with the error so the UI can show what failed.
+        final e = GeminiException(raw.code, '${raw.message} [$name]', retryable: raw.retryable);
         last = e;
         tried.add(name);
         if (!pinned && (e.code == 'MODEL_NOT_FOUND' || (e.code == 'QUOTA' && !e.retryable))) {
           // This model's daily quota is used up (or it is gone): move on to the next one.
           _exhausted[name] = DateTime.now().add(const Duration(hours: 1));
-          if ((await _candidates(tier)).every(tried.contains)) rethrow;
+          if ((await _candidates(tier)).every(tried.contains)) throw e;
           continue;
         }
-        if (!e.retryable) rethrow;
+        if (!e.retryable) throw e;
         // A slow or flaky connection should fail within minutes, not tens of minutes.
         retries++;
-        if (retries > 2 || (e.code == 'TIMEOUT' && retries > 1)) rethrow;
+        if (retries > 2 || (e.code == 'TIMEOUT' && retries > 1)) throw e;
         await Future<void>.delayed(Duration(milliseconds: 800 * (1 << retries)));
       }
     }

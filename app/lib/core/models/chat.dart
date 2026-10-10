@@ -14,6 +14,7 @@ class ChatTurn {
     this.result,
     this.state = MessageState.pending,
     this.errorCode,
+    this.errorDetail,
     this.favorite = false,
   });
 
@@ -27,6 +28,9 @@ class ChatTurn {
   AnswerResult? result;
   MessageState state;
   String? errorCode;
+
+  /// Technical reason behind [errorCode] (status, model, timeout), shown small.
+  String? errorDetail;
   bool favorite;
 
   factory ChatTurn.fromJson(Map<String, dynamic> j) => ChatTurn(
@@ -40,6 +44,7 @@ class ChatTurn {
             ? MessageState.done
             : MessageState.failed, // a pending turn from a previous run was interrupted
         errorCode: j['errorCode'] as String? ?? (j['state'] == 'done' ? null : 'INTERRUPTED'),
+        errorDetail: j['errorDetail'] as String?,
         favorite: j['favorite'] == true,
       );
 
@@ -52,6 +57,7 @@ class ChatTurn {
         if (result != null) 'result': result!.toJson(),
         'state': state.name,
         if (errorCode != null) 'errorCode': errorCode,
+        if (errorDetail != null) 'errorDetail': errorDetail,
         'favorite': favorite,
       };
 }

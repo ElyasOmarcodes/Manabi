@@ -231,7 +231,7 @@ class _TurnView extends StatelessWidget {
           child: switch (turn.state) {
             MessageState.pending => StageTimeline(key: const ValueKey('p'), progress: progress ?? AskProgress()),
             MessageState.done when turn.result != null => AnswerCard(key: ValueKey('a${turn.id}'), turn: turn, onRetry: retry),
-            _ => _ErrorLine(key: const ValueKey('e'), code: turn.errorCode, onRetry: retry),
+            _ => _ErrorLine(key: const ValueKey('e'), code: turn.errorCode, detail: turn.errorDetail, onRetry: retry),
           },
         ),
       ]),
@@ -273,8 +273,9 @@ class _UserBubble extends StatelessWidget {
 }
 
 class _ErrorLine extends StatelessWidget {
-  const _ErrorLine({super.key, required this.code, required this.onRetry});
+  const _ErrorLine({super.key, required this.code, this.detail, required this.onRetry});
   final String? code;
+  final String? detail;
   final VoidCallback onRetry;
   @override
   Widget build(BuildContext context) {
@@ -286,6 +287,11 @@ class _ErrorLine extends StatelessWidget {
       Expanded(
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(errorText(l, code), style: TextStyle(fontFamily: uiFont, color: a.text, height: 1.6)),
+          if (detail != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Text(detail!, maxLines: 3, overflow: TextOverflow.ellipsis, textDirection: TextDirection.ltr, style: TextStyle(fontFamily: uiFont, fontSize: 11.5, color: a.faint, height: 1.4)),
+            ),
           const SizedBox(height: 6),
           if (isSetupError(code))
             SoftButton(dense: true, label: l.openSettings, icon: Icons.tune_rounded, onTap: () => openSection(context, Section.settings))

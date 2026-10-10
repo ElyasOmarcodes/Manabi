@@ -133,6 +133,7 @@ class ChatController extends ChangeNotifier with WidgetsBindingObserver {
     turn
       ..state = MessageState.pending
       ..errorCode = null
+      ..errorDetail = null
       ..result = null;
     final r = _requests[turn.id] ?? (fallbackLanguage: 'en', depth: 'standard', requestId: _uuid.v4());
     _run(chat, turn, fallbackLanguage: r.fallbackLanguage, depth: r.depth, requestId: r.requestId);
@@ -186,7 +187,10 @@ class ChatController extends ChangeNotifier with WidgetsBindingObserver {
         }
         notifyListeners();
       },
-      onError: (Object e) => _fail(chat, turn, mapError(e).code),
+      onError: (Object e) {
+        final error = mapError(e);
+        _fail(chat, turn, error.code, detail: error.message);
+      },
       onDone: () {
         if (turn.state == MessageState.pending) return _fail(chat, turn, 'NETWORK');
         _finish(chat, turn);
@@ -195,7 +199,7 @@ class ChatController extends ChangeNotifier with WidgetsBindingObserver {
     );
   }
 
-  void _fail(Chat chat, ChatTurn turn, String code) {
+  void _fail(Chat chat, ChatTurn turn, String code, {String? detail}) {
     _running.remove(turn.id);
     // The connection dropped while the app was in the background: resume
     // the answer once the app is back (or right away if it already is).
@@ -210,7 +214,8 @@ class ChatController extends ChangeNotifier with WidgetsBindingObserver {
     }
     turn
       ..state = MessageState.failed
-      ..errorCode = code;
+      ..errorCode = code
+      ..errorDetail = (detail == null || detail.isEmpty) ? null : (detail.length > 240 ? '${detail.substring(0, 240)}…' : detail);
     _finish(chat, turn);
   }
 

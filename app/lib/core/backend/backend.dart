@@ -45,7 +45,7 @@ BackendException mapError(Object e) {
           'NETWORK' => 'NETWORK',
           _ => 'GEMINI_UNAVAILABLE',
         },
-        e.message);
+        '${e.code}: ${e.message}');
   }
   if (e is TimeoutException || e is http.ClientException) return BackendException('NETWORK', '$e');
   return BackendException('INTERNAL', '$e');
