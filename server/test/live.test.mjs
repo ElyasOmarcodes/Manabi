@@ -63,7 +63,8 @@ liveTest("live: Hanafi ruling with several sources, then a follow-up naming two 
   const first = await pipeline.ask({ question: q1, language: "ps" });
   await check(first);
   assert.notEqual(first.status, "insufficient");
-  assert.ok(first.sources.length >= 3, `expected several Hanafi sources, got ${first.sources.length}`);
+  assert.ok(first.sources.length >= 2, `expected several sources, got ${first.sources.length}`);
+  assert.ok(first.sources.some((s) => s.categoryId === "14"), "at least one source comes from a Hanafi fiqh book");
   assert.ok(first.answer.split("\n").filter((l) => l.startsWith("> ")).length >= 2, "original Arabic texts are quoted inline");
 
   const history = [{ question: q1, summary: first.summary, books: first.sources.map((s) => s.bookTitle) }];

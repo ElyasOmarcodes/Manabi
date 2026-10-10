@@ -190,7 +190,13 @@ const ask = async (name, { lang, question, width = 1440, height = 900, theme = "
     await page.keyboard.press("Enter");
     await page.waitForTimeout(2500);
     await shot(page, `${name}-progress`);
-    const status = await waitForAnswer(page, done);
+    const status = await waitForAnswer(page, done).catch(async (error) => {
+      // Keep evidence of what the app showed instead of the answer.
+      await shot(page, `${name}-timeout`);
+      const texts = await page.evaluate(() => [...document.querySelectorAll("flt-semantics")].map((n) => n.getAttribute("aria-label") || "").filter(Boolean).slice(-25));
+      console.error(name, "visible:", JSON.stringify(texts).slice(0, 1500));
+      throw error;
+    });
     console.log(name, "status:", status);
     await page.waitForTimeout(1500);
     await shot(page, `${name}-answer`);

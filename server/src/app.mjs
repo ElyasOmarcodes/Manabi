@@ -159,10 +159,12 @@ export const createApp = ({ config, pipeline, turath, catalog, gemini, logger = 
     const heartbeat = setInterval(() => res.write(": keep-alive\n\n"), 15_000);
     try {
       const result = await pipeline.ask(body, send);
+      logger.info?.("ask", result.status, `${result.sources?.length ?? 0} sources`, result.model, `${result.elapsedMs}ms`);
       send("result", result);
     } catch (error) {
       const info = errorInfo(error);
       if (info.status >= 500) logger.error("ask failed", error?.code ?? error?.name, error?.message);
+      else logger.info?.("ask rejected", info.code, String(info.message ?? "").slice(0, 160));
       send("error", { code: info.code, message: info.message });
     } finally {
       clearInterval(heartbeat);

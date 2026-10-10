@@ -94,8 +94,11 @@ jobs:
   screenshots:
     name: Screenshots (UI + real answers)
     runs-on: ubuntu-latest
-    needs: [server, flutter]
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    # After the live tests, so the two jobs don't compete for the same Gemini quota.
+    needs: [server, flutter, server-live]
+    if: >-
+      always() && needs.server.result == 'success' && needs.flutter.result == 'success' &&
+      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     env:
       HAS_GEMINI_KEY: ${{ secrets.GEMINI_API_KEY != '' || secrets.GEMINI_API_KYA != '' }}
       # Real answers spend Gemini quota: only daily and on manual runs.
