@@ -98,11 +98,18 @@ String stripMarkdown(String markdown) => parseBlocks(markdown).map((b) {
       };
     }).join('\n\n');
 
+bool _isArabic(String text) {
+  final arabic = RegExp('[\u0600-\u06FF]').allMatches(text).length;
+  final latin = RegExp('[A-Za-z]').allMatches(text).length;
+  return arabic > latin;
+}
+
 class AnswerMarkdown extends StatelessWidget {
-  const AnswerMarkdown({super.key, required this.markdown, this.onCite, this.style});
+  const AnswerMarkdown({super.key, required this.markdown, this.onCite, this.style, this.quoteScale = 1});
   final String markdown;
   final ValueChanged<int>? onCite;
   final TextStyle? style;
+  final double quoteScale;
 
   @override
   Widget build(BuildContext context) {
@@ -113,7 +120,7 @@ class AnswerMarkdown extends StatelessWidget {
       children: [
         for (final b in blocks)
           Padding(
-            padding: EdgeInsets.only(bottom: b.kind == BlockKind.heading ? 6 : 10),
+            padding: EdgeInsets.only(top: b.kind == BlockKind.heading ? 10 : 0, bottom: b.kind == BlockKind.heading ? 4 : 10),
             child: _block(context, b, base),
           ),
       ],
@@ -142,10 +149,28 @@ class AnswerMarkdown extends StatelessWidget {
           ]),
         );
       case BlockKind.quote:
+        // Verified Arabic source text: right-to-left, classical font, brand bar.
+        final arabic = _isArabic(b.text);
         return Container(
-          padding: const EdgeInsetsDirectional.only(start: 14, top: 4, bottom: 4),
-          decoration: BoxDecoration(border: BorderDirectional(start: BorderSide(color: context.aura.accent, width: 3))),
-          child: Text.rich(_spans(context, b.text, base.copyWith(fontStyle: FontStyle.italic))),
+          margin: const EdgeInsets.symmetric(vertical: 4),
+          padding: const EdgeInsetsDirectional.fromSTEB(16, 10, 16, 10),
+          decoration: BoxDecoration(
+            color: context.aura.accentTint,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Directionality(
+            textDirection: arabic ? TextDirection.rtl : Directionality.of(context),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Container(width: 3, height: 26, margin: const EdgeInsetsDirectional.only(end: 12, top: 6), decoration: BoxDecoration(color: context.aura.accent, borderRadius: BorderRadius.circular(3))),
+              Expanded(
+                child: Text.rich(_spans(
+                  context,
+                  b.text,
+                  arabic ? arabicStyle(context, size: (base.fontSize ?? 16) + 2.5, scale: quoteScale) : base.copyWith(fontStyle: FontStyle.italic),
+                )),
+              ),
+            ]),
+          ),
         );
       case BlockKind.paragraph:
         return Text.rich(_spans(context, b.text, base));
@@ -173,21 +198,20 @@ class CiteChip extends StatelessWidget {
   final ValueChanged<int>? onTap;
 
   @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 2),
-        child: Pressable(
-          onTap: onTap == null ? null : () => onTap!(n),
-          scale: 0.85,
-          child: Container(
-            constraints: const BoxConstraints(minWidth: 22),
-            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
-            decoration: BoxDecoration(
-              gradient: context.aura.brand,
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [BoxShadow(color: AuraHues.violet.withValues(alpha: 0.3), blurRadius: 8, offset: const Offset(0, 3), spreadRadius: -3)],
-            ),
-            child: Text('$n', textAlign: TextAlign.center, style: const TextStyle(fontFamily: uiFont, fontSize: 11.5, fontWeight: FontWeight.w800, color: Colors.white, height: 1.5)),
-          ),
+  Widget build(BuildContext context) {
+    final a = context.aura;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 2),
+      child: Pressable(
+        onTap: onTap == null ? null : () => onTap!(n),
+        scale: 0.85,
+        child: Container(
+          constraints: const BoxConstraints(minWidth: 20),
+          padding: const EdgeInsets.symmetric(horizontal: 6),
+          decoration: BoxDecoration(color: a.accentTint, borderRadius: BorderRadius.circular(8)),
+          child: Text('$n', textAlign: TextAlign.center, style: TextStyle(fontFamily: uiFont, fontSize: 11.5, fontWeight: FontWeight.w700, color: a.accent, height: 1.6)),
         ),
-      );
+      ),
+    );
+  }
 }

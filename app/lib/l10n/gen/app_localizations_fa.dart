@@ -531,4 +531,13 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get allCategories => 'همهٔ دسته‌ها';
+
+  @override
+  String get stageReading => 'خواندن و گزینش صفحه‌ها';
+
+  @override
+  String get welcomeQuestion => 'امروز دربارهٔ چه می‌خواهید پژوهش کنید؟';
+
+  @override
+  String get options => 'گزینه‌های جست‌وجو';
 }

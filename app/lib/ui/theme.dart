@@ -6,19 +6,23 @@ import 'package:flutter/material.dart';
 const uiFont = 'Vazirmatn';
 const arabicFont = 'NotoNaskhArabic';
 
+/// Restrained brand palette: one violet with an orchid companion for the
+/// signature gradient. Everything else is neutral. Named "hues" are kept so
+/// call sites read well, but they all map onto the brand pair; red is
+/// reserved for destructive actions and errors.
 class AuraHues {
-  static const violet = Color(0xFF7357FF);
-  static const blue = Color(0xFF3B82F6);
-  static const cyan = Color(0xFF14C3E0);
-  static const pink = Color(0xFFF2569B);
-  static const orange = Color(0xFFFF9655);
-  static const mint = Color(0xFF19C394);
-  static const amber = Color(0xFFF5B43C);
-  static const rose = Color(0xFFFF6B6B);
+  static const violet = Color(0xFF6A5AE0);
+  static const orchid = Color(0xFFB44CD6);
+  static const blue = violet;
+  static const cyan = violet;
+  static const mint = violet;
+  static const amber = violet;
+  static const pink = orchid;
+  static const orange = orchid;
+  static const rose = Color(0xFFE5484D);
 
-  /// Palette for icon tiles and covers – cycled by index.
-  static const all = [violet, blue, cyan, mint, amber, orange, pink, rose];
-  static Color at(int i) => all[i.abs() % all.length];
+  static const all = [violet];
+  static Color at(int i) => violet;
 }
 
 class Aura extends ThemeExtension<Aura> {
@@ -54,48 +58,45 @@ class Aura extends ThemeExtension<Aura> {
   final Color danger;
   final Color shadow;
 
-  LinearGradient get brand => const LinearGradient(colors: [AuraHues.violet, AuraHues.blue, AuraHues.cyan], begin: Alignment.topLeft, end: Alignment.bottomRight);
-  LinearGradient get warm => const LinearGradient(colors: [AuraHues.pink, AuraHues.orange], begin: Alignment.topLeft, end: Alignment.bottomRight);
-  LinearGradient get soft => LinearGradient(
-        colors: dark
-            ? [AuraHues.violet.withValues(alpha: 0.16), AuraHues.cyan.withValues(alpha: 0.08)]
-            : [AuraHues.violet.withValues(alpha: 0.08), AuraHues.cyan.withValues(alpha: 0.06)],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      );
+  LinearGradient get brand => const LinearGradient(colors: [AuraHues.violet, AuraHues.orchid], begin: Alignment.topLeft, end: Alignment.bottomRight);
+  LinearGradient get warm => brand;
+
+  /// Very light brand tint used behind quotes and info boxes.
+  LinearGradient get soft => LinearGradient(colors: [accentTint, accentTint]);
+  Color get accentTint => AuraHues.violet.withValues(alpha: dark ? 0.14 : 0.07);
 
   static const light = Aura(
     dark: false,
-    bg: Color(0xFFF6F7FC),
+    bg: Color(0xFFFFFFFF),
     surface: Color(0xFFFFFFFF),
-    surfaceAlt: Color(0xFFF0F2FA),
-    glass: Color(0xCCFFFFFF),
-    border: Color(0xFFE5E8F3),
-    text: Color(0xFF111327),
-    muted: Color(0xFF666B8A),
-    faint: Color(0xFFA3A8C3),
-    accent: Color(0xFF6650F5),
+    surfaceAlt: Color(0xFFF3F3F7),
+    glass: Color(0xF2FFFFFF),
+    border: Color(0xFFE8E8EF),
+    text: Color(0xFF16161D),
+    muted: Color(0xFF6B6B7B),
+    faint: Color(0xFFA6A6B4),
+    accent: Color(0xFF6A5AE0),
     success: Color(0xFF12A673),
     warning: Color(0xFFE08A00),
     danger: Color(0xFFE5484D),
-    shadow: Color(0x1A3B3F8F),
+    shadow: Color(0x0F1A1A2E),
   );
 
   static const night = Aura(
     dark: true,
-    bg: Color(0xFF070811),
-    surface: Color(0xFF10121D),
-    surfaceAlt: Color(0xFF171A29),
-    glass: Color(0xB3131626),
-    border: Color(0xFF242842),
-    text: Color(0xFFF1F2FA),
-    muted: Color(0xFF9095B4),
-    faint: Color(0xFF5A5F80),
-    accent: Color(0xFF9B8CFF),
+    bg: Color(0xFF111114),
+    surface: Color(0xFF1A1A1F),
+    surfaceAlt: Color(0xFF232329),
+    glass: Color(0xF21A1A1F),
+    border: Color(0xFF2C2C33),
+    text: Color(0xFFEDEDF2),
+    muted: Color(0xFF9D9DAB),
+    faint: Color(0xFF63636F),
+    accent: Color(0xFF9A8CFF),
     success: Color(0xFF3DD9A0),
     warning: Color(0xFFFFC266),
     danger: Color(0xFFFF6B70),
-    shadow: Color(0x66000000),
+    shadow: Color(0x40000000),
   );
 
   @override
@@ -135,8 +136,8 @@ ThemeData buildTheme(Brightness brightness) {
   final scheme = ColorScheme.fromSeed(seedColor: AuraHues.violet, brightness: brightness).copyWith(
     primary: a.accent,
     onPrimary: Colors.white,
-    secondary: AuraHues.cyan,
-    tertiary: AuraHues.pink,
+    secondary: AuraHues.orchid,
+    tertiary: AuraHues.orchid,
     surface: a.bg,
     onSurface: a.text,
     onSurfaceVariant: a.muted,

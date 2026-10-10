@@ -167,7 +167,7 @@ class _CategoriesTab extends StatelessWidget {
               onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => _CategoryBooks(category: cat, color: hue))),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Row(children: [
-                  IconTile(icon: categoryIcon(cat.id), color: hue, size: 40, gradient: true),
+                  IconTile(icon: categoryIcon(cat.id), color: hue, size: 40),
                   const Spacer(),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),

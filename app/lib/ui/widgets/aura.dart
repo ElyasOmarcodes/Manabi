@@ -6,69 +6,13 @@ import 'package:flutter/material.dart';
 
 import '../theme.dart';
 
-/// Slowly drifting colour fields behind every page.
-class AuroraBackground extends StatefulWidget {
+/// Clean solid page background (kept as a widget so pages share one look).
+class AuroraBackground extends StatelessWidget {
   const AuroraBackground({super.key, required this.child, this.intensity = 1});
   final Widget child;
   final double intensity;
   @override
-  State<AuroraBackground> createState() => _AuroraBackgroundState();
-}
-
-class _AuroraBackgroundState extends State<AuroraBackground> with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(seconds: 24))..repeat();
-
-  @override
-  void dispose() {
-    _c.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final a = context.aura;
-    final k = (a.dark ? 0.55 : 0.32) * widget.intensity;
-    return Stack(children: [
-      Positioned.fill(child: ColoredBox(color: a.bg)),
-      Positioned.fill(
-        child: RepaintBoundary(
-          child: AnimatedBuilder(
-            animation: _c,
-            builder: (context, _) => CustomPaint(painter: _AuroraPainter(_c.value, k, a.dark)),
-          ),
-        ),
-      ),
-      Positioned.fill(child: widget.child),
-    ]);
-  }
-}
-
-class _AuroraPainter extends CustomPainter {
-  _AuroraPainter(this.t, this.k, this.dark);
-  final double t;
-  final double k;
-  final bool dark;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-    final r = math.max(w, h) * 0.55;
-    void blob(Color c, double ox, double oy, double phase, double scale) {
-      final a = 2 * math.pi * (t + phase);
-      final center = Offset(w * ox + math.cos(a) * w * 0.06, h * oy + math.sin(a) * h * 0.05);
-      final paint = Paint()
-        ..shader = RadialGradient(colors: [c.withValues(alpha: k), c.withValues(alpha: 0)]).createShader(Rect.fromCircle(center: center, radius: r * scale));
-      canvas.drawCircle(center, r * scale, paint);
-    }
-
-    blob(AuraHues.violet, 0.92, 0.02, 0, 0.9);
-    blob(AuraHues.cyan, 0.05, 0.35, 0.33, 0.75);
-    blob(dark ? AuraHues.blue : AuraHues.pink, 0.75, 0.98, 0.66, 0.8);
-  }
-
-  @override
-  bool shouldRepaint(_AuroraPainter old) => old.t != t || old.k != k;
+  Widget build(BuildContext context) => ColoredBox(color: context.aura.bg, child: child);
 }
 
 /// Frosted glass surface with a hairline border and diffuse shadow.
@@ -468,7 +412,7 @@ class _AuraOrbState extends State<AuraOrb> with SingleTickerProviderStateMixin {
               child: Container(
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  gradient: RadialGradient(colors: [AuraHues.violet.withValues(alpha: 0.35), AuraHues.cyan.withValues(alpha: 0.0)]),
+                  gradient: RadialGradient(colors: [AuraHues.violet.withValues(alpha: 0.18), AuraHues.violet.withValues(alpha: 0.0)]),
                 ),
               ),
             ),
@@ -481,7 +425,7 @@ class _AuraOrbState extends State<AuraOrb> with SingleTickerProviderStateMixin {
                   height: s * 0.82,
                   decoration: const BoxDecoration(
                     shape: BoxShape.circle,
-                    gradient: SweepGradient(colors: [AuraHues.violet, AuraHues.blue, AuraHues.cyan, AuraHues.pink, AuraHues.violet]),
+                    gradient: SweepGradient(colors: [AuraHues.violet, AuraHues.orchid, AuraHues.violet]),
                   ),
                 ),
               ),

@@ -62,7 +62,7 @@ class _TypingDotsState extends State<TypingDots> with SingleTickerProviderStateM
                 child: Container(
                   width: widget.size,
                   height: widget.size,
-                  decoration: BoxDecoration(shape: BoxShape.circle, color: [AuraHues.violet, AuraHues.blue, AuraHues.cyan][i]),
+                  decoration: BoxDecoration(shape: BoxShape.circle, color: AuraHues.violet.withValues(alpha: 0.45 + 0.25 * i)),
                 ),
               ),
             ),

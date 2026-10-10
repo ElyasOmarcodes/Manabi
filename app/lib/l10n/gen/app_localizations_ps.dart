@@ -530,4 +530,13 @@ class AppLocalizationsPs extends AppLocalizations {
 
   @override
   String get allCategories => 'ټولې ډلې';
+
+  @override
+  String get stageReading => 'د مخونو لوستل او غوره کول';
+
+  @override
+  String get welcomeQuestion => 'نن د څه په اړه څېړنه کوئ؟';
+
+  @override
+  String get options => 'د لټون اختیارونه';
 }

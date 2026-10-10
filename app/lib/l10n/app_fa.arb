@@ -38,14 +38,26 @@
   "stageComposing": "نوشتن پاسخ از روی منابع",
   "stageVerifying": "تطبیق هر نقل‌قول با کتاب",
   "foundSources": "{count, plural, =0{صفحه‌ای یافت نشد} =1{۱ صفحه یافت شد} other{{count} صفحه یافت شد}}",
-  "@foundSources": {"placeholders": {"count": {"type": "int"}}},
+  "@foundSources": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "searchedFor": "عبارت‌های جست‌وجو",
   "statusAnswered": "پاسخ مستند",
   "statusPartial": "تا اندازه‌ای مستند",
   "statusInsufficient": "پاسخ مستندی یافت نشد",
   "sources": "منابع",
   "sourceCount": "{count, plural, =1{۱ منبع} other{{count} منبع}}",
-  "@sourceCount": {"placeholders": {"count": {"type": "int"}}},
+  "@sourceCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "viewSource": "خواندن صفحه",
   "openLink": "باز کردن در تراث",
   "openShamela": "باز کردن در شامله",
@@ -103,7 +115,13 @@
   "searchBooks": "جست‌وجوی نام کتاب",
   "searchAuthors": "جست‌وجوی مؤلف",
   "booksCount": "{count, plural, =1{۱ کتاب} other{{count} کتاب}}",
-  "@booksCount": {"placeholders": {"count": {"type": "int"}}},
+  "@booksCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "noResults": "نتیجه‌ای نیست",
   "askInThisBook": "پرسش در این کتاب",
   "askThisAuthor": "پرسش در آثار این مؤلف",
@@ -115,7 +133,13 @@
   "fullTextSearch": "جست‌وجوی متن",
   "searchInText": "جست‌وجو در متن کتاب‌ها (عربی)",
   "matches": "{count} نتیجه",
-  "@matches": {"placeholders": {"count": {"type": "int"}}},
+  "@matches": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "readPage": "خواندن",
   "previousPage": "صفحهٔ قبل",
   "nextPage": "صفحهٔ بعد",
@@ -149,21 +173,48 @@
   "modelOverrideHint": "خالی = تازه‌ترین مدل Flash",
   "testConnection": "آزمایش اتصال",
   "connectionOk": "وصل است · {model}",
-  "@connectionOk": {"placeholders": {"model": {"type": "String"}}},
+  "@connectionOk": {
+    "placeholders": {
+      "model": {
+        "type": "String"
+      }
+    }
+  },
   "data": "داده‌ها",
   "clearHistory": "حذف همهٔ گفتگوها",
   "clearHistoryConfirm": "همهٔ گفتگوها و پاسخ‌های ذخیره‌شده از این دستگاه حذف شوند؟",
   "about": "درباره",
   "aboutBody": "منابع از راه کیت متن‌باز Nusus در کتابخانهٔ تراث (turath.io) جست‌وجو می‌کند و Gemini را تنها برای برنامه‌ریزی جست‌وجو و چیدن پاسخ از روی صفحه‌های یافته‌شده به کار می‌برد. هر نقل‌قول پیش از نمایش با متن کتاب تطبیق داده می‌شود.",
   "catalogInfo": "فهرست آفلاین: {books} کتاب · {authors} مؤلف ({date})",
-  "@catalogInfo": {"placeholders": {"books": {"type": "int"}, "authors": {"type": "int"}, "date": {"type": "String"}}},
+  "@catalogInfo": {
+    "placeholders": {
+      "books": {
+        "type": "int"
+      },
+      "authors": {
+        "type": "int"
+      },
+      "date": {
+        "type": "String"
+      }
+    }
+  },
   "version": "نسخهٔ {v}",
-  "@version": {"placeholders": {"v": {"type": "String"}}},
+  "@version": {
+    "placeholders": {
+      "v": {
+        "type": "String"
+      }
+    }
+  },
   "chatWith": "از منابع بپرسید",
   "question": "پرسش",
   "answer": "پاسخ",
   "generatedBy": "ساخته‌شده توسط منابع از منابع تراث",
   "notConfiguredTitle": "اتصال را تنظیم کنید",
   "openSettings": "باز کردن تنظیمات",
-  "allCategories": "همهٔ دسته‌ها"
+  "allCategories": "همهٔ دسته‌ها",
+  "stageReading": "خواندن و گزینش صفحه‌ها",
+  "welcomeQuestion": "امروز دربارهٔ چه می‌خواهید پژوهش کنید؟",
+  "options": "گزینه‌های جست‌وجو"
 }

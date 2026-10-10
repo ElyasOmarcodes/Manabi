@@ -534,4 +534,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get allCategories => 'All categories';
+
+  @override
+  String get stageReading => 'Reading and ranking the pages';
+
+  @override
+  String get welcomeQuestion => 'What would you like to research today?';
+
+  @override
+  String get options => 'Search options';
 }

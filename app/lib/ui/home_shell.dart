@@ -175,20 +175,8 @@ class _Dock extends StatelessWidget {
                             duration: const Duration(milliseconds: 300),
                             margin: const EdgeInsets.symmetric(horizontal: 2),
                             decoration: BoxDecoration(
-                              gradient: i == index ? a.brand : null,
+                              color: i == index ? a.accentTint : null,
                               borderRadius: BorderRadius.circular(24),
-                              boxShadow: i == index
-                                  ? [
-                                      BoxShadow(
-                                        color: AuraHues.violet.withValues(
-                                          alpha: 0.35,
-                                        ),
-                                        blurRadius: 16,
-                                        offset: const Offset(0, 6),
-                                        spreadRadius: -6,
-                                      ),
-                                    ]
-                                  : null,
                             ),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
@@ -196,7 +184,7 @@ class _Dock extends StatelessWidget {
                                 Icon(
                                   i == index ? dests[i].active : dests[i].icon,
                                   size: 22,
-                                  color: i == index ? Colors.white : a.muted,
+                                  color: i == index ? a.accent : a.muted,
                                 ),
                                 if (i == index) ...[
                                   const SizedBox(width: 6),
@@ -206,9 +194,9 @@ class _Dock extends StatelessWidget {
                                       maxLines: 1,
                                       overflow: TextOverflow.fade,
                                       softWrap: false,
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontFamily: uiFont,
-                                        color: Colors.white,
+                                        color: a.accent,
                                         fontWeight: FontWeight.w700,
                                         fontSize: 13,
                                       ),

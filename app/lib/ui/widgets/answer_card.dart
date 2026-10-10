@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -12,122 +14,186 @@ import '../theme.dart';
 import 'answer_markdown.dart';
 import 'common.dart';
 
-class AnswerCard extends StatefulWidget {
+/// Assistant reply in a clean chatbot style: plain text on the page, inline
+/// verified Arabic quotes, a quiet action row and a references sheet.
+class AnswerCard extends StatelessWidget {
   const AnswerCard({super.key, required this.turn, this.onRetry});
   final ChatTurn turn;
   final VoidCallback? onRetry;
+
   @override
-  State<AnswerCard> createState() => _AnswerCardState();
+  Widget build(BuildContext context) {
+    final r = turn.result!;
+    final l = context.l;
+    final a = context.aura;
+    final rtl = isRtlLanguage(r.language);
+    final scale = context.watch<SettingsController>().arabicScale;
+    final chats = context.read<ChatController>();
+    void openRefs([int? focus]) => showReferences(context, r, focus: focus);
+
+    return Directionality(
+      textDirection: rtl ? TextDirection.rtl : TextDirection.ltr,
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        if (r.status != AnswerStatus.answered)
+          Padding(padding: const EdgeInsets.only(bottom: 10), child: Align(alignment: AlignmentDirectional.centerStart, child: StatusPill(status: r.status))),
+        AnswerMarkdown(markdown: r.answer, onCite: openRefs, quoteScale: scale),
+        if (r.detail.isNotEmpty && !r.isDocumented) Text(r.detail, style: TextStyle(fontFamily: uiFont, color: a.muted, height: 1.75)),
+        if (r.notes.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(r.notes, style: TextStyle(fontFamily: uiFont, fontSize: 13.5, color: a.muted, height: 1.7)),
+          ),
+        if (r.related.isNotEmpty && r.sources.isEmpty) ...[
+          const SizedBox(height: 6),
+          Text(l.relatedSources, style: TextStyle(fontFamily: uiFont, fontSize: 13, fontWeight: FontWeight.w600, color: a.muted)),
+          for (final s in r.related.take(5)) _RelatedTile(source: s),
+        ],
+        const SizedBox(height: 10),
+        Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 2, runSpacing: 4, children: [
+          if (r.sources.isNotEmpty)
+            Padding(
+              padding: const EdgeInsetsDirectional.only(end: 6),
+              child: Pressable(
+                onTap: openRefs,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                  decoration: BoxDecoration(color: a.surfaceAlt, borderRadius: BorderRadius.circular(20)),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(Icons.menu_book_rounded, size: 16, color: a.accent),
+                    const SizedBox(width: 6),
+                    Text('${l.sources} (${r.sources.length})', style: TextStyle(fontFamily: uiFont, fontSize: 13, fontWeight: FontWeight.w600, color: a.text)),
+                    const SizedBox(width: 6),
+                    _CoverStack(sources: r.sources),
+                  ]),
+                ),
+              ),
+            ),
+          _Action(icon: Icons.copy_rounded, tooltip: l.copy, onTap: () => copyText(context, answerAsText(turn, l))),
+          _Action(icon: Icons.ios_share_rounded, tooltip: l.share, onTap: () => shareTurnText(context, turn)),
+          _Action(
+            icon: turn.favorite ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
+            tooltip: turn.favorite ? l.unsave : l.save,
+            color: turn.favorite ? a.accent : null,
+            onTap: () {
+              chats.toggleFavorite(turn);
+              toast(context, turn.favorite ? l.saved : l.unsave);
+            },
+          ),
+          _Action(
+            icon: Icons.picture_as_pdf_outlined,
+            tooltip: l.export,
+            onTap: () => showExportSheet(context, title: turn.question, turns: [turn], uiLanguage: context.read<SettingsController>().uiLanguage),
+          ),
+          if (onRetry != null) _Action(icon: Icons.refresh_rounded, tooltip: l.retry, onTap: onRetry!),
+        ]),
+      ]),
+    );
+  }
 }
 
-class _AnswerCardState extends State<AnswerCard> {
-  final Map<int, GlobalKey> _keys = {};
-  int? _flash;
+/// Small overlapping book-cover dots next to the references button.
+class _CoverStack extends StatelessWidget {
+  const _CoverStack({required this.sources});
+  final List<AnswerSource> sources;
+  @override
+  Widget build(BuildContext context) {
+    final n = math.min(3, sources.length);
+    return SizedBox(
+      width: 14.0 + (n - 1) * 9,
+      height: 16,
+      child: Stack(children: [
+        for (var i = 0; i < n; i++)
+          PositionedDirectional(
+            start: i * 9.0,
+            child: Container(
+              width: 14,
+              height: 16,
+              decoration: BoxDecoration(
+                gradient: context.aura.brand,
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: context.aura.surfaceAlt, width: 1.5),
+              ),
+            ),
+          ),
+      ]),
+    );
+  }
+}
 
-  void _jumpTo(int n) {
-    final key = _keys[n];
-    if (key?.currentContext == null) return;
-    Scrollable.ensureVisible(key!.currentContext!, duration: const Duration(milliseconds: 480), curve: Curves.easeOutCubic, alignment: 0.15);
-    setState(() => _flash = n);
-    Future.delayed(const Duration(milliseconds: 1500), () {
-      if (mounted) setState(() => _flash = null);
-    });
+Future<void> showReferences(BuildContext context, AnswerResult r, {int? focus}) => showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (_) => FractionallySizedBox(heightFactor: 0.88, child: _ReferencesSheet(result: r, focus: focus)),
+    );
+
+class _ReferencesSheet extends StatefulWidget {
+  const _ReferencesSheet({required this.result, this.focus});
+  final AnswerResult result;
+  final int? focus;
+  @override
+  State<_ReferencesSheet> createState() => _ReferencesSheetState();
+}
+
+class _ReferencesSheetState extends State<_ReferencesSheet> {
+  final _keys = <int, GlobalKey>{};
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.focus != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final ctx = _keys[widget.focus]?.currentContext;
+        if (ctx != null) Scrollable.ensureVisible(ctx, duration: const Duration(milliseconds: 350), alignment: 0.05);
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final r = widget.turn.result!;
     final l = context.l;
     final a = context.aura;
-    final rtl = isRtlLanguage(r.language);
-    final chats = context.read<ChatController>();
-    for (final s in r.sources) {
-      _keys.putIfAbsent(s.n, GlobalKey.new);
-    }
+    final r = widget.result;
     return Directionality(
-      textDirection: rtl ? TextDirection.rtl : TextDirection.ltr,
+      textDirection: Directionality.of(context),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Row(children: [
-          const ManabiMark(size: 34),
-          const SizedBox(width: 10),
-          StatusPill(status: r.status),
-          const Spacer(),
-          if (r.sources.isNotEmpty)
-            Text(l.sourceCount(r.sources.length), style: TextStyle(fontFamily: uiFont, fontSize: 12.5, color: a.muted, fontWeight: FontWeight.w600)),
-        ]),
-        const SizedBox(height: 12),
-        AuraCard(
-          padding: const EdgeInsets.fromLTRB(22, 18, 22, 8),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            AnswerMarkdown(markdown: r.answer, onCite: _jumpTo),
-            if (r.detail.isNotEmpty && !r.isDocumented) Text(r.detail, style: TextStyle(fontFamily: uiFont, color: a.muted, height: 1.7)),
-            if (r.opinions.isNotEmpty) ...[
-              SectionLabel(l.opinions),
-              for (final (i, o) in r.opinions.indexed) _OpinionTile(opinion: o, color: AuraHues.at(i + 1), onCite: _jumpTo),
-            ],
-            if (r.notes.isNotEmpty) ...[
-              SectionLabel(l.notes),
-              Text(r.notes, style: TextStyle(fontFamily: uiFont, color: a.muted, height: 1.7)),
-            ],
-            const SizedBox(height: 8),
-            Divider(color: a.border),
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Row(children: [
-                _Action(icon: Icons.copy_rounded, tooltip: l.copy, onTap: () => copyText(context, answerAsText(widget.turn, l))),
-                _Action(icon: Icons.ios_share_rounded, tooltip: l.share, onTap: () => shareTurnText(context, widget.turn)),
-                _Action(
-                  icon: widget.turn.favorite ? Icons.bookmark_rounded : Icons.bookmark_outline_rounded,
-                  tooltip: widget.turn.favorite ? l.unsave : l.save,
-                  color: widget.turn.favorite ? AuraHues.pink : null,
-                  onTap: () {
-                    chats.toggleFavorite(widget.turn);
-                    toast(context, widget.turn.favorite ? l.saved : l.unsave);
-                  },
-                ),
-                _Action(
-                  icon: Icons.picture_as_pdf_outlined,
-                  tooltip: l.export,
-                  onTap: () => showExportSheet(context, title: widget.turn.question, turns: [widget.turn], uiLanguage: context.read<SettingsController>().uiLanguage),
-                ),
-                if (widget.onRetry != null) _Action(icon: Icons.refresh_rounded, tooltip: l.retry, onTap: widget.onRetry!),
-                const Spacer(),
-                if (r.elapsedMs != null)
-                  Text('${(r.elapsedMs! / 1000).toStringAsFixed(1)}s', style: TextStyle(fontFamily: uiFont, fontSize: 12, color: a.faint)),
-              ]),
-            ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(22, 0, 22, 10),
+          child: Row(children: [
+            Text('${l.sources} (${r.sources.length})', style: TextStyle(fontFamily: uiFont, fontSize: 19, fontWeight: FontWeight.w800, color: a.text)),
+            const Spacer(),
+            if (r.queries.isNotEmpty) Icon(Icons.manage_search_rounded, size: 18, color: a.faint),
           ]),
         ),
-        if (r.sources.isNotEmpty) ...[
-          SectionLabel(l.sources),
-          for (final s in r.sources)
-            Padding(
-              key: _keys[s.n],
-              padding: const EdgeInsets.only(bottom: 12),
-              child: SourceCard(source: s, highlight: _flash == s.n),
-            ),
-        ],
-        if (r.related.isNotEmpty) ...[
-          SectionLabel(l.relatedSources),
-          AuraCard(
-            padding: const EdgeInsets.symmetric(vertical: 6),
-            child: Column(children: [for (final s in r.related.take(5)) _RelatedTile(source: s)]),
-          ),
-        ],
-        if (r.queries.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(top: 12),
-            child: Wrap(spacing: 6, runSpacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: [
-              Icon(Icons.manage_search_rounded, size: 16, color: a.faint),
-              for (final q in r.queries) QueryChip(q),
-            ]),
-          ),
-        Padding(
-          padding: const EdgeInsets.only(top: 12),
-          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Icon(Icons.info_outline_rounded, size: 15, color: a.faint),
-            const SizedBox(width: 6),
-            Expanded(child: Text(l.disclaimer, style: TextStyle(fontFamily: uiFont, fontSize: 12, color: a.faint, height: 1.6))),
+        Expanded(
+          child: ListView(padding: const EdgeInsets.fromLTRB(16, 0, 16, 28), children: [
+            for (final s in r.sources)
+              Padding(
+                key: _keys.putIfAbsent(s.n, GlobalKey.new),
+                padding: const EdgeInsets.only(bottom: 12),
+                child: SourceCard(source: s, highlight: s.n == widget.focus),
+              ),
+            if (r.opinions.isNotEmpty) ...[
+              SectionLabel(l.opinions),
+              for (final o in r.opinions)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text.rich(
+                    TextSpan(children: [
+                      TextSpan(text: '${o.holder}: ', style: const TextStyle(fontWeight: FontWeight.w700)),
+                      TextSpan(text: o.view),
+                      TextSpan(text: '  ${o.sources.map((n) => '[$n]').join()}', style: TextStyle(color: a.accent, fontWeight: FontWeight.w700)),
+                    ]),
+                    style: TextStyle(fontFamily: uiFont, color: a.text, height: 1.7),
+                  ),
+                ),
+            ],
+            if (r.queries.isNotEmpty) ...[
+              SectionLabel(l.searchedFor),
+              Wrap(spacing: 6, runSpacing: 6, children: [for (final q in r.queries) QueryChip(q)]),
+            ],
+            const SizedBox(height: 16),
+            Text(l.disclaimer, style: TextStyle(fontFamily: uiFont, fontSize: 12, color: a.faint, height: 1.6)),
           ]),
         ),
       ]),
@@ -157,10 +223,7 @@ class _Action extends StatelessWidget {
   final VoidCallback onTap;
   final Color? color;
   @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsetsDirectional.only(end: 4),
-        child: AuraIconButton(icon: icon, tooltip: tooltip, onTap: onTap, size: 38, filled: false, color: color ?? context.aura.muted),
-      );
+  Widget build(BuildContext context) => AuraIconButton(icon: icon, tooltip: tooltip, onTap: onTap, size: 34, filled: false, color: color ?? context.aura.muted);
 }
 
 class QueryChip extends StatelessWidget {
@@ -168,38 +231,10 @@ class QueryChip extends StatelessWidget {
   final String q;
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 1),
-        decoration: BoxDecoration(gradient: context.aura.soft, borderRadius: BorderRadius.circular(20)),
-        child: Text(q, textDirection: TextDirection.rtl, style: arabicStyle(context, size: 13.5, color: context.aura.accent).copyWith(height: 1.7)),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 1),
+        decoration: BoxDecoration(color: context.aura.surfaceAlt, borderRadius: BorderRadius.circular(10)),
+        child: Text(q, textDirection: TextDirection.rtl, style: arabicStyle(context, size: 13.5, color: context.aura.muted).copyWith(height: 1.7)),
       );
-}
-
-class _OpinionTile extends StatelessWidget {
-  const _OpinionTile({required this.opinion, required this.color, required this.onCite});
-  final Opinion opinion;
-  final Color color;
-  final ValueChanged<int> onCite;
-  @override
-  Widget build(BuildContext context) {
-    final a = context.aura;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: a.dark ? 0.12 : 0.07),
-        borderRadius: BorderRadius.circular(18),
-        border: BorderDirectional(start: BorderSide(color: color, width: 3)),
-      ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Expanded(child: Text(opinion.holder, style: TextStyle(fontFamily: uiFont, fontWeight: FontWeight.w800, color: color))),
-          for (final n in opinion.sources) CiteChip(n: n, onTap: onCite),
-        ]),
-        const SizedBox(height: 4),
-        Text(opinion.view, style: TextStyle(fontFamily: uiFont, color: a.text, height: 1.7)),
-      ]),
-    );
-  }
 }
 
 /// One numbered source: metadata, verified Arabic quote and links.
@@ -214,114 +249,73 @@ class SourceCard extends StatelessWidget {
     final a = context.aura;
     final scale = context.watch<SettingsController>().arabicScale;
     final s = source;
-    final hue = AuraHues.at(s.n - 1);
+    final location = [
+      if (s.volume != null) '${l.volume} ${s.volume}',
+      if (s.printedPage != null) '${l.page} ${s.printedPage}',
+      if (s.internalPage != null) '${l.turathPage} ${s.internalPage}',
+    ].join('  ·  ');
     return AnimatedContainer(
       duration: const Duration(milliseconds: 400),
-      curve: Curves.easeOutCubic,
-      padding: EdgeInsets.all(highlight ? 2 : 0),
-      decoration: BoxDecoration(borderRadius: BorderRadius.circular(28), gradient: highlight ? a.brand : null),
-      child: AuraCard(
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Stack(alignment: Alignment.center, children: [
-              BookCover(title: s.bookTitle, seed: s.n + 2, width: 44, height: 56),
-              PositionedDirectional(
-                top: 0,
-                start: 0,
-                child: Container(
-                  width: 20,
-                  height: 20,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(color: a.surface, shape: BoxShape.circle, border: Border.all(color: hue, width: 1.5)),
-                  child: Text('${s.n}', style: TextStyle(fontFamily: uiFont, fontSize: 10.5, fontWeight: FontWeight.w800, color: hue, height: 1.2)),
-                ),
-              ),
-            ]),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Directionality(
-                textDirection: TextDirection.rtl,
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(s.bookTitle, style: arabicStyle(context, size: 17, scale: scale, weight: FontWeight.w700).copyWith(height: 1.55)),
-                  if (s.authorName != null) Text(s.authorName!, style: arabicStyle(context, size: 14.5, scale: scale, color: a.muted).copyWith(height: 1.5)),
-                ]),
-              ),
-            ),
-          ]),
-          const SizedBox(height: 10),
-          Wrap(spacing: 6, runSpacing: 6, children: [
-            if (s.volume != null) _Meta(icon: Icons.layers_outlined, text: '${l.volume} ${s.volume}', color: AuraHues.blue),
-            if (s.printedPage != null) _Meta(icon: Icons.description_outlined, text: '${l.page} ${s.printedPage}', color: AuraHues.violet),
-            if (s.internalPage != null) _Meta(icon: Icons.tag_rounded, text: '${l.turathPage} ${s.internalPage}', color: AuraHues.cyan),
-            if (s.headings.isNotEmpty) _Meta(icon: Icons.segment_rounded, text: s.headings.last, color: AuraHues.amber, arabic: true),
-          ]),
-          for (final q in s.quotes) ...[
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
-              decoration: BoxDecoration(gradient: a.soft, borderRadius: BorderRadius.circular(20)),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                Row(children: [
-                  GradientText('❝', style: const TextStyle(fontSize: 26, height: 1)),
-                  const Spacer(),
-                  Icon(q.exact ? Icons.verified_rounded : Icons.fact_check_rounded, size: 15, color: a.success),
-                  const SizedBox(width: 4),
-                  Flexible(
-                    child: Text(q.exact ? l.quoteVerified : l.quoteClose,
-                        maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontFamily: uiFont, fontSize: 11.5, color: a.success, fontWeight: FontWeight.w600)),
-                  ),
-                ]),
-                SelectableText(q.text, textDirection: TextDirection.rtl, style: arabicStyle(context, size: 18.5, scale: scale)),
-                if (q.relevance != null && q.relevance!.isNotEmpty)
-                  Padding(padding: const EdgeInsets.only(top: 2), child: Text(q.relevance!, style: TextStyle(fontFamily: uiFont, fontSize: 12.5, color: a.muted, height: 1.6))),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+      decoration: BoxDecoration(
+        color: a.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: highlight ? a.accent : a.border, width: highlight ? 1.5 : 1),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Container(
+            width: 26,
+            height: 26,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(color: a.accentTint, borderRadius: BorderRadius.circular(8)),
+            child: Text('${s.n}', style: TextStyle(fontFamily: uiFont, fontSize: 12.5, fontWeight: FontWeight.w800, color: a.accent)),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Directionality(
+              textDirection: TextDirection.rtl,
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(s.bookTitle, style: arabicStyle(context, size: 16.5, scale: scale, weight: FontWeight.w700).copyWith(height: 1.55)),
+                if (s.authorName != null) Text(s.authorName!, style: arabicStyle(context, size: 14, scale: scale, color: a.muted).copyWith(height: 1.5)),
+                if (location.isNotEmpty) Text(location, style: TextStyle(fontFamily: uiFont, fontSize: 12, color: a.faint)),
               ]),
             ),
-          ],
-          const SizedBox(height: 10),
-          Wrap(spacing: 8, runSpacing: 8, children: [
-            if (s.internalPage != null)
-              SoftButton(
-                dense: true,
-                icon: Icons.chrome_reader_mode_outlined,
-                label: l.viewSource,
-                onTap: () => openReader(context, s.bookId, s.internalPage!, title: s.bookTitle, highlight: s.quotes.isEmpty ? null : s.quotes.first.text),
-              ),
-            SoftButton(dense: true, icon: Icons.open_in_new_rounded, label: l.openLink, color: AuraHues.blue, onTap: () => openUrl(s.url)),
-            if (s.shamelaUrl != null) SoftButton(dense: true, label: l.openShamela, color: AuraHues.mint, onTap: () => openUrl(s.shamelaUrl!)),
-            SoftButton(dense: true, icon: Icons.copy_rounded, label: l.copy, color: a.muted, onTap: () => copyText(context, sourceAsText(s, l))),
-          ]),
-          const SizedBox(height: 8),
-        ]),
-      ),
-    );
-  }
-}
-
-class _Meta extends StatelessWidget {
-  const _Meta({required this.icon, required this.text, required this.color, this.arabic = false});
-  final IconData icon;
-  final String text;
-  final Color color;
-  final bool arabic;
-  @override
-  Widget build(BuildContext context) => Container(
-        constraints: const BoxConstraints(maxWidth: 260),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        decoration: BoxDecoration(color: color.withValues(alpha: context.aura.dark ? 0.16 : 0.09), borderRadius: BorderRadius.circular(20)),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(icon, size: 14, color: color),
-          const SizedBox(width: 5),
-          Flexible(
-            child: Text(text,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: arabic
-                    ? arabicStyle(context, size: 12.5, color: color).copyWith(height: 1.5)
-                    : TextStyle(fontFamily: uiFont, fontSize: 12, fontWeight: FontWeight.w600, color: color)),
           ),
         ]),
-      );
+        for (final q in s.quotes) ...[
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
+            decoration: BoxDecoration(color: a.accentTint, borderRadius: BorderRadius.circular(14)),
+            child: SelectableText(q.text, textDirection: TextDirection.rtl, style: arabicStyle(context, size: 17.5, scale: scale)),
+          ),
+        ],
+        if (s.quotes.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Row(children: [
+              Icon(Icons.verified_rounded, size: 14, color: a.success),
+              const SizedBox(width: 4),
+              Expanded(child: Text(l.quoteVerified, style: TextStyle(fontFamily: uiFont, fontSize: 11.5, color: a.success))),
+            ]),
+          ),
+        const SizedBox(height: 6),
+        Wrap(spacing: 6, runSpacing: 6, children: [
+          if (s.internalPage != null)
+            SoftButton(
+              dense: true,
+              icon: Icons.chrome_reader_mode_outlined,
+              label: l.viewSource,
+              onTap: () => openReader(context, s.bookId, s.internalPage!, title: s.bookTitle, highlight: s.quotes.isEmpty ? null : s.quotes.first.text),
+            ),
+          SoftButton(dense: true, icon: Icons.open_in_new_rounded, label: l.openLink, color: a.muted, onTap: () => openUrl(s.url)),
+          if (s.shamelaUrl != null) SoftButton(dense: true, label: l.openShamela, color: a.muted, onTap: () => openUrl(s.shamelaUrl!)),
+          SoftButton(dense: true, icon: Icons.copy_rounded, label: l.copy, color: a.muted, onTap: () => copyText(context, sourceAsText(s, l))),
+        ]),
+      ]),
+    );
+  }
 }
 
 class _RelatedTile extends StatelessWidget {
@@ -329,110 +323,122 @@ class _RelatedTile extends StatelessWidget {
   final AnswerSource source;
   @override
   Widget build(BuildContext context) => InkWell(
+        borderRadius: BorderRadius.circular(12),
         onTap: source.internalPage == null ? () => openUrl(source.url) : () => openReader(context, source.bookId, source.internalPage!, title: source.bookTitle),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          padding: const EdgeInsets.symmetric(vertical: 6),
           child: Row(children: [
-            BookCover(title: source.bookTitle, seed: source.n, width: 32, height: 42),
-            const SizedBox(width: 12),
+            Icon(Icons.description_outlined, size: 18, color: context.aura.faint),
+            const SizedBox(width: 10),
             Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(source.bookTitle, textDirection: TextDirection.rtl, maxLines: 1, overflow: TextOverflow.ellipsis, style: arabicStyle(context, size: 15, weight: FontWeight.w700).copyWith(height: 1.5)),
-                Text(source.citation ?? '', textDirection: TextDirection.rtl, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontFamily: uiFont, fontSize: 11.5, color: context.aura.muted)),
-              ]),
+              child: Text(source.citation ?? source.bookTitle,
+                  textDirection: TextDirection.rtl, maxLines: 1, overflow: TextOverflow.ellipsis, style: arabicStyle(context, size: 14.5, color: context.aura.muted).copyWith(height: 1.5)),
             ),
           ]),
         ),
       );
 }
 
-/// Live progress while an answer is prepared: breathing orb + step rail.
-class StageTimeline extends StatelessWidget {
+/// Gemini-style progress: a rotating brand sparkle with the current step,
+/// expandable to show the search details.
+class StageTimeline extends StatefulWidget {
   const StageTimeline({super.key, required this.progress, this.onCancel});
   final AskProgress progress;
   final VoidCallback? onCancel;
+  @override
+  State<StageTimeline> createState() => _StageTimelineState();
+}
+
+class _StageTimelineState extends State<StageTimeline> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 1600))..repeat();
+  bool _open = false;
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final l = context.l;
     final a = context.aura;
-    final steps = [
-      (AskStage.planning, l.stagePlanning, Icons.psychology_alt_rounded),
-      (AskStage.searching, l.stageSearching, Icons.travel_explore_rounded),
-      (AskStage.composing, l.stageComposing, Icons.edit_note_rounded),
-      (AskStage.verifying, l.stageVerifying, Icons.fact_check_rounded),
-    ];
-    final current = progress.stage.index;
-    return AuraCard(
-      padding: const EdgeInsets.fromLTRB(18, 18, 18, 10),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Row(children: [
-          const AuraOrb(size: 54),
-          const SizedBox(width: 14),
-          Expanded(
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 300),
-              child: Text(steps[current].$2, key: ValueKey(current), style: TextStyle(fontFamily: uiFont, fontSize: 16, fontWeight: FontWeight.w700, color: a.text)),
+    final p = widget.progress;
+    final label = switch (p.stage) {
+      AskStage.planning => l.stagePlanning,
+      AskStage.searching => l.stageSearching,
+      AskStage.reading => l.stageReading,
+      AskStage.composing => l.stageComposing,
+      AskStage.verifying => l.stageVerifying,
+    };
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => setState(() => _open = !_open),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            RotationTransition(
+              turns: _c,
+              child: ShaderMask(
+                blendMode: BlendMode.srcIn,
+                shaderCallback: (r) => a.brand.createShader(Offset.zero & r.size),
+                child: const Icon(Icons.auto_awesome_rounded, size: 22),
+              ),
             ),
-          ),
-          const TypingDots(size: 7),
-        ]),
-        const SizedBox(height: 16),
-        for (final (i, (stage, label, icon)) in steps.indexed)
-          IntrinsicHeight(
-            child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              SizedBox(
-                width: 30,
-                child: Column(children: [
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 350),
-                    width: 26,
-                    height: 26,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: stage.index <= current ? a.brand : null,
-                      color: stage.index <= current ? null : a.surfaceAlt,
+            const SizedBox(width: 10),
+            AnimatedBuilder(
+              animation: _c,
+              builder: (context, child) => ShaderMask(
+                blendMode: BlendMode.srcIn,
+                shaderCallback: (r) => LinearGradient(
+                  colors: [a.muted, a.text, a.muted],
+                  stops: [(_c.value - 0.3).clamp(0, 1), _c.value, (_c.value + 0.3).clamp(0, 1)],
+                ).createShader(Offset.zero & r.size),
+                child: child,
+              ),
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 250),
+                child: Text(label, key: ValueKey(label), style: const TextStyle(fontFamily: uiFont, fontSize: 15, fontWeight: FontWeight.w600)),
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(_open ? Icons.expand_less_rounded : Icons.expand_more_rounded, size: 20, color: a.faint),
+          ]),
+        ),
+      ),
+      AnimatedSize(
+        duration: const Duration(milliseconds: 250),
+        alignment: Alignment.topCenter,
+        child: !_open
+            ? const SizedBox(width: double.infinity)
+            : Padding(
+                padding: const EdgeInsetsDirectional.only(start: 32, top: 4, bottom: 4),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  for (final stage in AskStage.values)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 2),
+                      child: Row(children: [
+                        Icon(stage.index < p.stage.index ? Icons.check_rounded : Icons.circle, size: stage.index < p.stage.index ? 15 : 6, color: stage.index <= p.stage.index ? a.accent : a.faint),
+                        const SizedBox(width: 8),
+                        Text(
+                          switch (stage) {
+                            AskStage.planning => l.stagePlanning,
+                            AskStage.searching => l.stageSearching,
+                            AskStage.reading => l.stageReading,
+                            AskStage.composing => l.stageComposing,
+                            AskStage.verifying => l.stageVerifying,
+                          },
+                          style: TextStyle(fontFamily: uiFont, fontSize: 13, color: stage.index <= p.stage.index ? a.text : a.faint),
+                        ),
+                      ]),
                     ),
-                    child: Icon(stage.index < current ? Icons.check_rounded : icon, size: 15, color: stage.index <= current ? Colors.white : a.faint),
-                  ),
-                  if (i < steps.length - 1)
-                    Expanded(
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 350),
-                        width: 2,
-                        margin: const EdgeInsets.symmetric(vertical: 3),
-                        decoration: BoxDecoration(color: stage.index < current ? AuraHues.blue.withValues(alpha: 0.6) : a.border, borderRadius: BorderRadius.circular(2)),
-                      ),
-                    ),
+                  if (p.queries.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 6), child: Wrap(spacing: 6, runSpacing: 6, children: [for (final q in p.queries) QueryChip(q)])),
+                  if (p.sourcesFound != null)
+                    Padding(padding: const EdgeInsets.only(top: 6), child: Text(l.foundSources(p.sourcesFound!), style: TextStyle(fontFamily: uiFont, fontSize: 12.5, color: a.muted))),
                 ]),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 3, bottom: 12),
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(label,
-                        style: TextStyle(
-                            fontFamily: uiFont,
-                            fontSize: 13.5,
-                            fontWeight: stage.index == current ? FontWeight.w700 : FontWeight.w500,
-                            color: stage.index <= current ? a.text : a.faint)),
-                    if (stage == AskStage.searching && progress.queries.isNotEmpty)
-                      Padding(padding: const EdgeInsets.only(top: 6), child: Wrap(spacing: 6, runSpacing: 6, children: [for (final q in progress.queries) QueryChip(q)])),
-                    if (stage == AskStage.searching && progress.sourcesFound != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 4),
-                        child: Text(l.foundSources(progress.sourcesFound!), style: TextStyle(fontFamily: uiFont, fontSize: 12, color: a.muted)),
-                      ),
-                  ]),
-                ),
-              ),
-            ]),
-          ),
-        if (onCancel != null)
-          Align(alignment: AlignmentDirectional.centerEnd, child: SoftButton(dense: true, icon: Icons.stop_rounded, label: l.stop, color: a.danger, onTap: onCancel)),
-        const SizedBox(height: 6),
-      ]),
-    );
+      ),
+    ]);
   }
 }

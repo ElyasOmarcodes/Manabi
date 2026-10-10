@@ -1055,6 +1055,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'All categories'**
   String get allCategories;
+
+  /// No description provided for @stageReading.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading and ranking the pages'**
+  String get stageReading;
+
+  /// No description provided for @welcomeQuestion.
+  ///
+  /// In en, this message translates to:
+  /// **'What would you like to research today?'**
+  String get welcomeQuestion;
+
+  /// No description provided for @options.
+  ///
+  /// In en, this message translates to:
+  /// **'Search options'**
+  String get options;
 }
 
 class _AppLocalizationsDelegate

@@ -534,4 +534,13 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get allCategories => 'كل التصنيفات';
+
+  @override
+  String get stageReading => 'قراءة الصفحات وانتقاء الأنسب';
+
+  @override
+  String get welcomeQuestion => 'عمّ تريد أن تبحث اليوم؟';
+
+  @override
+  String get options => 'خيارات البحث';
 }
