@@ -16,7 +16,7 @@ class SavedScreen extends StatelessWidget {
     final favorites = context.watch<ChatController>().favorites;
     final l = context.l;
     return AuraPage(
-      title: Text(l.navFavorites, style: TextStyle(fontFamily: uiFont, fontSize: 20, fontWeight: FontWeight.w800, color: context.aura.text)),
+      titleText: l.navFavorites,
       body: favorites.isEmpty
               ? EmptyState(icon: Icons.bookmark_add_outlined, text: l.noFavorites, color: AuraHues.pink)
               : ListView.builder(
@@ -85,7 +85,7 @@ class _SavedDetail extends StatelessWidget {
     context.watch<ChatController>();
     final a = context.aura;
     return AuraPage(
-      title: Text(chat.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontFamily: uiFont, fontSize: 17, fontWeight: FontWeight.w800, color: a.text)),
+      titleText: chat.title,
       actions: [
         AuraIconButton(
           tooltip: context.l.chats,

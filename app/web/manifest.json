@@ -4,7 +4,7 @@
     "start_url": ".",
     "display": "standalone",
     "background_color": "#FFFFFF",
-    "theme_color": "#6A5AE0",
+    "theme_color": "#6C5CE7",
     "description": "Manabi - grounded Islamic research assistant over Turath sources",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,

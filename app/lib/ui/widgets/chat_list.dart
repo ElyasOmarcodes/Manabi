@@ -8,6 +8,7 @@ import '../../state/settings_controller.dart';
 import '../export/export_actions.dart';
 import '../home_shell.dart';
 import '../theme.dart';
+import 'brand_logo.dart';
 import 'common.dart';
 
 /// The app menu: new chat, search, quick links, chats by date, settings.
@@ -61,13 +62,11 @@ class _SidebarState extends State<Sidebar> {
       Padding(
         padding: const EdgeInsets.fromLTRB(16, 14, 10, 8),
         child: Row(children: [
-          const ManabiMark(size: 34),
-          const SizedBox(width: 10),
-          Expanded(child: Text(l.appName, style: TextStyle(fontFamily: uiFont, fontSize: 19, fontWeight: FontWeight.w800, color: a.text))),
-          AuraIconButton(
+          const Padding(padding: EdgeInsetsDirectional.only(start: 4), child: BrandLogo(height: 30, latin: false)),
+          const Spacer(),
+          RoundIconButton(
             icon: Icons.edit_square,
             tooltip: l.newChat,
-            filled: false,
             onTap: () {
               chats.newChat();
               _closeDrawer();

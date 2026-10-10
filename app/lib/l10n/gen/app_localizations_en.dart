@@ -291,11 +291,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get errGeminiQuota =>
-      'Gemini usage limit reached. Please try again later.';
+      'Today\'s Gemini usage limit has been reached. Try again in a few hours, or enable billing for the key in Google AI Studio.';
 
   @override
   String get errGeminiUnavailable =>
-      'The AI service is not responding right now. Please try again.';
+      'The AI service did not respond in time. Check your connection and try again.';
 
   @override
   String get errTurathUnavailable =>
@@ -574,4 +574,152 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get allBooks => 'All books';
+
+  @override
+  String get settingsApp => 'App';
+
+  @override
+  String get settingsAnswersGroup => 'Answers & research';
+
+  @override
+  String get settingsInfo => 'Info & help';
+
+  @override
+  String get aiStyle => 'AI style';
+
+  @override
+  String get dataStorage => 'Data & storage';
+
+  @override
+  String get help => 'Help';
+
+  @override
+  String get privacyPolicy => 'Privacy policy';
+
+  @override
+  String get aboutUs => 'About us';
+
+  @override
+  String get licenses => 'Open-source licenses';
+
+  @override
+  String get resetSettings => 'Reset settings';
+
+  @override
+  String get resetSettingsConfirm =>
+      'All settings (including your key) return to their defaults. Your chats are kept.';
+
+  @override
+  String get textSize => 'Text size';
+
+  @override
+  String get textSizeSample =>
+      'Manabi answers your questions with sources from the books of Turath.';
+
+  @override
+  String get researchDepth => 'Research depth';
+
+  @override
+  String get depthQuick => 'Quick';
+
+  @override
+  String get depthStandard => 'Standard';
+
+  @override
+  String get depthDeep => 'Deep';
+
+  @override
+  String get depthQuickInfo =>
+      'Reads fewer pages and answers fast — up to 6 sources.';
+
+  @override
+  String get depthStandardInfo =>
+      'Balances speed and breadth — up to 14 sources and one follow-up search.';
+
+  @override
+  String get depthDeepInfo =>
+      'Wide search, more books and two follow-up rounds — up to 18 sources; takes longer.';
+
+  @override
+  String get depthHint =>
+      'The deeper it goes, the more books are searched and read.';
+
+  @override
+  String get chooseLanguage => 'Choose a language';
+
+  @override
+  String get openLibrary => 'Open the library';
+
+  @override
+  String get openLibrarySub => 'Books, authors and full-text search';
+
+  @override
+  String get helpHowTitle => 'How Manabi works';
+
+  @override
+  String get helpHowBody =>
+      '1. It understands your question and writes Arabic search terms.\n2. It searches thousands of Turath books, including any school or book you name.\n3. It reads the most relevant pages and picks the best ones.\n4. It writes the answer from those pages only.\n5. Every quoted passage is matched word for word against the book; anything not found is removed.';
+
+  @override
+  String get helpTipsTitle => 'Tips for a good question';
+
+  @override
+  String get helpTipsBody =>
+      '• Ask a clear, specific question.\n• If you want a school\'s view, name it (Hanafi, Shafi\'i, Maliki, Hanbali).\n• Name a book, or use + to limit the search to a book, author or category.\n• Choose Deep research for difficult or disputed questions.';
+
+  @override
+  String get helpSourcesTitle => 'Sources and citations';
+
+  @override
+  String get helpSourcesBody =>
+      'The Sources button under every answer lists each citation: book, author, volume, page, the original Arabic text and a direct link on Turath. Small numbers like [1] in the text point to that source.';
+
+  @override
+  String get helpLimitsTitle => 'Limits';
+
+  @override
+  String get helpLimitsBody =>
+      'Manabi is not a mufti; it reports what the books say, and says so plainly when it finds no documented answer. For a ruling on your own situation, consult a trusted scholar.';
+
+  @override
+  String get privacyStoredTitle => 'What is stored';
+
+  @override
+  String get privacyStoredBody =>
+      'Your chats, saved answers and settings are kept on your device only. Manabi needs no account and collects no personal data.';
+
+  @override
+  String get privacySentTitle => 'What is sent';
+
+  @override
+  String get privacySentBody =>
+      'When you ask, the question and a short summary of recent answers are sent to the Manabi server (or to Google Gemini in direct mode) to build the answer, and search terms are sent to turath.io. The server does not store questions; it keeps an answer in memory for up to 20 minutes so an interrupted answer can be recovered.';
+
+  @override
+  String get privacyKeyTitle => 'Your key';
+
+  @override
+  String get privacyKeyBody =>
+      'If you use your own Gemini key, it is kept in the device\'s secure storage (Keychain / Keystore) and sent only to Google.';
+
+  @override
+  String get privacyDeleteTitle => 'Deleting';
+
+  @override
+  String get privacyDeleteBody =>
+      'You can delete all chats and settings at any time under Data & storage.';
+
+  @override
+  String get aboutMission =>
+      'Our aim: easy, faithful and documented access to the original sources of the Islamic sciences — in Pashto, Dari, Arabic and English.';
+
+  @override
+  String get aboutCredits =>
+      'With thanks to the Turath library (turath.io) and the Nusus SDK.';
+
+  @override
+  String get sourceCode => 'Source code';
+
+  @override
+  String get dataCatalog => 'Offline catalog';
 }

@@ -290,11 +290,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get errGeminiAuth => 'مفتاح Gemini مفقود أو غير صالح.';
 
   @override
-  String get errGeminiQuota => 'بلغ استخدام Gemini حده. حاول لاحقًا.';
+  String get errGeminiQuota =>
+      'بلغ استعمال Gemini حدَّه اليومي. أعد المحاولة بعد ساعات، أو فعّل الفوترة للمفتاح في Google AI Studio.';
 
   @override
   String get errGeminiUnavailable =>
-      'خدمة الذكاء الاصطناعي لا تستجيب الآن. حاول مرة أخرى.';
+      'لم تستجب خدمة الذكاء الاصطناعي في الوقت المحدد. تحقّق من الاتصال وأعد المحاولة.';
 
   @override
   String get errTurathUnavailable =>
@@ -574,4 +575,149 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get allBooks => 'كل الكتب';
+
+  @override
+  String get settingsApp => 'التطبيق';
+
+  @override
+  String get settingsAnswersGroup => 'الإجابات والبحث';
+
+  @override
+  String get settingsInfo => 'معلومات ومساعدة';
+
+  @override
+  String get aiStyle => 'أسلوب الذكاء الاصطناعي';
+
+  @override
+  String get dataStorage => 'البيانات والتخزين';
+
+  @override
+  String get help => 'المساعدة';
+
+  @override
+  String get privacyPolicy => 'سياسة الخصوصية';
+
+  @override
+  String get aboutUs => 'من نحن';
+
+  @override
+  String get licenses => 'تراخيص المصادر المفتوحة';
+
+  @override
+  String get resetSettings => 'إعادة ضبط الإعدادات';
+
+  @override
+  String get resetSettingsConfirm =>
+      'ستعود كل الإعدادات (ومنها المفتاح) إلى وضعها الأصلي. تبقى محادثاتك.';
+
+  @override
+  String get textSize => 'حجم النص';
+
+  @override
+  String get textSizeSample =>
+      'يجيب «منابع» عن أسئلتك جوابًا موثّقًا من كتب التراث.';
+
+  @override
+  String get researchDepth => 'عمق البحث';
+
+  @override
+  String get depthQuick => 'سريع';
+
+  @override
+  String get depthStandard => 'متوسط';
+
+  @override
+  String get depthDeep => 'معمّق';
+
+  @override
+  String get depthQuickInfo => 'يقرأ صفحات أقل ويجيب بسرعة — حتى ٦ مصادر.';
+
+  @override
+  String get depthStandardInfo =>
+      'توازن بين السرعة والشمول — حتى ١٤ مصدرًا وجولة بحث إضافية.';
+
+  @override
+  String get depthDeepInfo =>
+      'بحث واسع وكتب أكثر وجولتان إضافيتان — حتى ١٨ مصدرًا؛ يستغرق وقتًا أطول.';
+
+  @override
+  String get depthHint => 'كلما زاد العمق، بُحث في كتب أكثر وقُرئت صفحات أكثر.';
+
+  @override
+  String get chooseLanguage => 'اختر اللغة';
+
+  @override
+  String get openLibrary => 'فتح المكتبة';
+
+  @override
+  String get openLibrarySub => 'الكتب والمؤلفون والبحث في النص';
+
+  @override
+  String get helpHowTitle => 'كيف يعمل «منابع»';
+
+  @override
+  String get helpHowBody =>
+      '١. يفهم سؤالك ويصوغ كلمات البحث بالعربية.\n٢. يبحث في آلاف كتب التراث، ومنها المذهب والكتاب اللذان تذكرهما.\n٣. يقرأ أقرب الصفحات صلةً ويختارها.\n٤. يكتب الجواب من هذه الصفحات وحدها.\n٥. يطابق كل نص منقول مع الكتاب الأصلي كلمةً كلمة، وما لا يوجد يُحذف.';
+
+  @override
+  String get helpTipsTitle => 'نصائح لسؤال جيد';
+
+  @override
+  String get helpTipsBody =>
+      '• اكتب سؤالك واضحًا محددًا.\n• إن أردت قول مذهب فاذكر اسمه (حنفي، شافعي، مالكي، حنبلي).\n• اذكر اسم الكتاب، أو حدّد النطاق بكتاب أو مؤلف أو تصنيف عبر زر +.\n• للمسائل الدقيقة والخلافية اختر البحث «المعمّق».';
+
+  @override
+  String get helpSourcesTitle => 'المصادر والإحالات';
+
+  @override
+  String get helpSourcesBody =>
+      'يعرض زر «المصادر» تحت كل جواب جميع الإحالات: اسم الكتاب والمؤلف والجزء والصفحة والنص العربي الأصلي ورابطًا مباشرًا في تراث. وتشير الأرقام الصغيرة مثل [١] في النص إلى ذلك المصدر.';
+
+  @override
+  String get helpLimitsTitle => 'الحدود';
+
+  @override
+  String get helpLimitsBody =>
+      '«منابع» ليس مفتيًا؛ إنما ينقل ما تقوله الكتب، وإن لم يجد جوابًا موثّقًا صرّح بذلك. وللحكم في حالتك الخاصة استشر عالمًا موثوقًا.';
+
+  @override
+  String get privacyStoredTitle => 'ما الذي يُحفظ';
+
+  @override
+  String get privacyStoredBody =>
+      'تُحفظ محادثاتك والإجابات المحفوظة والإعدادات على جهازك وحده. لا يطلب «منابع» حسابًا ولا يجمع بيانات شخصية.';
+
+  @override
+  String get privacySentTitle => 'ما الذي يُرسل';
+
+  @override
+  String get privacySentBody =>
+      'عند السؤال يُرسل نص السؤال وملخص الإجابات الأخيرة إلى خادم «منابع» (أو إلى Google Gemini في الوضع المباشر) لإعداد الجواب، وتُرسل كلمات البحث إلى turath.io. لا يحفظ الخادم الأسئلة؛ وإنما يُبقي الجواب في الذاكرة حتى ٢٠ دقيقة ليُستعاد إن انقطع الاتصال.';
+
+  @override
+  String get privacyKeyTitle => 'مفتاحك';
+
+  @override
+  String get privacyKeyBody =>
+      'إذا استعملت مفتاح Gemini الخاص بك، يُحفظ في التخزين الآمن للجهاز (Keychain / Keystore) ولا يُرسل إلا إلى Google.';
+
+  @override
+  String get privacyDeleteTitle => 'الحذف';
+
+  @override
+  String get privacyDeleteBody =>
+      'يمكنك حذف كل المحادثات والإعدادات في أي وقت من قسم «البيانات والتخزين».';
+
+  @override
+  String get aboutMission =>
+      'غايتنا: وصول ميسَّر أمين موثَّق إلى المصادر الأصلية للعلوم الإسلامية — بالبشتو والدرية والعربية والإنجليزية.';
+
+  @override
+  String get aboutCredits => 'شكرًا لمكتبة تراث (turath.io) ولـ Nusus SDK.';
+
+  @override
+  String get sourceCode => 'الشيفرة المصدرية';
+
+  @override
+  String get dataCatalog => 'الفهرس دون اتصال';
 }

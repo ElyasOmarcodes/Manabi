@@ -42,7 +42,7 @@ export const pickModel = (models) => rankModels(models, "main")[0];
 /** A 429 that names a daily/plan quota (as opposed to a short burst limit). */
 const isExhausted = (message) => /quota|exceeded your current/i.test(message ?? "");
 
-export const createGemini = ({ apiKey, model, fetch: fetcher = fetch, timeoutMs = 120_000, now = () => Date.now() } = {}) => {
+export const createGemini = ({ apiKey, model, fetch: fetcher = fetch, timeoutMs = 90_000, now = () => Date.now() } = {}) => {
   if (!apiKey) throw new GeminiError("NO_API_KEY", "Gemini API key is not configured");
   let available; // models listed by the API
   const exhausted = new Map(); // model → time it may be retried
@@ -114,6 +114,7 @@ export const createGemini = ({ apiKey, model, fetch: fetcher = fetch, timeoutMs 
     };
     let lastError;
     const tried = new Set();
+    let retries = 0;
     for (let attempt = 0; attempt < 6; attempt += 1) {
       const name = (await candidates(tier)).find((m) => !tried.has(m) || attempt < 2) ?? (await resolveModel(tier));
       try {
@@ -143,7 +144,10 @@ export const createGemini = ({ apiKey, model, fetch: fetcher = fetch, timeoutMs 
         } else if (!error.retryable) {
           throw error;
         }
-        await sleep(800 * 2 ** Math.min(attempt, 3));
+        // A slow or flaky connection should fail within minutes, not tens of minutes.
+        retries += 1;
+        if (retries > 2 || (error.code === "TIMEOUT" && retries > 1)) throw error;
+        await sleep(800 * 2 ** retries);
       }
     }
     throw lastError;

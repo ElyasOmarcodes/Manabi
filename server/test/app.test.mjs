@@ -87,6 +87,37 @@ test("ask streams stages then a verified result", async () => {
   assert.equal(result.sources[0].quotes[0].exact, true);
 });
 
+test("a retried requestId rejoins the same answer without asking Gemini again", async () => {
+  let calls = 0;
+  const queue = [
+    { standaloneQuestion: "q", detectedLanguage: "ar", questionType: "hadith", isIslamicStudies: true, queries: ["النيات"], madhhabs: [], requestedBooks: [], referenceBooks: [] },
+    (request) => ({ selected: [/\[(C\d+)\] Book: [^\n]*Page: 5\b/.exec(request.prompt)[1]], coverage: "full", followUpQueries: [], followUpBooks: [] }),
+    (request) => {
+      const key = /\[(S\d+)\] Book: [^\n]*Page: 5\b/.exec(request.prompt)[1];
+      return { status: "answered", answer: `نص [${key}]`, citations: [{ id: "Q1", sourceId: key, quote: "إنما الأعمال بالنيات وإنما لكل امرئ ما نوى" }] };
+    },
+  ];
+  gemini.generateJson = async (request) => {
+    calls += 1;
+    const next = queue.shift();
+    return { data: typeof next === "function" ? next(request) : next, model: "test-model" };
+  };
+  const ask = () =>
+    fetch(`${base}/api/ask`, {
+      method: "POST",
+      headers: { "content-type": "application/json", accept: "text/event-stream" },
+      body: JSON.stringify({ question: "ما حديث النية؟", language: "ar", requestId: "resume-test-0001" }),
+    }).then((r) => r.text());
+  const first = await ask();
+  const again = await ask();
+  assert.equal(calls, 3, "the pipeline ran once");
+  for (const text of [first, again]) {
+    const result = [...text.matchAll(/event: result\ndata: (.*)\n/g)].map((m) => JSON.parse(m[1]))[0];
+    assert.equal(result.status, "answered");
+  }
+  assert.match(again, /event: stage/, "a rejoining client also gets the recorded stages");
+});
+
 test("ask is rate limited per client", async () => {
   const ask = () => fetch(`${base}/api/ask`, { method: "POST", body: "{}" });
   const statuses = [];

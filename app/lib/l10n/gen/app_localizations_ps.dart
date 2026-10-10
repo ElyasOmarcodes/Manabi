@@ -288,11 +288,11 @@ class AppLocalizationsPs extends AppLocalizations {
 
   @override
   String get errGeminiQuota =>
-      'د Gemini د کارونې حد پوره شو. وروسته بیا هڅه وکړئ.';
+      'د Gemini د نن ورځې د کارونې حد پوره شوی. څو ساعته وروسته بیا هڅه وکړئ، یا د کیلي لپاره په Google AI Studio کې billing فعال کړئ.';
 
   @override
   String get errGeminiUnavailable =>
-      'د AI خدمت اوس ځواب نه ورکوي. بیا هڅه وکړئ.';
+      'د AI خدمت په ټاکلي وخت کې ځواب ورنه کړ. انټرنېټ وګورئ او بیا هڅه وکړئ.';
 
   @override
   String get errTurathUnavailable =>
@@ -570,4 +570,152 @@ class AppLocalizationsPs extends AppLocalizations {
 
   @override
   String get allBooks => 'ټول کتابونه';
+
+  @override
+  String get settingsApp => 'اپلیکیشن';
+
+  @override
+  String get settingsAnswersGroup => 'ځوابونه او څېړنه';
+
+  @override
+  String get settingsInfo => 'معلومات او مرسته';
+
+  @override
+  String get aiStyle => 'د AI سبک';
+
+  @override
+  String get dataStorage => 'معلومات او زېرمه';
+
+  @override
+  String get help => 'مرسته';
+
+  @override
+  String get privacyPolicy => 'د محرمیت پالیسي';
+
+  @override
+  String get aboutUs => 'زموږ په اړه';
+
+  @override
+  String get licenses => 'د خلاصې سرچینې جوازونه';
+
+  @override
+  String get resetSettings => 'تنظیمات اصلي حالت ته راګرځول';
+
+  @override
+  String get resetSettingsConfirm =>
+      'ټول تنظیمات (د کیلي په ګډون) اصلي حالت ته راګرځي. چټونه مو پاتې کېږي.';
+
+  @override
+  String get textSize => 'د متن اندازه';
+
+  @override
+  String get textSizeSample =>
+      'منابع ستاسو پوښتنو ته د تراث له کتابونو مستند ځواب درکوي.';
+
+  @override
+  String get researchDepth => 'د څېړنې کچه';
+
+  @override
+  String get depthQuick => 'چټکه';
+
+  @override
+  String get depthStandard => 'منځنۍ';
+
+  @override
+  String get depthDeep => 'ژوره';
+
+  @override
+  String get depthQuickInfo =>
+      'لږ مخونه لولي او ژر ځواب درکوي — تر ۶ منابعو پورې.';
+
+  @override
+  String get depthStandardInfo =>
+      'د چټکتیا او پراخوالي توازن — تر ۱۴ منابعو او یو اضافي لټون.';
+
+  @override
+  String get depthDeepInfo =>
+      'پراخه لټون، ډېر کتابونه او دوه اضافي پړاوونه — تر ۱۸ منابعو؛ ډېر وخت نیسي.';
+
+  @override
+  String get depthHint =>
+      'څومره چې ژوره وي، هومره ډېر کتابونه لټول او لوستل کېږي.';
+
+  @override
+  String get chooseLanguage => 'ژبه وټاکئ';
+
+  @override
+  String get openLibrary => 'کتابتون پرانیستل';
+
+  @override
+  String get openLibrarySub => 'کتابونه، مؤلفین او د متن لټون';
+
+  @override
+  String get helpHowTitle => 'منابع څنګه کار کوي';
+
+  @override
+  String get helpHowBody =>
+      '۱. پوښتنه مو پوهېږي او په عربي د لټون ټکي جوړوي.\n۲. د تراث په زرګونو کتابونو کې لټون کوي، د مذهب او کتاب په ګډون چې تاسو یې یادوئ.\n۳. تر ټولو اړوند مخونه لولي او غوره کوي.\n۴. یوازې له همدې مخونو ځواب لیکي.\n۵. هر نقل شوی عبارت له اصلي کتاب سره کلمه په کلمه پرتله کوي؛ که ونه موندل شي، لرې کېږي.';
+
+  @override
+  String get helpTipsTitle => 'د ښې پوښتنې لارښوونې';
+
+  @override
+  String get helpTipsBody =>
+      '• پوښتنه روښانه او ځانګړې ولیکئ.\n• که د یوه مذهب نظر غواړئ، د مذهب نوم ولیکئ (حنفي، شافعي، مالکي، حنبلي).\n• د کتاب نوم یاد کړئ، یا د + له لارې ساحه یو کتاب، مؤلف یا ډلې ته محدوده کړئ.\n• د سختو او اختلافي مسلو لپاره «ژوره» څېړنه وټاکئ.';
+
+  @override
+  String get helpSourcesTitle => 'منابع او حوالې';
+
+  @override
+  String get helpSourcesBody =>
+      'د هر ځواب لاندې د «منابع» تڼۍ ټولې حوالې ښيي: د کتاب نوم، مؤلف، ټوک، مخ، اصلي عربي متن او په تراث کې مستقیم لینک. په متن کې کوچنۍ شمېرې لکه [۱] هغې سرچینې ته اشاره کوي.';
+
+  @override
+  String get helpLimitsTitle => 'حدود';
+
+  @override
+  String get helpLimitsBody =>
+      'منابع مفتي نه دی؛ هغه څه نقلوي چې کتابونه یې وايي. که مستند ځواب ونه موندل شي، په ښکاره یې وايي. د شخصي حکم لپاره له باوري عالم سره مشوره وکړئ.';
+
+  @override
+  String get privacyStoredTitle => 'څه ساتل کېږي';
+
+  @override
+  String get privacyStoredBody =>
+      'ستاسو چټونه، خوندي ځوابونه او تنظیمات یوازې ستاسو په وسیله کې ساتل کېږي. منابع حساب نه غواړي او شخصي معلومات نه راټولوي.';
+
+  @override
+  String get privacySentTitle => 'څه لېږل کېږي';
+
+  @override
+  String get privacySentBody =>
+      'کله چې پوښتنه کوئ، د پوښتنې متن او د وروستیو ځوابونو لنډیز د ځواب جوړولو لپاره د منابع سرور (یا په مستقیم حالت کې Google Gemini) ته لېږل کېږي، او د لټون ټکي turath.io ته. سرور پوښتنې نه ساتي؛ یوازې د قطع شوي ځواب د بېرته ترلاسه کولو لپاره یې تر ۲۰ دقیقو پورې په حافظه کې ساتي.';
+
+  @override
+  String get privacyKeyTitle => 'ستاسو کیلي';
+
+  @override
+  String get privacyKeyBody =>
+      'که خپله Gemini کیلي وکاروئ، د وسیلې په خوندي زېرمه (Keychain / Keystore) کې ساتل کېږي او یوازې Google ته لېږل کېږي.';
+
+  @override
+  String get privacyDeleteTitle => 'ړنګول';
+
+  @override
+  String get privacyDeleteBody =>
+      'د «معلومات او زېرمه» له برخې ټول چټونه او تنظیمات هر وخت ړنګولی شئ.';
+
+  @override
+  String get aboutMission =>
+      'زموږ موخه: د اسلامي علومو اصلي سرچینو ته اسانه، امانتداره او مستنده لاسرسی — په پښتو، دري، عربي او انګلیسي.';
+
+  @override
+  String get aboutCredits =>
+      'له تراث کتابتون (turath.io) او Nusus SDK څخه مننه.';
+
+  @override
+  String get sourceCode => 'سرچینې کوډ';
+
+  @override
+  String get dataCatalog => 'آفلاین فهرست';
 }

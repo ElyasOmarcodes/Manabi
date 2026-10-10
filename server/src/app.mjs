@@ -144,29 +144,76 @@ export const createApp = ({ config, pipeline, turath, catalog, gemini, logger = 
     }],
   ];
 
+  // Answers keep running when the client disconnects (a phone app that goes to
+  // the background loses its stream). The client retries with the same
+  // requestId and gets the finished answer, or rejoins the running one,
+  // without spending Gemini quota again.
+  const jobs = new Map();
+  const JOB_TTL_MS = 20 * 60 * 1000;
+  const startJob = (id, body) => {
+    const job = { events: [], listeners: new Set(), result: undefined, error: undefined };
+    const emit = (event, data) => {
+      job.events.push([event, data]);
+      for (const l of job.listeners) l(event, data);
+    };
+    job.done = pipeline
+      .ask(body, emit)
+      .then((result) => {
+        job.result = result;
+        logger.info?.("ask", result.status, `${result.sources?.length ?? 0} sources`, result.model, `${result.elapsedMs}ms`, result.depth ?? "");
+      })
+      .catch((error) => {
+        job.error = error;
+        const info = errorInfo(error);
+        if (info.status >= 500) logger.error("ask failed", error?.code ?? error?.name, error?.message);
+        else logger.info?.("ask rejected", info.code, String(info.message ?? "").slice(0, 160));
+      })
+      .finally(() => {
+        job.listeners.clear();
+        if (!id) return;
+        // Failed answers are not kept: a retry should really try again.
+        if (job.error) jobs.delete(id);
+        else setTimeout(() => jobs.delete(id), JOB_TTL_MS).unref?.();
+      });
+    if (id) jobs.set(id, job);
+    return job;
+  };
+
   const handleAsk = async (req, res, cors) => {
-    if (!gemini) return json(res, 503, { error: { code: "GEMINI_AUTH", message: "GEMINI_API_KYA is not configured on the server" } }, cors);
-    const limited = askLimiter(clientKey(req));
-    if (!limited.ok) {
-      return json(res, 429, { error: { code: "RATE_LIMITED", message: "Too many questions, please wait" } }, { ...cors, "retry-after": String(limited.retryAfter) });
-    }
+    if (!gemini) return json(res, 503, { error: { code: "GEMINI_AUTH", message: "GEMINI_API_KEY is not configured on the server" } }, cors);
     const body = await readJson(req);
+    const id = typeof body?.requestId === "string" && /^[A-Za-z0-9-]{8,64}$/.test(body.requestId) ? body.requestId : undefined;
+    let job = id ? jobs.get(id) : undefined;
+    if (!job) {
+      const limited = askLimiter(clientKey(req));
+      if (!limited.ok) {
+        return json(res, 429, { error: { code: "RATE_LIMITED", message: "Too many questions, please wait" } }, { ...cors, "retry-after": String(limited.retryAfter) });
+      }
+      job = startJob(id, body);
+    }
     const stream = String(req.headers.accept ?? "").includes("text/event-stream");
-    if (!stream) return json(res, 200, await pipeline.ask(body), cors);
+    if (!stream) {
+      await job.done;
+      if (job.error) throw job.error;
+      return json(res, 200, job.result, cors);
+    }
 
     res.writeHead(200, { ...cors, "content-type": "text/event-stream; charset=utf-8", "cache-control": "no-store", connection: "keep-alive", "x-accel-buffering": "no" });
     const send = (event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
     const heartbeat = setInterval(() => res.write(": keep-alive\n\n"), 15_000);
+    for (const [event, data] of job.events) send(event, data);
+    job.listeners.add(send);
+    req.on("close", () => job.listeners.delete(send));
     try {
-      const result = await pipeline.ask(body, send);
-      logger.info?.("ask", result.status, `${result.sources?.length ?? 0} sources`, result.model, `${result.elapsedMs}ms`);
-      send("result", result);
-    } catch (error) {
-      const info = errorInfo(error);
-      if (info.status >= 500) logger.error("ask failed", error?.code ?? error?.name, error?.message);
-      else logger.info?.("ask rejected", info.code, String(info.message ?? "").slice(0, 160));
-      send("error", { code: info.code, message: info.message });
+      await job.done;
+      if (job.error) {
+        const info = errorInfo(job.error);
+        send("error", { code: info.code, message: info.message });
+      } else {
+        send("result", job.result);
+      }
     } finally {
+      job.listeners.delete(send);
       clearInterval(heartbeat);
       res.end();
     }

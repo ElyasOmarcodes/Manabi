@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { catalog } from "../src/catalog.mjs";
-import { createPipeline, INSUFFICIENT, namedMadhhabs, resolveBooks, searchPlan } from "../src/pipeline.mjs";
+import { createPipeline, INSUFFICIENT, limitsFor, namedMadhhabs, resolveBooks, searchPlan } from "../src/pipeline.mjs";
 import { normalizeArabic } from "../src/verify.mjs";
 import { fixtures, fixtureTurath, scriptedGemini } from "./helpers.mjs";
 
@@ -159,4 +159,23 @@ test("schools named in the question are detected", () => {
   assert.deepEqual(namedMadhhabs("د حنفي مذهب علماء څه فرمايي"), ["hanafi"]);
   assert.deepEqual(namedMadhhabs("What do the Shafi'is and Hanbalis say?"), ["shafii", "hanbali"]);
   assert.deepEqual(namedMadhhabs("حدیث نیت"), []);
+});
+
+test("research depth changes how wide the search goes", () => {
+  const queries = ["a", "b", "c", "d", "e", "f", "g", "h"];
+  const count = (depth) => searchPlan({ queries, madhhabs: ["hanafi"], referenceBookIds: ["1", "2", "3", "4", "5", "6"], userScoped: false, limits: limitsFor(depth) }).length;
+  assert.ok(count("quick") < count("standard") && count("standard") < count("deep"));
+  assert.equal(limitsFor("quick").followUpRounds, 0);
+  assert.equal(limitsFor("nonsense").maxSelected, limitsFor("standard").maxSelected);
+});
+
+test("quick research skips the follow-up round", async () => {
+  const gemini = scriptedGemini(
+    plan({ queries: ["الإسلام"] }),
+    { selected: [], coverage: "partial", missing: "intention", followUpQueries: ["النيات"], followUpBooks: [] },
+    { status: "insufficient", answer: "", citations: [] },
+  );
+  const result = await createPipeline({ gemini, turath: fixtureTurath(), catalog }).ask({ question: "q", language: "ar", depth: "quick" });
+  assert.equal(gemini.prompts.length, 3, "plan, one ranking and compose: no follow-up search");
+  assert.equal(result.depth, "quick");
 });

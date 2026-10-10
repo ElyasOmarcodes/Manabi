@@ -34,7 +34,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     }
 
     return AuraPage(
-      title: Text(l.history, style: TextStyle(fontFamily: uiFont, fontSize: 20, fontWeight: FontWeight.w800, color: context.aura.text)),
+      titleText: l.history,
       body: Column(children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),

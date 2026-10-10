@@ -107,6 +107,13 @@ class _App extends StatelessWidget {
         PashtoCupertinoFallback(),
       ],
       supportedLocales: AppLocalizations.supportedLocales,
+      builder: (context, child) {
+        // Phones get a slightly more compact type scale; the user can adjust it in Appearance.
+        final mq = MediaQuery.of(context);
+        final base = mq.textScaler.scale(100) / 100;
+        final phone = mq.size.shortestSide < 600;
+        return MediaQuery(data: mq.copyWith(textScaler: TextScaler.linear(base * (phone ? 0.9 : 1.0) * settings.textScale)), child: child!);
+      },
       home: const HomeShell(),
     );
   }

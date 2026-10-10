@@ -53,7 +53,7 @@ String? pickModel(List<Map<String, dynamic>> models) {
 bool _isExhausted(String message) => RegExp('quota|exceeded your current', caseSensitive: false).hasMatch(message);
 
 class GeminiClient implements JsonModel {
-  GeminiClient({required this.apiKey, this.model, http.Client? client, this.timeout = const Duration(seconds: 90)})
+  GeminiClient({required this.apiKey, this.model, http.Client? client, this.timeout = const Duration(seconds: 75)})
       : _http = client ?? http.Client();
 
   final String apiKey;
@@ -146,6 +146,7 @@ class GeminiClient implements JsonModel {
     };
     GeminiException? last;
     final tried = <String>{};
+    var retries = 0;
     final pinned = model != null && model!.isNotEmpty;
     for (var attempt = 0; attempt < 6; attempt++) {
       final name = await resolveModel(tier);
@@ -173,7 +174,10 @@ class GeminiClient implements JsonModel {
           continue;
         }
         if (!e.retryable) rethrow;
-        await Future<void>.delayed(Duration(milliseconds: 800 * (1 << attempt)));
+        // A slow or flaky connection should fail within minutes, not tens of minutes.
+        retries++;
+        if (retries > 2 || (e.code == 'TIMEOUT' && retries > 1)) rethrow;
+        await Future<void>.delayed(Duration(milliseconds: 800 * (1 << retries)));
       }
     }
     throw last!;

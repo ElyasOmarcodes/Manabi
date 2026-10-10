@@ -30,23 +30,66 @@ final _madhhabNames = {
 /// Schools the question names explicitly (a safety net for the planner).
 List<String> namedMadhhabs(String text) => [for (final e in _madhhabNames.entries) if (e.value.hasMatch(text)) e.key];
 
+/// How widely a question is researched; port of LIMITS / DEPTHS in
+/// server/src/pipeline.mjs.
 class Limits {
-  static const generalQueries = 6;
-  static const hitsPerGeneral = 8;
-  static const requestedBooks = 3;
-  static const queriesPerRequested = 4;
-  static const hitsPerRequested = 4;
-  static const referenceBooks = 5;
-  static const queriesPerReference = 2;
-  static const hitsPerReference = 3;
-  static const queriesPerMadhhab = 3;
-  static const hitsPerMadhhab = 4;
-  static const maxSearches = 40;
-  static const maxCandidates = 64;
+  const Limits({
+    this.generalQueries = 6,
+    this.hitsPerGeneral = 8,
+    this.requestedBooks = 3,
+    this.queriesPerRequested = 4,
+    this.hitsPerRequested = 4,
+    this.referenceBooks = 5,
+    this.queriesPerReference = 2,
+    this.hitsPerReference = 3,
+    this.queriesPerMadhhab = 3,
+    this.hitsPerMadhhab = 4,
+    this.maxSearches = 40,
+    this.maxCandidates = 64,
+    this.maxSelected = 14,
+    this.continuationPages = 6,
+    this.followUpRounds = 1,
+  });
+  final int generalQueries;
+  final int hitsPerGeneral;
+  final int requestedBooks;
+  final int queriesPerRequested;
+  final int hitsPerRequested;
+  final int referenceBooks;
+  final int queriesPerReference;
+  final int hitsPerReference;
+  final int queriesPerMadhhab;
+  final int hitsPerMadhhab;
+  final int maxSearches;
+  final int maxCandidates;
+  final int maxSelected;
+  final int continuationPages;
+  final int followUpRounds;
+
   static const excerptChars = 650;
   static const sourceChars = 2400;
-  static const maxSelected = 14;
-  static const continuationPages = 6;
+
+  static const standard = Limits();
+  static const quick = Limits(
+      generalQueries: 3, hitsPerGeneral: 6, referenceBooks: 3, queriesPerMadhhab: 2, maxSearches: 18, maxCandidates: 32, maxSelected: 6, continuationPages: 2, followUpRounds: 0);
+  static const deep = Limits(
+      generalQueries: 8,
+      hitsPerGeneral: 10,
+      referenceBooks: 6,
+      queriesPerReference: 3,
+      queriesPerMadhhab: 4,
+      hitsPerMadhhab: 5,
+      maxSearches: 64,
+      maxCandidates: 96,
+      maxSelected: 18,
+      continuationPages: 10,
+      followUpRounds: 2);
+
+  static Limits forDepth(String? depth) => switch (depth) {
+        'quick' => quick,
+        'deep' => deep,
+        _ => standard,
+      };
 }
 
 /// `fast` is used for planning and ranking, `main` for writing the answer.
@@ -84,14 +127,30 @@ class PipelineException implements Exception {
 }
 
 class AskRequest {
-  const AskRequest(
-      {required this.question, this.language = 'auto', this.fallbackLanguage = 'en', this.scope = SearchScope.all, this.history = const [], this.maxSources = 12});
+  const AskRequest({
+    required this.question,
+    this.language = 'auto',
+    this.fallbackLanguage = 'en',
+    this.scope = SearchScope.all,
+    this.history = const [],
+    this.maxSources,
+    this.depth = 'standard',
+    this.requestId,
+  });
   final String question;
   final String language;
   final String fallbackLanguage;
   final SearchScope scope;
   final List<HistoryTurn> history;
-  final int maxSources;
+
+  /// Optional cap on sources; by default the research depth decides.
+  final int? maxSources;
+
+  /// 'quick', 'standard' or 'deep'.
+  final String depth;
+
+  /// Lets the server hand back an answer whose stream was interrupted.
+  final String? requestId;
 
   Map<String, dynamic> toJson() => {
         'question': question,
@@ -101,7 +160,9 @@ class AskRequest {
         'history': [
           for (final h in history) {'question': h.question, 'summary': h.summary, 'books': h.books}
         ],
-        'maxSources': maxSources,
+        'maxSources': ?maxSources,
+        'depth': depth,
+        'requestId': ?requestId,
       };
 }
 
@@ -172,32 +233,33 @@ List<PlannedSearch> searchPlan({
   List<String> madhhabs = const [],
   List<String> requestedBookIds = const [],
   List<String> referenceBookIds = const [],
+  Limits limits = Limits.standard,
 }) {
   final userScoped = !scope.isAll;
   final plan = <PlannedSearch>[
-    for (final q in queries.take(Limits.generalQueries))
-      PlannedSearch(q, Limits.hitsPerGeneral, 'general', bookId: scope.bookId, authorId: scope.authorId, categoryId: scope.categoryId),
+    for (final q in queries.take(limits.generalQueries))
+      PlannedSearch(q, limits.hitsPerGeneral, 'general', bookId: scope.bookId, authorId: scope.authorId, categoryId: scope.categoryId),
   ];
   if (!userScoped) {
-    for (final id in requestedBookIds.take(Limits.requestedBooks)) {
-      for (final q in queries.take(Limits.queriesPerRequested)) {
-        plan.add(PlannedSearch(q, Limits.hitsPerRequested, 'requested', bookId: id));
+    for (final id in requestedBookIds.take(limits.requestedBooks)) {
+      for (final q in queries.take(limits.queriesPerRequested)) {
+        plan.add(PlannedSearch(q, limits.hitsPerRequested, 'requested', bookId: id));
       }
     }
-    for (final id in referenceBookIds.take(Limits.referenceBooks)) {
-      for (final q in queries.take(Limits.queriesPerReference)) {
-        plan.add(PlannedSearch(q, Limits.hitsPerReference, 'reference', bookId: id));
+    for (final id in referenceBookIds.take(limits.referenceBooks)) {
+      for (final q in queries.take(limits.queriesPerReference)) {
+        plan.add(PlannedSearch(q, limits.hitsPerReference, 'reference', bookId: id));
       }
     }
     for (final m in madhhabs) {
       final c = madhhabCategory[m];
       if (c == null) continue;
-      for (final q in queries.take(Limits.queriesPerMadhhab)) {
-        plan.add(PlannedSearch(q, Limits.hitsPerMadhhab, 'madhhab', categoryId: c));
+      for (final q in queries.take(limits.queriesPerMadhhab)) {
+        plan.add(PlannedSearch(q, limits.hitsPerMadhhab, 'madhhab', categoryId: c));
       }
     }
   }
-  return plan.take(Limits.maxSearches).toList();
+  return plan.take(limits.maxSearches).toList();
 }
 
 /// A retrieved page, as candidate and as numbered source.
@@ -383,7 +445,7 @@ class AnswerPipeline {
       ].join(', ');
 
   /// Runs searches (bounded concurrency 6) and merges hits into a de-duplicated pool.
-  Future<({List<PipelineSource> candidates, int total, bool failed})> _collect(List<PlannedSearch> plan, {List<PipelineSource> existing = const []}) async {
+  Future<({List<PipelineSource> candidates, int total, bool failed})> _collect(List<PlannedSearch> plan, {List<PipelineSource> existing = const [], Limits limits = Limits.standard}) async {
     final results = List<SearchHits?>.filled(plan.length, null);
     var failures = 0;
     var cursor = 0;
@@ -404,7 +466,7 @@ class AnswerPipeline {
     final order = [for (var i = 0; i < plan.length; i++) i]..sort((a, b) => (plan[b].kind == 'requested' ? 1 : 0) - (plan[a].kind == 'requested' ? 1 : 0));
     final seen = {for (final c in existing) c.id};
     final pool = <PipelineSource>[];
-    for (var round = 0; existing.length + pool.length < Limits.maxCandidates; round++) {
+    for (var round = 0; existing.length + pool.length < limits.maxCandidates; round++) {
       var any = false;
       for (final i in order) {
         final r = results[i];
@@ -413,7 +475,7 @@ class AnswerPipeline {
         final c = _candidate(r.items[round], round < r.snippets.length ? r.snippets[round] : null, catalog);
         if (!seen.add(c.id)) continue;
         pool.add(c);
-        if (existing.length + pool.length >= Limits.maxCandidates) break;
+        if (existing.length + pool.length >= limits.maxCandidates) break;
       }
       if (!any) break;
     }
@@ -421,9 +483,9 @@ class AnswerPipeline {
   }
 
   /// Adds the page after each of the strongest sources as its own source.
-  Future<List<PipelineSource>> _withContinuations(List<PipelineSource> selected) async {
+  Future<List<PipelineSource>> _withContinuations(List<PipelineSource> selected, int limit) async {
     final have = {for (final c in selected) c.id};
-    final targets = selected.where((c) => c.passage.internalPage != null).take(Limits.continuationPages).toList();
+    final targets = selected.where((c) => c.passage.internalPage != null).take(limit).toList();
     final next = await Future.wait([
       for (final c in targets)
         turath.getPage(c.passage.bookId, c.passage.internalPage! + 1).then<PagePassage?>((p) => p).catchError((Object _) => null),
@@ -464,6 +526,7 @@ class AnswerPipeline {
     if (question.isEmpty) throw const PipelineException('INVALID_ARGUMENT', 'question must not be empty');
     if (question.length > 2000) throw const PipelineException('INVALID_ARGUMENT', 'question is too long');
     final scope = request.scope;
+    final limits = Limits.forDepth(request.depth);
 
     // 1. plan
     yield const AskStageEvent(AskStage.planning);
@@ -483,7 +546,7 @@ class AnswerPipeline {
             ? detected as String
             : (languageNames.containsKey(request.fallbackLanguage) ? request.fallbackLanguage : 'en');
     final madhhabs = {...(p['madhhabs'] as List? ?? const []).whereType<String>(), ...namedMadhhabs(question)}.where(madhhabCategory.containsKey).toList();
-    final requestedIds = resolveBooks(_titles(p['requestedBooks'], Limits.requestedBooks), catalog, perTitle: 2);
+    final requestedIds = resolveBooks(_titles(p['requestedBooks'], limits.requestedBooks), catalog, perTitle: 2);
     final referenceIds = resolveBooks(_titles(p['referenceBooks'], 6), catalog).where((id) => !requestedIds.contains(id)).toList();
     final standalone = (p['standaloneQuestion'] as String?)?.trim().isNotEmpty == true ? (p['standaloneQuestion'] as String).trim() : question;
     yield AskPlanEvent(queries);
@@ -513,7 +576,9 @@ class AnswerPipeline {
 
     // 2. search
     yield const AskStageEvent(AskStage.searching);
-    final first = await _collect(searchPlan(queries: queries, scope: scope, madhhabs: madhhabs, requestedBookIds: requestedIds, referenceBookIds: referenceIds));
+    final first = await _collect(
+        searchPlan(queries: queries, scope: scope, madhhabs: madhhabs, requestedBookIds: requestedIds, referenceBookIds: referenceIds, limits: limits),
+        limits: limits);
     if (first.failed) throw const PipelineException('TURATH_UNAVAILABLE', 'The Turath library could not be reached');
     var candidates = [for (var i = 0; i < first.candidates.length; i++) first.candidates[i].withKey('C${i + 1}')];
     var total = first.total;
@@ -523,39 +588,40 @@ class AnswerPipeline {
       return;
     }
 
-    // 3. read & rank, with one optional follow-up round
+    // 3. read & rank, then follow-up rounds if something is missing
     yield const AskStageEvent(AskStage.reading);
     var used = [...queries];
     var ranking = await _rank(standalone, candidates, used);
-    final followQueries = cleanQueries(ranking['followUpQueries'], max: 5).where((q) => !used.contains(q)).toList();
-    final followBooks = resolveBooks(_titles(ranking['followUpBooks'], 4), catalog);
-    if (ranking['coverage'] != 'full' && (followQueries.isNotEmpty || followBooks.isNotEmpty)) {
+    for (var round = 0; round < limits.followUpRounds && ranking['coverage'] != 'full'; round++) {
+      final followQueries = cleanQueries(ranking['followUpQueries'], max: 5).where((q) => !used.contains(q)).toList();
+      final followBooks = resolveBooks(_titles(ranking['followUpBooks'], 4), catalog);
+      if (followQueries.isEmpty && followBooks.isEmpty) break;
       yield const AskStageEvent(AskStage.searching);
       final keepKeys = (ranking['selected'] as List? ?? const []).map((k) => '$k'.toUpperCase()).toSet();
       final keep = candidates.where((c) => keepKeys.contains(c.key)).toList();
       final extra = await _collect(
-        searchPlan(queries: followQueries.isNotEmpty ? followQueries : queries.take(3).toList(), scope: scope, requestedBookIds: followBooks),
+        searchPlan(queries: followQueries.isNotEmpty ? followQueries : queries.take(3).toList(), scope: scope, requestedBookIds: followBooks, limits: limits),
         existing: keep,
+        limits: limits,
       );
       total += extra.total;
-      if (extra.candidates.isNotEmpty) {
-        used = [...used, ...followQueries];
-        final merged = [...keep, ...extra.candidates];
-        candidates = [for (var i = 0; i < merged.length; i++) merged[i].withKey('C${i + 1}')];
-        yield AskSourcesEvent(candidates.length, total);
-        yield const AskStageEvent(AskStage.reading);
-        ranking = await _rank(standalone, candidates, used);
-      }
+      if (extra.candidates.isEmpty) break;
+      used = [...used, ...followQueries];
+      final merged = [...keep, ...extra.candidates];
+      candidates = [for (var i = 0; i < merged.length; i++) merged[i].withKey('C${i + 1}')];
+      yield AskSourcesEvent(candidates.length, total);
+      yield const AskStageEvent(AskStage.reading);
+      ranking = await _rank(standalone, candidates, used);
     }
     final byKey = {for (final c in candidates) c.key: c};
     var selected = (ranking['selected'] as List? ?? const []).map((k) => '$k'.trim().toUpperCase()).toSet().map((k) => byKey[k]).whereType<PipelineSource>().toList();
     if (selected.isEmpty && ranking['coverage'] != 'none') selected = candidates.take(6).toList();
-    selected = selected.take(request.maxSources.clamp(3, Limits.maxSelected)).toList();
+    selected = selected.take((request.maxSources ?? limits.maxSelected).clamp(3, limits.maxSelected)).toList();
     if (selected.isEmpty) {
       yield AskResultEvent(nothing(total: total, related: [for (var i = 0; i < candidates.length && i < 6; i++) candidates[i].withKey('S${i + 1}')]));
       return;
     }
-    final expanded = await _withContinuations(selected);
+    final expanded = await _withContinuations(selected, limits.continuationPages);
     final sources = [for (var i = 0; i < expanded.length; i++) expanded[i].withKey('S${i + 1}')];
 
     // 4. compose

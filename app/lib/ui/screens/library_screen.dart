@@ -39,7 +39,6 @@ class _LibraryScreenState extends State<LibraryScreen> {
   @override
   Widget build(BuildContext context) {
     final l = context.l;
-    final a = context.aura;
     final hint = switch (_tab) {
       _Tab.books => l.searchBooks,
       _Tab.authors => l.searchAuthors,
@@ -47,7 +46,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
       _Tab.fullText => l.searchInText,
     };
     return AuraPage(
-      title: Text(l.library, style: TextStyle(fontFamily: uiFont, fontSize: 20, fontWeight: FontWeight.w800, color: a.text)),
+      titleText: l.library,
       body: CustomScrollView(slivers: [
         SliverToBoxAdapter(
           child: ReadingWidth(

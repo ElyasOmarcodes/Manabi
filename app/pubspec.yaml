@@ -40,6 +40,7 @@ flutter:
   assets:
     - assets/catalog/
     - assets/images/
+    - assets/brand/
   fonts:
     - family: Vazirmatn
       fonts:
@@ -59,13 +60,13 @@ flutter_launcher_icons:
   android: true
   ios: true
   remove_alpha_ios: true
-  adaptive_icon_background: "#6A5AE0"
+  adaptive_icon_background: "#6C5CE7"
   adaptive_icon_foreground: assets/images/icon_foreground.png
   web:
     generate: true
     image_path: assets/images/icon.png
     background_color: "#FFFFFF"
-    theme_color: "#6A5AE0"
+    theme_color: "#6C5CE7"
   windows:
     generate: true
     image_path: assets/images/icon.png
@@ -77,10 +78,11 @@ flutter_launcher_icons:
 flutter_native_splash:
   color: "#FFFFFF"
   image: assets/images/splash_logo.png
-  color_dark: "#111114"
-  image_dark: assets/images/splash_logo.png
+  color_dark: "#0F0F14"
+  image_dark: assets/images/splash_logo_dark.png
   android_12:
     color: "#FFFFFF"
-    color_dark: "#111114"
-    image: assets/images/splash_logo.png
+    color_dark: "#0F0F14"
+    image: assets/images/splash_android12.png
+    image_dark: assets/images/splash_android12.png
   web: true

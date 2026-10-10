@@ -615,13 +615,13 @@ abstract class AppLocalizations {
   /// No description provided for @errGeminiQuota.
   ///
   /// In en, this message translates to:
-  /// **'Gemini usage limit reached. Please try again later.'**
+  /// **'Today\'s Gemini usage limit has been reached. Try again in a few hours, or enable billing for the key in Google AI Studio.'**
   String get errGeminiQuota;
 
   /// No description provided for @errGeminiUnavailable.
   ///
   /// In en, this message translates to:
-  /// **'The AI service is not responding right now. Please try again.'**
+  /// **'The AI service did not respond in time. Check your connection and try again.'**
   String get errGeminiUnavailable;
 
   /// No description provided for @errTurathUnavailable.
@@ -1133,6 +1133,270 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'All books'**
   String get allBooks;
+
+  /// No description provided for @settingsApp.
+  ///
+  /// In en, this message translates to:
+  /// **'App'**
+  String get settingsApp;
+
+  /// No description provided for @settingsAnswersGroup.
+  ///
+  /// In en, this message translates to:
+  /// **'Answers & research'**
+  String get settingsAnswersGroup;
+
+  /// No description provided for @settingsInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Info & help'**
+  String get settingsInfo;
+
+  /// No description provided for @aiStyle.
+  ///
+  /// In en, this message translates to:
+  /// **'AI style'**
+  String get aiStyle;
+
+  /// No description provided for @dataStorage.
+  ///
+  /// In en, this message translates to:
+  /// **'Data & storage'**
+  String get dataStorage;
+
+  /// No description provided for @help.
+  ///
+  /// In en, this message translates to:
+  /// **'Help'**
+  String get help;
+
+  /// No description provided for @privacyPolicy.
+  ///
+  /// In en, this message translates to:
+  /// **'Privacy policy'**
+  String get privacyPolicy;
+
+  /// No description provided for @aboutUs.
+  ///
+  /// In en, this message translates to:
+  /// **'About us'**
+  String get aboutUs;
+
+  /// No description provided for @licenses.
+  ///
+  /// In en, this message translates to:
+  /// **'Open-source licenses'**
+  String get licenses;
+
+  /// No description provided for @resetSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset settings'**
+  String get resetSettings;
+
+  /// No description provided for @resetSettingsConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'All settings (including your key) return to their defaults. Your chats are kept.'**
+  String get resetSettingsConfirm;
+
+  /// No description provided for @textSize.
+  ///
+  /// In en, this message translates to:
+  /// **'Text size'**
+  String get textSize;
+
+  /// No description provided for @textSizeSample.
+  ///
+  /// In en, this message translates to:
+  /// **'Manabi answers your questions with sources from the books of Turath.'**
+  String get textSizeSample;
+
+  /// No description provided for @researchDepth.
+  ///
+  /// In en, this message translates to:
+  /// **'Research depth'**
+  String get researchDepth;
+
+  /// No description provided for @depthQuick.
+  ///
+  /// In en, this message translates to:
+  /// **'Quick'**
+  String get depthQuick;
+
+  /// No description provided for @depthStandard.
+  ///
+  /// In en, this message translates to:
+  /// **'Standard'**
+  String get depthStandard;
+
+  /// No description provided for @depthDeep.
+  ///
+  /// In en, this message translates to:
+  /// **'Deep'**
+  String get depthDeep;
+
+  /// No description provided for @depthQuickInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Reads fewer pages and answers fast — up to 6 sources.'**
+  String get depthQuickInfo;
+
+  /// No description provided for @depthStandardInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Balances speed and breadth — up to 14 sources and one follow-up search.'**
+  String get depthStandardInfo;
+
+  /// No description provided for @depthDeepInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Wide search, more books and two follow-up rounds — up to 18 sources; takes longer.'**
+  String get depthDeepInfo;
+
+  /// No description provided for @depthHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The deeper it goes, the more books are searched and read.'**
+  String get depthHint;
+
+  /// No description provided for @chooseLanguage.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a language'**
+  String get chooseLanguage;
+
+  /// No description provided for @openLibrary.
+  ///
+  /// In en, this message translates to:
+  /// **'Open the library'**
+  String get openLibrary;
+
+  /// No description provided for @openLibrarySub.
+  ///
+  /// In en, this message translates to:
+  /// **'Books, authors and full-text search'**
+  String get openLibrarySub;
+
+  /// No description provided for @helpHowTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'How Manabi works'**
+  String get helpHowTitle;
+
+  /// No description provided for @helpHowBody.
+  ///
+  /// In en, this message translates to:
+  /// **'1. It understands your question and writes Arabic search terms.\n2. It searches thousands of Turath books, including any school or book you name.\n3. It reads the most relevant pages and picks the best ones.\n4. It writes the answer from those pages only.\n5. Every quoted passage is matched word for word against the book; anything not found is removed.'**
+  String get helpHowBody;
+
+  /// No description provided for @helpTipsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Tips for a good question'**
+  String get helpTipsTitle;
+
+  /// No description provided for @helpTipsBody.
+  ///
+  /// In en, this message translates to:
+  /// **'• Ask a clear, specific question.\n• If you want a school\'s view, name it (Hanafi, Shafi\'i, Maliki, Hanbali).\n• Name a book, or use + to limit the search to a book, author or category.\n• Choose Deep research for difficult or disputed questions.'**
+  String get helpTipsBody;
+
+  /// No description provided for @helpSourcesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sources and citations'**
+  String get helpSourcesTitle;
+
+  /// No description provided for @helpSourcesBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The Sources button under every answer lists each citation: book, author, volume, page, the original Arabic text and a direct link on Turath. Small numbers like [1] in the text point to that source.'**
+  String get helpSourcesBody;
+
+  /// No description provided for @helpLimitsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Limits'**
+  String get helpLimitsTitle;
+
+  /// No description provided for @helpLimitsBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Manabi is not a mufti; it reports what the books say, and says so plainly when it finds no documented answer. For a ruling on your own situation, consult a trusted scholar.'**
+  String get helpLimitsBody;
+
+  /// No description provided for @privacyStoredTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'What is stored'**
+  String get privacyStoredTitle;
+
+  /// No description provided for @privacyStoredBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Your chats, saved answers and settings are kept on your device only. Manabi needs no account and collects no personal data.'**
+  String get privacyStoredBody;
+
+  /// No description provided for @privacySentTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'What is sent'**
+  String get privacySentTitle;
+
+  /// No description provided for @privacySentBody.
+  ///
+  /// In en, this message translates to:
+  /// **'When you ask, the question and a short summary of recent answers are sent to the Manabi server (or to Google Gemini in direct mode) to build the answer, and search terms are sent to turath.io. The server does not store questions; it keeps an answer in memory for up to 20 minutes so an interrupted answer can be recovered.'**
+  String get privacySentBody;
+
+  /// No description provided for @privacyKeyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your key'**
+  String get privacyKeyTitle;
+
+  /// No description provided for @privacyKeyBody.
+  ///
+  /// In en, this message translates to:
+  /// **'If you use your own Gemini key, it is kept in the device\'s secure storage (Keychain / Keystore) and sent only to Google.'**
+  String get privacyKeyBody;
+
+  /// No description provided for @privacyDeleteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Deleting'**
+  String get privacyDeleteTitle;
+
+  /// No description provided for @privacyDeleteBody.
+  ///
+  /// In en, this message translates to:
+  /// **'You can delete all chats and settings at any time under Data & storage.'**
+  String get privacyDeleteBody;
+
+  /// No description provided for @aboutMission.
+  ///
+  /// In en, this message translates to:
+  /// **'Our aim: easy, faithful and documented access to the original sources of the Islamic sciences — in Pashto, Dari, Arabic and English.'**
+  String get aboutMission;
+
+  /// No description provided for @aboutCredits.
+  ///
+  /// In en, this message translates to:
+  /// **'With thanks to the Turath library (turath.io) and the Nusus SDK.'**
+  String get aboutCredits;
+
+  /// No description provided for @sourceCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Source code'**
+  String get sourceCode;
+
+  /// No description provided for @dataCatalog.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline catalog'**
+  String get dataCatalog;
 }
 
 class _AppLocalizationsDelegate

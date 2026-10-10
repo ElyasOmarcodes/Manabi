@@ -16,6 +16,7 @@ import 'package:manabi/state/settings_controller.dart';
 import 'package:manabi/ui/export/exporter.dart';
 import 'package:manabi/l10n/gen/app_localizations_en.dart';
 import 'package:manabi/core/models/chat.dart';
+import 'package:manabi/ui/widgets/depth_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 const sampleResult = {
@@ -111,7 +112,7 @@ void main() {
       final s = await tester.runAsync(services);
       await tester.pumpWidget(ManabiApp(services: Future.value(s)));
       await tester.pump(const Duration(seconds: 2));
-      expect(find.text('Assalamu alaikum'), findsOneWidget);
+      expect(find.text('What would you like to research today?'), findsOneWidget);
       expect(find.text('Set up a connection'), findsOneWidget);
       // Asking without a server configured fails gracefully with a setup hint.
       await tester.enterText(find.byType(TextField).last, 'What is ihsan?');
@@ -128,8 +129,58 @@ void main() {
       await settle(tester);
       await tester.tap(find.text('Settings').first);
       await settle(tester);
-      await tester.scrollUntilVisible(find.text('Test connection'), 300, scrollable: find.byType(Scrollable).last);
-      expect(find.text('Test connection'), findsOneWidget);
+      // Settings home lists sections; each opens its own page.
+      for (final (row, marker) in [
+        ('Appearance', 'Text size'),
+        ('AI style', 'Research depth'),
+        ('Connection', 'Test connection'),
+        ('Data & storage', 'Reset settings'),
+        ('Help', 'How Manabi works'),
+        ('Privacy policy', 'What is stored'),
+        ('About us', 'Open-source licenses'),
+      ]) {
+        await tester.scrollUntilVisible(find.text(row), 200, scrollable: find.byType(Scrollable).last);
+        await tester.tap(find.text(row));
+        await settle(tester);
+        await tester.scrollUntilVisible(find.text(marker), 200, scrollable: find.byType(Scrollable).last);
+        expect(find.text(marker), findsOneWidget, reason: '$row page');
+        await tester.tap(find.byIcon(Icons.arrow_back_rounded));
+        await settle(tester);
+      }
+      // AI style: choosing a research depth is remembered.
+      await tester.scrollUntilVisible(find.text('AI style'), 200, scrollable: find.byType(Scrollable).last);
+      await tester.tap(find.text('AI style'));
+      await settle(tester);
+      await tester.tap(find.text('Deep'));
+      await settle(tester);
+      expect(s!.settings.researchDepth, 'deep');
+      // The app language opens as a dialog.
+      await tester.tap(find.byIcon(Icons.arrow_back_rounded));
+      await settle(tester);
+      await tester.tap(find.text('App language'));
+      await settle(tester);
+      expect(find.text('پښتو'), findsWidgets);
+    });
+
+    testWidgets('composer: + sheet and research depth slider', (tester) async {
+      tester.view.physicalSize = const Size(390 * 3, 844 * 3);
+      tester.view.devicePixelRatio = 3;
+      addTearDown(tester.view.reset);
+      final s = await tester.runAsync(services);
+      await tester.pumpWidget(ManabiApp(services: Future.value(s)));
+      await tester.pump(const Duration(seconds: 2));
+      await tester.tap(find.byTooltip('Search options'));
+      await settle(tester);
+      expect(find.text('Search scope'), findsOneWidget);
+      expect(find.text('Research depth'), findsOneWidget);
+      await tester.tap(find.text('Research depth'));
+      await settle(tester);
+      // Drag the slider to the far end (deep).
+      final slider = find.byType(DepthSlider);
+      await tester.tapAt(tester.getTopRight(slider) + const Offset(-20, 28));
+      await settle(tester);
+      expect(s!.settings.researchDepth, 'deep');
+      expect(tester.takeException(), isNull);
     });
 
     for (final lang in ['ps', 'fa', 'ar']) {
@@ -143,7 +194,7 @@ void main() {
         await tester.pump(const Duration(seconds: 2));
         // GPT-style structure: menu → each destination opens as a page.
         for (final icon in [Icons.auto_stories_rounded, Icons.bookmark_rounded, Icons.history_rounded, Icons.settings_rounded]) {
-          await tester.tap(find.byIcon(Icons.menu_rounded));
+          await tester.tap(find.byIcon(Icons.notes_rounded));
           await settle(tester);
           await tester.tap(find.byIcon(icon).last);
           await settle(tester);

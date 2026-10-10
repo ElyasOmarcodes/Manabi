@@ -14,10 +14,13 @@ import '../export/export_actions.dart';
 import '../home_shell.dart';
 import '../theme.dart';
 import '../widgets/answer_card.dart';
+import '../widgets/brand_logo.dart';
 import '../widgets/common.dart';
+import '../widgets/depth_picker.dart';
 import '../widgets/scope_picker.dart';
 
-/// Chat page in a clean, distraction-free chatbot style.
+/// Chat page in the familiar ChatGPT layout: a quiet top bar, the
+/// conversation, and one composer at the bottom.
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
   @override
@@ -63,11 +66,12 @@ class _ChatScreenState extends State<ChatScreen> {
               ? _Welcome(configured: settings.isConfigured)
               : ListView.builder(
                   controller: _scroll,
-                  padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                   itemCount: chat.turns.length,
-                  itemBuilder: (context, i) => ReadingWidth(maxWidth: 760, child: _TurnView(turn: chat.turns[i], progress: chats.progress[chat.turns[i].id])),
+                  itemBuilder: (context, i) => ReadingWidth(maxWidth: 740, child: _TurnView(turn: chat.turns[i], progress: chats.progress[chat.turns[i].id])),
                 ),
         ),
+        if (empty) const _Suggestions(),
         _Composer(pending: pending),
         SizedBox(height: wide ? 12 : MediaQuery.paddingOf(context).bottom + 4),
       ]),
@@ -83,26 +87,36 @@ class _TopBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final l = context.l;
     final a = context.aura;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 6, 8, 0),
-      child: Row(children: [
-        if (!wide) AuraIconButton(icon: Icons.menu_rounded, tooltip: l.chats, filled: false, onTap: () => Scaffold.of(context).openDrawer()) else const SizedBox(width: 12),
-        Expanded(
-          child: Text(chat?.title ?? l.appName,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: wide ? TextAlign.start : TextAlign.center,
-              style: TextStyle(fontFamily: uiFont, fontSize: 16, fontWeight: FontWeight.w700, color: a.text)),
-        ),
-        if (chat != null && chat!.turns.isNotEmpty)
-          AuraIconButton(
-            tooltip: l.exportChat,
-            icon: Icons.ios_share_rounded,
-            filled: false,
-            onTap: () => showExportSheet(context, title: chat!.title, turns: chat!.turns, uiLanguage: context.read<SettingsController>().uiLanguage),
+    final hasTurns = chat != null && chat!.turns.isNotEmpty;
+    return SizedBox(
+      height: 56,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        child: Row(children: [
+          if (!wide) RoundIconButton(icon: Icons.notes_rounded, tooltip: l.chats, onTap: () => Scaffold.of(context).openDrawer()) else const SizedBox(width: 8),
+          const SizedBox(width: 10),
+          Expanded(
+            child: hasTurns
+                ? Text(chat!.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: wide ? TextAlign.start : TextAlign.center,
+                    style: TextStyle(fontFamily: uiFont, fontSize: 15, fontWeight: FontWeight.w600, color: a.text))
+                : (wide ? const SizedBox() : const Center(child: BrandLogo(height: 26, latin: false))),
           ),
-        AuraIconButton(tooltip: l.newChat, icon: Icons.edit_square, filled: false, onTap: () => context.read<ChatController>().newChat()),
-      ]),
+          const SizedBox(width: 10),
+          if (hasTurns) ...[
+            RoundIconButton(
+              tooltip: l.exportChat,
+              icon: Icons.ios_share_rounded,
+              filled: false,
+              onTap: () => showExportSheet(context, title: chat!.title, turns: chat!.turns, uiLanguage: context.read<SettingsController>().uiLanguage),
+            ),
+            const SizedBox(width: 4),
+          ],
+          RoundIconButton(tooltip: l.newChat, icon: Icons.edit_square, onTap: () => context.read<ChatController>().newChat()),
+        ]),
+      ),
     );
   }
 }
@@ -114,78 +128,80 @@ class _Welcome extends StatelessWidget {
   Widget build(BuildContext context) {
     final l = context.l;
     final a = context.aura;
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Reveal(child: BrandLogo(height: 64)),
+          const SizedBox(height: 18),
+          Reveal(
+            delay: 80,
+            child: Text(l.welcomeQuestion, textAlign: TextAlign.center, style: TextStyle(fontFamily: uiFont, fontSize: 19, fontWeight: FontWeight.w600, color: a.text, height: 1.5)),
+          ),
+          if (!configured)
+            Padding(
+              padding: const EdgeInsets.only(top: 16),
+              child: Pressable(
+                onTap: () => openSection(context, Section.settings),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                  decoration: BoxDecoration(color: a.accentTint, borderRadius: BorderRadius.circular(20)),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(Icons.link_rounded, size: 17, color: a.accent),
+                    const SizedBox(width: 8),
+                    Flexible(child: Text(l.notConfiguredTitle, style: TextStyle(fontFamily: uiFont, fontSize: 13.5, fontWeight: FontWeight.w600, color: a.accent))),
+                  ]),
+                ),
+              ),
+            ),
+        ]),
+      ),
+    );
+  }
+}
+
+/// Starter questions as a horizontal row of small cards above the composer.
+class _Suggestions extends StatelessWidget {
+  const _Suggestions();
+  @override
+  Widget build(BuildContext context) {
+    final l = context.l;
+    final a = context.aura;
     final nav = context.read<NavController>();
-    final suggestions = [
+    final items = [
       (l.suggestion1, Icons.format_quote_rounded, AuraHues.amber),
       (l.suggestion2, Icons.balance_rounded, AuraHues.green),
       (l.suggestion3, Icons.auto_awesome_rounded, AuraHues.violet),
       (l.suggestion4, Icons.school_rounded, AuraHues.teal),
     ];
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(22, 12, 22, 12),
-        child: ReadingWidth(
-          maxWidth: 680,
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            const Reveal(child: ManabiMark(size: 52)),
-            const SizedBox(height: 18),
-            Reveal(
-              delay: 60,
-              child: GradientText(l.welcomeTitle, textAlign: TextAlign.center, style: const TextStyle(fontFamily: uiFont, fontSize: 28, fontWeight: FontWeight.w800, height: 1.35)),
-            ),
-            Reveal(
-              delay: 100,
-              child: Text(l.welcomeQuestion, textAlign: TextAlign.center, style: TextStyle(fontFamily: uiFont, fontSize: 20, fontWeight: FontWeight.w600, color: a.muted, height: 1.5)),
-            ),
-            const SizedBox(height: 26),
-            if (!configured)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 16),
-                child: Pressable(
-                  onTap: () => openSection(context, Section.settings),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    decoration: BoxDecoration(color: a.accentTint, borderRadius: BorderRadius.circular(16)),
-                    child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      Icon(Icons.link_rounded, size: 18, color: a.accent),
-                      const SizedBox(width: 8),
-                      Flexible(child: Text(l.notConfiguredTitle, style: TextStyle(fontFamily: uiFont, fontWeight: FontWeight.w600, color: a.accent))),
-                      const SizedBox(width: 6),
-                      Icon(Directionality.of(context) == TextDirection.rtl ? Icons.chevron_left_rounded : Icons.chevron_right_rounded, size: 18, color: a.accent),
-                    ]),
-                  ),
+    return ReadingWidth(
+      maxWidth: 788,
+      child: SizedBox(
+        height: 76,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          itemCount: items.length,
+          separatorBuilder: (_, _) => const SizedBox(width: 8),
+          itemBuilder: (context, i) {
+            final (text, icon, color) = items[i];
+            return Reveal(
+              delay: 60 + i * 40,
+              child: Pressable(
+                onTap: () => nav.prefill(text),
+                child: Container(
+                  width: 228,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(color: a.surface, border: Border.all(color: a.border), borderRadius: BorderRadius.circular(18)),
+                  child: Row(children: [
+                    Icon(icon, size: 18, color: color),
+                    const SizedBox(width: 10),
+                    Expanded(child: Text(text, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontFamily: uiFont, fontSize: 13, height: 1.5, color: a.text))),
+                  ]),
                 ),
               ),
-            LayoutBuilder(builder: (context, c) {
-              final two = c.maxWidth > 520;
-              return Wrap(spacing: 10, runSpacing: 10, children: [
-                for (final (i, (text, icon, color)) in suggestions.indexed)
-                  SizedBox(
-                    width: two ? (c.maxWidth - 10) / 2 : c.maxWidth,
-                    child: Reveal(
-                      delay: 140 + i * 50,
-                      child: Pressable(
-                        onTap: () => nav.prefill(text),
-                        child: Container(
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(color: a.surface, border: Border.all(color: a.border), borderRadius: BorderRadius.circular(20)),
-                          child: Row(children: [
-                            Container(
-                              width: 38,
-                              height: 38,
-                              decoration: BoxDecoration(color: color.withValues(alpha: a.dark ? 0.2 : 0.11), borderRadius: BorderRadius.circular(12)),
-                              child: Icon(icon, size: 20, color: color),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(child: Text(text, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontFamily: uiFont, fontSize: 14, height: 1.55, color: a.text))),
-                          ]),
-                        ),
-                      ),
-                    ),
-                  ),
-              ]);
-            }),
-          ]),
+            );
+          },
         ),
       ),
     );
@@ -201,9 +217,9 @@ class _TurnView extends StatelessWidget {
   Widget build(BuildContext context) {
     final chats = context.read<ChatController>();
     final settings = context.read<SettingsController>();
-    void retry() => chats.retry(turn, fallbackLanguage: settings.uiLanguage, maxSources: settings.maxSources);
+    void retry() => chats.retry(turn, fallbackLanguage: settings.uiLanguage, depth: settings.researchDepth);
     return Padding(
-      padding: const EdgeInsets.only(bottom: 30),
+      padding: const EdgeInsets.only(bottom: 26),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         _UserBubble(turn: turn),
         const SizedBox(height: 18),
@@ -234,12 +250,12 @@ class _UserBubble extends StatelessWidget {
     return Align(
       alignment: AlignmentDirectional.centerEnd,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 560),
+        constraints: const BoxConstraints(maxWidth: 520),
         child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             decoration: BoxDecoration(color: a.surfaceAlt, borderRadius: BorderRadius.circular(22)),
-            child: SelectableText(turn.question, style: TextStyle(fontFamily: uiFont, color: a.text, fontSize: 15.5, height: 1.65)),
+            child: SelectableText(turn.question, style: TextStyle(fontFamily: uiFont, color: a.text, fontSize: 15, height: 1.6)),
           ),
           if (label.isNotEmpty)
             Padding(
@@ -281,7 +297,8 @@ class _ErrorLine extends StatelessWidget {
   }
 }
 
-/// One rounded input box: text on top, options / scope / send underneath.
+/// ChatGPT-style composer: + on one side, the text in the middle, research
+/// depth and send on the other; chosen options show as pills above the text.
 class _Composer extends StatefulWidget {
   const _Composer({required this.pending});
   final ChatTurn? pending;
@@ -313,7 +330,7 @@ class _ComposerState extends State<_Composer> {
     final settings = context.read<SettingsController>();
     final nav = context.read<NavController>();
     _controller.clear();
-    await context.read<ChatController>().ask(text, language: settings.answerLanguage, fallbackLanguage: settings.uiLanguage, scope: nav.scope, maxSources: settings.maxSources);
+    await context.read<ChatController>().ask(text, language: settings.answerLanguage, fallbackLanguage: settings.uiLanguage, scope: nav.scope, depth: settings.researchDepth);
   }
 
   @override
@@ -336,73 +353,80 @@ class _ComposerState extends State<_Composer> {
     final scope = nav.scope;
     final scopeLabel = [?scope.bookTitle, ?scope.authorName, ?scope.categoryTitle].join(' · ');
     final langLabel = settings.answerLanguage == 'auto' ? null : languageLabels(l)[settings.answerLanguage];
+    final deepOrQuick = settings.researchDepth != 'standard';
+    final pills = [
+      if (scopeLabel.isNotEmpty) _Pill(icon: Icons.filter_list_rounded, label: scopeLabel, onTap: () => showOptionsSheet(context), onClear: () => nav.setScope(SearchScope.all)),
+      if (langLabel != null) _Pill(icon: Icons.translate_rounded, label: langLabel, onTap: () => showOptionsSheet(context), onClear: () => settings.setAnswerLanguage('auto')),
+      if (deepOrQuick)
+        _Pill(icon: depthIcon(settings.researchDepth), label: depthLabel(l, settings.researchDepth), onTap: () => showDepthSheet(context), onClear: () => settings.setResearchDepth('standard')),
+    ];
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 6, 14, 6),
+      padding: const EdgeInsets.fromLTRB(12, 4, 12, 6),
       child: ReadingWidth(
         maxWidth: 760,
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 220),
+          duration: const Duration(milliseconds: 200),
           decoration: BoxDecoration(
             color: a.surface,
-            borderRadius: BorderRadius.circular(26),
-            border: Border.all(color: _focus.hasFocus ? a.accent.withValues(alpha: 0.55) : a.border, width: _focus.hasFocus ? 1.4 : 1),
-            boxShadow: [BoxShadow(color: a.shadow, blurRadius: 24, offset: const Offset(0, 8), spreadRadius: -10)],
+            borderRadius: BorderRadius.circular(28),
+            border: Border.all(color: _focus.hasFocus ? a.faint.withValues(alpha: 0.6) : a.border),
+            boxShadow: [BoxShadow(color: a.shadow, blurRadius: 18, offset: const Offset(0, 6), spreadRadius: -10)],
           ),
-          padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              child: CallbackShortcuts(
-                bindings: {const SingleActivator(LogicalKeyboardKey.enter): _send},
-                child: TextField(
-                  controller: _controller,
-                  focusNode: _focus,
-                  minLines: 1,
-                  maxLines: 7,
-                  maxLength: 2000,
-                  textInputAction: TextInputAction.newline,
-                  style: TextStyle(fontFamily: uiFont, fontSize: 15.5, height: 1.6, color: a.text),
-                  decoration: InputDecoration(
-                    hintText: l.askPlaceholder,
-                    filled: false,
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    counterText: '',
-                    contentPadding: const EdgeInsets.symmetric(vertical: 12),
+          padding: const EdgeInsets.all(6),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            if (pills.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(6, 4, 6, 2),
+                child: SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: pills)),
+              ),
+            Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+              RoundIconButton(icon: Icons.add_rounded, tooltip: l.options, size: 40, filled: false, onTap: () => showOptionsSheet(context)),
+              Expanded(
+                child: CallbackShortcuts(
+                  bindings: {const SingleActivator(LogicalKeyboardKey.enter): _send},
+                  child: TextField(
+                    controller: _controller,
+                    focusNode: _focus,
+                    minLines: 1,
+                    maxLines: 6,
+                    maxLength: 2000,
+                    textInputAction: TextInputAction.newline,
+                    style: TextStyle(fontFamily: uiFont, fontSize: 15, height: 1.55, color: a.text),
+                    decoration: InputDecoration(
+                      hintText: l.askPlaceholder,
+                      hintMaxLines: 1,
+                      filled: false,
+                      isDense: true,
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      counterText: '',
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+                    ),
                   ),
                 ),
               ),
-            ),
-            Row(children: [
-              AuraIconButton(icon: Icons.add_rounded, tooltip: l.options, size: 38, onTap: () => _showOptions(context)),
-              const SizedBox(width: 6),
-              Expanded(
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(children: [
-                    if (scopeLabel.isNotEmpty)
-                      _Pill(icon: Icons.filter_list_rounded, label: scopeLabel, onTap: () => _showOptions(context), onClear: () => nav.setScope(SearchScope.all)),
-                    if (langLabel != null)
-                      _Pill(icon: Icons.translate_rounded, label: langLabel, onTap: () => _showOptions(context), onClear: () => settings.setAnswerLanguage('auto')),
-                  ]),
-                ),
+              RoundIconButton(
+                icon: depthIcon(settings.researchDepth),
+                tooltip: '${l.researchDepth}: ${depthLabel(l, settings.researchDepth)}',
+                size: 40,
+                filled: false,
+                color: deepOrQuick ? a.accent : a.muted,
+                onTap: () => showDepthSheet(context),
               ),
+              const SizedBox(width: 2),
               Tooltip(
                 message: busy ? l.stop : l.send,
                 child: Pressable(
                   onTap: busy ? () => context.read<ChatController>().cancel(widget.pending!) : (canSend ? _send : null),
                   scale: 0.88,
                   child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    width: 38,
-                    height: 38,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: busy ? a.text : (canSend ? a.accent : a.surfaceAlt),
-                    ),
-                    child: Icon(busy ? Icons.stop_rounded : Icons.arrow_upward_rounded, size: 20, color: busy ? a.bg : (canSend ? Colors.white : a.faint)),
+                    duration: const Duration(milliseconds: 180),
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(shape: BoxShape.circle, color: busy || canSend ? a.text : a.surfaceAlt),
+                    child: Icon(busy ? Icons.stop_rounded : Icons.arrow_upward_rounded, size: 20, color: busy || canSend ? a.bg : a.faint),
                   ),
                 ),
               ),
@@ -412,8 +436,6 @@ class _ComposerState extends State<_Composer> {
       ),
     );
   }
-
-  Future<void> _showOptions(BuildContext context) => showModalBottomSheet(context: context, builder: (_) => const _OptionsSheet());
 }
 
 class _Pill extends StatelessWidget {
@@ -430,17 +452,17 @@ class _Pill extends StatelessWidget {
       child: Pressable(
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsetsDirectional.fromSTEB(10, 6, 6, 6),
-          decoration: BoxDecoration(color: a.accentTint, borderRadius: BorderRadius.circular(18)),
+          padding: const EdgeInsetsDirectional.fromSTEB(10, 5, 6, 5),
+          decoration: BoxDecoration(color: a.accentTint, borderRadius: BorderRadius.circular(16)),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
-            Icon(icon, size: 15, color: a.accent),
+            Icon(icon, size: 14, color: a.accent),
             const SizedBox(width: 5),
             ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 190),
+              constraints: const BoxConstraints(maxWidth: 180),
               child: Text(label, overflow: TextOverflow.ellipsis, style: TextStyle(fontFamily: uiFont, fontSize: 12.5, fontWeight: FontWeight.w600, color: a.accent)),
             ),
             const SizedBox(width: 2),
-            GestureDetector(onTap: onClear, child: Icon(Icons.close_rounded, size: 16, color: a.accent)),
+            GestureDetector(onTap: onClear, child: Icon(Icons.close_rounded, size: 15, color: a.accent)),
           ]),
         ),
       ),
@@ -448,7 +470,9 @@ class _Pill extends StatelessWidget {
   }
 }
 
-/// "+" sheet: search scope and answer language.
+Future<void> showOptionsSheet(BuildContext context) => showModalBottomSheet(context: context, isScrollControlled: true, builder: (_) => const _OptionsSheet());
+
+/// "+" sheet: where to search (tiles) and the answer options (rows).
 class _OptionsSheet extends StatelessWidget {
   const _OptionsSheet();
   @override
@@ -460,46 +484,101 @@ class _OptionsSheet extends StatelessWidget {
     final a = context.aura;
     final scope = nav.scope;
     final labels = languageLabels(l);
-    Widget row(IconData icon, String title, String? value, VoidCallback onTap, {bool selected = false}) => ListTile(
-          leading: Icon(icon, color: selected || value != null ? a.accent : a.muted),
-          title: Text(title, style: TextStyle(fontFamily: uiFont, fontWeight: FontWeight.w600, color: a.text)),
-          subtitle: value == null ? null : Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: arabicStyle(context, size: 14, color: a.accent).copyWith(height: 1.5)),
-          trailing: selected ? Icon(Icons.check_rounded, color: a.accent) : null,
-          onTap: onTap,
-        );
+    final tiles = [
+      (Icons.all_inclusive_rounded, l.scopeAll, null as String?, AuraHues.violet, scope.isAll, () => nav.setScope(SearchScope.all)),
+      (Icons.category_outlined, l.scopeCategory, scope.categoryTitle, AuraHues.blue, scope.categoryTitle != null, () async {
+        final c = await pickFromCatalog<CatalogCategory>(context, PickKind.category);
+        if (c != null) nav.setScope(scope.withCategory(c.id, c.title));
+      }),
+      (Icons.person_outline_rounded, l.scopeAuthor, scope.authorName, AuraHues.amber, scope.authorName != null, () async {
+        final x = await pickFromCatalog<CatalogAuthor>(context, PickKind.author);
+        if (x != null) nav.setScope(scope.withAuthor(x.id, x.name));
+      }),
+      (Icons.menu_book_outlined, l.scopeBook, scope.bookTitle, AuraHues.teal, scope.bookTitle != null, () async {
+        final b = await pickFromCatalog<CatalogBook>(context, PickKind.book, authorId: scope.authorId, categoryId: scope.categoryId);
+        if (b != null) nav.setScope(scope.withBook(b.id, b.title).withAuthor(b.authorId, catalog.author(b.authorId)?.name));
+      }),
+    ];
     return SafeArea(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(10, 0, 10, 12),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 0, 14, 6),
-            child: Text(l.scopeTitle, style: TextStyle(fontFamily: uiFont, fontSize: 17, fontWeight: FontWeight.w800, color: a.text)),
-          ),
-          row(Icons.all_inclusive_rounded, l.scopeAll, null, () => nav.setScope(SearchScope.all), selected: scope.isAll),
-          row(Icons.category_outlined, l.scopeCategory, scope.categoryTitle, () async {
-            final c = await pickFromCatalog<CatalogCategory>(context, PickKind.category);
-            if (c != null) nav.setScope(scope.withCategory(c.id, c.title));
-          }),
-          row(Icons.person_outline_rounded, l.scopeAuthor, scope.authorName, () async {
-            final x = await pickFromCatalog<CatalogAuthor>(context, PickKind.author);
-            if (x != null) nav.setScope(scope.withAuthor(x.id, x.name));
-          }),
-          row(Icons.menu_book_outlined, l.scopeBook, scope.bookTitle, () async {
-            final b = await pickFromCatalog<CatalogBook>(context, PickKind.book, authorId: scope.authorId, categoryId: scope.categoryId);
-            if (b != null) nav.setScope(scope.withBook(b.id, b.title).withAuthor(b.authorId, catalog.author(b.authorId)?.name));
-          }),
-          const Divider(height: 24),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
-            child: Text(l.answerLanguage, style: TextStyle(fontFamily: uiFont, fontSize: 15, fontWeight: FontWeight.w700, color: a.text)),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            child: Wrap(spacing: 8, runSpacing: 8, children: [
-              for (final e in labels.entries) AuraChip(label: e.value, selected: settings.answerLanguage == e.key, onTap: () => settings.setAnswerLanguage(e.key)),
-            ]),
-          ),
-        ]),
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        child: ReadingWidth(
+          maxWidth: 620,
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
+            Padding(
+              padding: const EdgeInsetsDirectional.fromSTEB(4, 0, 4, 10),
+              child: Text(l.scopeTitle, style: TextStyle(fontFamily: uiFont, fontSize: 13, fontWeight: FontWeight.w600, color: a.muted)),
+            ),
+            LayoutBuilder(builder: (context, c) {
+              final cols = c.maxWidth >= 440 ? 4 : 2;
+              final w = (c.maxWidth - 8 * (cols - 1)) / cols;
+              return Wrap(spacing: 8, runSpacing: 8, children: [
+                for (final (icon, title, value, color, selected, onTap) in tiles)
+                  SizedBox(
+                    width: w,
+                    child: Pressable(
+                      onTap: onTap,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 180),
+                        height: 92,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: selected ? a.accentTint : a.surfaceAlt,
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: selected ? a.accent : Colors.transparent, width: 1.4),
+                        ),
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                          Icon(icon, size: 22, color: color),
+                          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontFamily: uiFont, fontSize: 14, fontWeight: FontWeight.w600, color: a.text)),
+                            if (value != null)
+                              Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: arabicStyle(context, size: 12.5, color: a.accent).copyWith(height: 1.4)),
+                          ]),
+                        ]),
+                      ),
+                    ),
+                  ),
+              ]);
+            }),
+            const SizedBox(height: 14),
+            Material(
+              color: a.surfaceAlt,
+              clipBehavior: Clip.antiAlias,
+              borderRadius: BorderRadius.circular(18),
+              child: Column(children: [
+                SettingsRow(
+                  icon: depthIcon(settings.researchDepth),
+                  color: AuraHues.violet,
+                  title: l.researchDepth,
+                  value: depthLabel(l, settings.researchDepth),
+                  onTap: () => showDepthSheet(context),
+                ),
+                Divider(height: 1, indent: 58, color: a.border),
+                SettingsRow(
+                  icon: Icons.translate_rounded,
+                  color: AuraHues.amber,
+                  title: l.answerLanguage,
+                  value: labels[settings.answerLanguage],
+                  onTap: () async {
+                    final v = await showChoiceDialog(context, title: l.answerLanguage, options: labels, selected: settings.answerLanguage);
+                    if (v != null) await settings.setAnswerLanguage(v);
+                  },
+                ),
+                Divider(height: 1, indent: 58, color: a.border),
+                SettingsRow(
+                  icon: Icons.auto_stories_outlined,
+                  color: AuraHues.teal,
+                  title: l.openLibrary,
+                  subtitle: l.openLibrarySub,
+                  onTap: () {
+                    final navigator = Navigator.of(context)..pop();
+                    navigator.push(MaterialPageRoute(builder: (_) => sectionPage(Section.library)));
+                  },
+                ),
+              ]),
+            ),
+          ]),
+        ),
       ),
     );
   }

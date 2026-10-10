@@ -231,6 +231,22 @@ void main() {
       expect(model.prompts, hasLength(4));
     });
 
+    test('quick research skips the follow-up round; deep plans more searches', () async {
+      final log = <Uri>[];
+      final model = ScriptedModel([
+        {...plan(), 'queries': ['الإسلام']},
+        {'selected': [], 'coverage': 'partial', 'missing': 'x', 'followUpQueries': ['النيات'], 'followUpBooks': []},
+        {'status': 'insufficient', 'answer': '', 'citations': []},
+      ]);
+      final pipeline = AnswerPipeline(model: model, turath: TurathClient(client: turathMock(log: log)), catalog: catalog);
+      await pipeline.ask(const AskRequest(question: 'q', language: 'ar', depth: 'quick')).toList();
+      expect(log.any((u) => u.path == '/search' && u.queryParameters['q'] == 'النيات'), isFalse);
+      expect(model.prompts, hasLength(3));
+      final queries = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+      int count(Limits l) => searchPlan(queries: queries, madhhabs: ['hanafi'], referenceBookIds: ['1', '2', '3', '4', '5', '6'], limits: l).length;
+      expect(count(Limits.quick) < count(Limits.standard) && count(Limits.standard) < count(Limits.deep), isTrue);
+    });
+
     test('Turath outage is reported', () async {
       final model = ScriptedModel([plan()]);
       final pipeline = AnswerPipeline(model: model, turath: TurathClient(client: turathMock(fail: true)), catalog: catalog);

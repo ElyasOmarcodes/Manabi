@@ -59,7 +59,20 @@ export const LIMITS = {
   sourceChars: 2400,
   maxSelected: 14,
   continuationPages: 6,
+  followUpRounds: 1,
 };
+
+/**
+ * Research depth, chosen by the user like a "thinking effort" control:
+ * quick reads fewer passages, deep searches wider and reads more pages.
+ */
+export const DEPTHS = {
+  quick: { generalQueries: 3, hitsPerGeneral: 6, referenceBooks: 3, queriesPerMadhhab: 2, maxSearches: 18, maxCandidates: 32, maxSelected: 6, continuationPages: 2, followUpRounds: 0 },
+  standard: {},
+  deep: { generalQueries: 8, hitsPerGeneral: 10, referenceBooks: 6, queriesPerReference: 3, queriesPerMadhhab: 4, hitsPerMadhhab: 5, maxSearches: 64, maxCandidates: 96, maxSelected: 18, continuationPages: 10, followUpRounds: 2 },
+};
+
+export const limitsFor = (depth) => ({ ...LIMITS, ...(DEPTHS[depth] ?? {}) });
 
 /**
  * Rulings often continue on the next page. For the strongest selected pages,
@@ -201,27 +214,27 @@ const toCandidate = (passage, catalog) => {
 };
 
 /** Builds the list of searches for one retrieval round. */
-export const searchPlan = ({ queries, scope, madhhabs = [], requestedBookIds = [], referenceBookIds = [], userScoped }) => {
+export const searchPlan = ({ queries, scope, madhhabs = [], requestedBookIds = [], referenceBookIds = [], userScoped, limits: L = LIMITS }) => {
   const plan = [];
-  for (const q of queries.slice(0, LIMITS.generalQueries)) plan.push({ query: q, scope, take: LIMITS.hitsPerGeneral, kind: "general" });
+  for (const q of queries.slice(0, L.generalQueries)) plan.push({ query: q, scope, take: L.hitsPerGeneral, kind: "general" });
   if (!userScoped) {
-    for (const id of requestedBookIds.slice(0, LIMITS.requestedBooks)) {
-      for (const q of queries.slice(0, LIMITS.queriesPerRequested)) plan.push({ query: q, scope: { bookIds: [id] }, take: LIMITS.hitsPerRequested, kind: "requested" });
+    for (const id of requestedBookIds.slice(0, L.requestedBooks)) {
+      for (const q of queries.slice(0, L.queriesPerRequested)) plan.push({ query: q, scope: { bookIds: [id] }, take: L.hitsPerRequested, kind: "requested" });
     }
-    for (const id of referenceBookIds.slice(0, LIMITS.referenceBooks)) {
-      for (const q of queries.slice(0, LIMITS.queriesPerReference)) plan.push({ query: q, scope: { bookIds: [id] }, take: LIMITS.hitsPerReference, kind: "reference" });
+    for (const id of referenceBookIds.slice(0, L.referenceBooks)) {
+      for (const q of queries.slice(0, L.queriesPerReference)) plan.push({ query: q, scope: { bookIds: [id] }, take: L.hitsPerReference, kind: "reference" });
     }
     for (const m of madhhabs) {
       const categoryId = MADHHAB_CATEGORY[m];
       if (!categoryId) continue;
-      for (const q of queries.slice(0, LIMITS.queriesPerMadhhab)) plan.push({ query: q, scope: { categoryIds: [categoryId] }, take: LIMITS.hitsPerMadhhab, kind: "madhhab" });
+      for (const q of queries.slice(0, L.queriesPerMadhhab)) plan.push({ query: q, scope: { categoryIds: [categoryId] }, take: L.hitsPerMadhhab, kind: "madhhab" });
     }
   }
-  return plan.slice(0, LIMITS.maxSearches);
+  return plan.slice(0, L.maxSearches);
 };
 
 /** Runs searches and merges their hits into a de-duplicated, interleaved candidate pool. */
-export const collectCandidates = async ({ turath, catalog, plan, existing = [] }) => {
+export const collectCandidates = async ({ turath, catalog, plan, existing = [], limits: L = LIMITS }) => {
   const settled = await settleAll(plan.map((s) => () => turath.search(s.query, { ...s.scope })));
   const failures = settled.filter((r) => !r.ok).length;
   const lists = settled.map((r, i) => (r.ok ? r.value.items.slice(0, plan[i].take) : []));
@@ -230,7 +243,7 @@ export const collectCandidates = async ({ turath, catalog, plan, existing = [] }
   const pool = [];
   // Requested books first, then interleave every list by rank.
   const order = [...plan.keys()].sort((a, b) => Number(plan[b].kind === "requested") - Number(plan[a].kind === "requested"));
-  for (let round = 0; existing.length + pool.length < LIMITS.maxCandidates; round += 1) {
+  for (let round = 0; existing.length + pool.length < L.maxCandidates; round += 1) {
     let any = false;
     for (const i of order) {
       const passage = lists[i][round];
@@ -240,7 +253,7 @@ export const collectCandidates = async ({ turath, catalog, plan, existing = [] }
       if (seen.has(candidate.id)) continue;
       seen.add(candidate.id);
       pool.push(candidate);
-      if (existing.length + pool.length >= LIMITS.maxCandidates) break;
+      if (existing.length + pool.length >= L.maxCandidates) break;
     }
     if (!any) break;
   }
@@ -359,7 +372,9 @@ export const createPipeline = ({ gemini, turath, catalog }) => {
     const scope = input.scope ?? {};
     const nususScope = scopeToNusus(scope);
     const history = Array.isArray(input.history) ? input.history.slice(-3) : [];
-    const maxSources = clampInt(input.maxSources, 3, LIMITS.maxSelected, 12);
+    const depth = DEPTHS[input.depth] ? input.depth : "standard";
+    const L = limitsFor(depth);
+    const maxSources = clampInt(input.maxSources, 3, L.maxSelected, L.maxSelected);
 
     // 1. plan
     onEvent("stage", { stage: "planning" });
@@ -381,7 +396,7 @@ export const createPipeline = ({ gemini, turath, catalog }) => {
     const standalone = typeof p.standaloneQuestion === "string" && p.standaloneQuestion.trim() ? p.standaloneQuestion.trim() : question;
     onEvent("plan", { queries, language, books: [...requestedBookIds, ...referenceBookIds].map((id) => catalog.book(id)?.title).filter(Boolean) });
 
-    const done = (result, extra = {}) => ({ ...result, queries, language, model: plan.model, elapsedMs: Date.now() - started, ...extra });
+    const done = (result, extra = {}) => ({ ...result, queries, language, depth, model: plan.model, elapsedMs: Date.now() - started, ...extra });
     if (!queries.length) return done(finalize({ composed: { status: "insufficient" }, sources: [], language }));
 
     // 2. search
@@ -389,7 +404,8 @@ export const createPipeline = ({ gemini, turath, catalog }) => {
     const first = await collectCandidates({
       turath,
       catalog,
-      plan: searchPlan({ queries, scope: nususScope, madhhabs, requestedBookIds, referenceBookIds, userScoped: Boolean(nususScope) }),
+      limits: L,
+      plan: searchPlan({ queries, scope: nususScope, madhhabs, requestedBookIds, referenceBookIds, userScoped: Boolean(nususScope), limits: L }),
     });
     if (first.failed) throw error("TURATH_UNAVAILABLE", "The Turath library could not be reached");
     let candidates = first.candidates.map((c, i) => ({ ...c, key: `C${i + 1}` }));
@@ -397,7 +413,7 @@ export const createPipeline = ({ gemini, turath, catalog }) => {
     onEvent("sources", { count: candidates.length, totalMatches });
     if (!candidates.length) return done(finalize({ composed: { status: "insufficient" }, sources: [], language }), { totalMatches });
 
-    // 3. read: rank, optionally one follow-up round
+    // 3. read: rank, then follow-up rounds if something is missing
     onEvent("stage", { stage: "reading" });
     const rank = async (pool, usedQueries) =>
       (
@@ -410,9 +426,11 @@ export const createPipeline = ({ gemini, turath, catalog }) => {
       ).data ?? {};
     let usedQueries = [...queries];
     let ranking = await rank(candidates, usedQueries);
-    const followQueries = cleanQueries(ranking.followUpQueries, 5).filter((q) => !usedQueries.includes(q));
-    const followBooks = resolveBooks(cleanTitles(ranking.followUpBooks, 4), catalog, 1);
-    if (ranking.coverage !== "full" && (followQueries.length || followBooks.length)) {
+    // Follow-up rounds: the reader names what is still missing (deeper research allows more rounds).
+    for (let round = 0; round < L.followUpRounds && ranking.coverage !== "full"; round += 1) {
+      const followQueries = cleanQueries(ranking.followUpQueries, 5).filter((q) => !usedQueries.includes(q));
+      const followBooks = resolveBooks(cleanTitles(ranking.followUpBooks, 4), catalog, 1);
+      if (!followQueries.length && !followBooks.length) break;
       onEvent("stage", { stage: "searching" });
       const selectedFirst = new Set((ranking.selected ?? []).map((k) => String(k).toUpperCase()));
       const keep = candidates.filter((c) => selectedFirst.has(c.key));
@@ -420,22 +438,23 @@ export const createPipeline = ({ gemini, turath, catalog }) => {
         turath,
         catalog,
         existing: keep,
+        limits: L,
         plan: searchPlan({
           queries: followQueries.length ? followQueries : queries.slice(0, 3),
           scope: nususScope,
           requestedBookIds: followBooks,
           madhhabs: [],
           userScoped: Boolean(nususScope),
+          limits: L,
         }),
       });
       totalMatches += extra.totalMatches;
-      if (extra.candidates.length) {
-        usedQueries = [...usedQueries, ...followQueries];
-        candidates = [...keep, ...extra.candidates].map((c, i) => ({ ...c, key: `C${i + 1}` }));
-        onEvent("sources", { count: candidates.length, totalMatches });
-        onEvent("stage", { stage: "reading" });
-        ranking = await rank(candidates, usedQueries);
-      }
+      if (!extra.candidates.length) break;
+      usedQueries = [...usedQueries, ...followQueries];
+      candidates = [...keep, ...extra.candidates].map((c, i) => ({ ...c, key: `C${i + 1}` }));
+      onEvent("sources", { count: candidates.length, totalMatches });
+      onEvent("stage", { stage: "reading" });
+      ranking = await rank(candidates, usedQueries);
     }
     const byKey = new Map(candidates.map((c) => [c.key, c]));
     let selected = [...new Set((ranking.selected ?? []).map((k) => String(k).trim().toUpperCase()))].map((k) => byKey.get(k)).filter(Boolean);
@@ -444,7 +463,7 @@ export const createPipeline = ({ gemini, turath, catalog }) => {
     if (!selected.length) {
       return done(finalize({ composed: { status: "insufficient" }, sources: candidates.slice(0, 6).map((c, i) => ({ ...c, key: `S${i + 1}` })), language }), { totalMatches });
     }
-    const expanded = typeof turath.getPage === "function" ? await addContinuations({ turath, catalog, selected }) : selected;
+    const expanded = typeof turath.getPage === "function" ? await addContinuations({ turath, catalog, selected, limit: L.continuationPages }) : selected;
     const sources = expanded.map((c, i) => ({ ...c, key: `S${i + 1}` }));
 
     // 4. compose

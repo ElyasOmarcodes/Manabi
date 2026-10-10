@@ -86,7 +86,7 @@ await run("01", async () => {
   await semantics(page);
   await tap(page, "د لټون اختیارونه");
   await page.waitForTimeout(700);
-  await shot(page, "03-chat-options");
+  await shot(page, "03-chat-plus-sheet");
   await tap(page, "کتاب", { exact: true });
   await page.waitForTimeout(800);
   await page.keyboard.type("رياض الصالحين");
@@ -102,65 +102,75 @@ await run("01", async () => {
 });
 
 await run("06", async () => {
-  const { ctx, page } = await section(desktop, "کتابتون");
-  await shot(page, "06-library-home");
-  await tap(page, "مؤلفین", { exact: true });
-  await shot(page, "07-library-authors");
-  await tap(page, "ډلې", { exact: true });
-  await shot(page, "08-library-categories");
-  await ctx.close();
-});
-
-await run("09", async () => {
-  const { ctx, page } = await section(desktop, "تنظیمات");
-  await shot(page, "09-settings");
-  await page.mouse.move(720, 500);
-  await page.mouse.wheel(0, 900);
+  const { ctx, page } = await section(phone);
+  await tap(page, "د څېړنې کچه");
   await page.waitForTimeout(700);
-  await shot(page, "10-settings-connection");
+  await shot(page, "06-phone-research-depth");
+  await ctx.close();
+  const p = await section(phone, "د لټون اختیارونه");
+  await shot(p.page, "07-phone-plus-sheet");
+  await p.ctx.close();
+});
+
+await run("08", async () => {
+  const { ctx, page } = await section(desktop, "کتابتون");
+  await shot(page, "08-library-home");
+  await tap(page, "مؤلفین", { exact: true });
+  await shot(page, "09-library-authors");
   await ctx.close();
 });
 
-await run("11", async () => {
-  const { ctx, page } = await section(desktop, "خوندي");
-  await shot(page, "11-saved");
+await run("10", async () => {
+  const { ctx, page } = await section(phone, "تنظیمات", true);
+  await shot(page, "10-phone-settings");
   await ctx.close();
-  const h = await section(desktop, "تاریخچه");
-  await shot(h.page, "12-history");
-  await h.ctx.close();
+  // Rows merge title and value into one label, so match partially.
+  for (const [label, name, scroll, nth] of [["بڼه", "11-phone-settings-appearance", 0, 0], ["د AI سبک", "12-phone-settings-ai-style", 0, 0], ["زموږ په اړه", "13-phone-settings-about", 600, 0], ["مرسته", "14-phone-settings-help", 600, -1]]) {
+    const p = await section(phone, "تنظیمات", true);
+    if (scroll) {
+      await p.page.mouse.move(195, 500);
+      await p.page.mouse.wheel(0, scroll);
+      await p.page.waitForTimeout(500);
+    }
+    await tap(p.page, label, nth < 0 ? { exact: true } : { nth });
+    await p.page.waitForTimeout(800);
+    await shot(p.page, name);
+    await p.ctx.close();
+  }
+  const l = await section(phone, "تنظیمات", true);
+  await tap(l.page, "د اپلیکیشن ژبه");
+  await shot(l.page, "15-phone-settings-language");
+  await l.ctx.close();
 });
 
-await run("13", async () => {
+await run("16", async () => {
   const dark = { ...desktop, theme: "dark" };
   const { ctx, page } = await section(dark);
-  await shot(page, "13-chat-welcome-dark");
+  await shot(page, "16-chat-welcome-dark");
   await ctx.close();
-  const l = await section(dark, "کتابتون");
-  await shot(l.page, "14-library-dark");
-  await l.ctx.close();
-});
-
-await run("15", async () => {
-  const { ctx, page } = await section(phone);
-  await shot(page, "15-phone-chat");
-  await tap(page, "چټونه", { exact: true });
-  await page.waitForTimeout(700);
-  await shot(page, "16-phone-menu");
-  await ctx.close();
-  const l = await section(phone, "کتابتون", true);
-  await shot(l.page, "17-phone-library");
-  await l.ctx.close();
-  const s = await section(phone, "تنظیمات", true);
-  await shot(s.page, "18-phone-settings");
+  const s = await section(dark, "تنظیمات");
+  await shot(s.page, "17-settings-dark");
   await s.ctx.close();
 });
 
-await run("19", async () => {
+await run("18", async () => {
+  const { ctx, page } = await section(phone);
+  await shot(page, "18-phone-chat");
+  await tap(page, "چټونه", { exact: true });
+  await page.waitForTimeout(700);
+  await shot(page, "19-phone-menu");
+  await ctx.close();
+  const l = await section(phone, "کتابتون", true);
+  await shot(l.page, "20-phone-library");
+  await l.ctx.close();
+});
+
+await run("21", async () => {
   const { ctx, page } = await section({ ...phone, theme: "dark", lang: "en" });
-  await shot(page, "19-phone-dark-english");
+  await shot(page, "21-phone-dark-english");
   await tap(page, "Chats", { exact: true });
   await page.waitForTimeout(700);
-  await shot(page, "20-phone-dark-menu");
+  await shot(page, "22-phone-dark-menu");
   await ctx.close();
 });
 

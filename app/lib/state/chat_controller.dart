@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:uuid/uuid.dart';
 
 import '../core/backend/backend.dart';
@@ -18,14 +18,25 @@ class AskProgress {
   int? sourcesFound;
 }
 
-class ChatController extends ChangeNotifier {
-  ChatController(this._store, this._backend) : chats = _store.loadAll();
+/// Errors that happen when the connection drops (e.g. the phone put the app
+/// in the background); such answers are resumed automatically.
+const _transientCodes = {'NETWORK', 'GEMINI_UNAVAILABLE', 'TURATH_UNAVAILABLE', 'INTERRUPTED', 'INTERNAL'};
+
+class ChatController extends ChangeNotifier with WidgetsBindingObserver {
+  ChatController(this._store, this._backend) : chats = _store.loadAll() {
+    WidgetsBinding.instance.addObserver(this);
+  }
 
   final ChatStore _store;
   ManabiBackend Function() _backend;
   final List<Chat> chats;
   final Map<String, AskProgress> progress = {};
   final Map<String, StreamSubscription<AskEvent>> _running = {};
+  final Map<String, ({String fallbackLanguage, String depth, String requestId})> _requests = {};
+  final Set<String> _sawBackground = {};
+  final Set<String> _autoRetried = {};
+  final Set<String> _resumeQueue = {};
+  bool _inBackground = false;
   String? currentId;
   static const _uuid = Uuid();
 
@@ -65,7 +76,32 @@ class ChatController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> ask(String question, {required String language, required String fallbackLanguage, SearchScope scope = SearchScope.all, int maxSources = 10}) async {
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.hidden) {
+      _inBackground = true;
+      _sawBackground.addAll(_running.keys);
+    } else if (state == AppLifecycleState.resumed) {
+      _inBackground = false;
+      final queued = [..._resumeQueue];
+      _resumeQueue.clear();
+      for (final id in queued) {
+        final found = _find(id);
+        if (found != null) _start(found.$1, found.$2);
+      }
+    }
+  }
+
+  (Chat, ChatTurn)? _find(String turnId) {
+    for (final c in chats) {
+      for (final t in c.turns) {
+        if (t.id == turnId) return (c, t);
+      }
+    }
+    return null;
+  }
+
+  Future<void> ask(String question, {required String language, required String fallbackLanguage, SearchScope scope = SearchScope.all, String depth = 'standard'}) async {
     final text = question.trim();
     if (text.isEmpty) return;
     var chat = current;
@@ -79,20 +115,32 @@ class ChatController extends ChangeNotifier {
     chat.turns.add(turn);
     chat.updatedAt = now;
     await _store.save(chat);
-    _run(chat, turn, fallbackLanguage: fallbackLanguage, maxSources: maxSources);
+    _requests[turn.id] = (fallbackLanguage: fallbackLanguage, depth: depth, requestId: _uuid.v4());
+    _start(chat, turn);
   }
 
-  void retry(ChatTurn turn, {required String fallbackLanguage, int maxSources = 10}) {
+  void retry(ChatTurn turn, {required String fallbackLanguage, String depth = 'standard'}) {
     final chat = chats.firstWhere((c) => c.turns.contains(turn));
+    // Same request id: if the server finished the answer meanwhile, it is
+    // returned at once without asking Gemini again.
+    final previous = _requests[turn.id];
+    _requests[turn.id] = (fallbackLanguage: fallbackLanguage, depth: depth, requestId: previous?.requestId ?? _uuid.v4());
+    _autoRetried.remove(turn.id);
+    _start(chat, turn);
+  }
+
+  void _start(Chat chat, ChatTurn turn) {
     turn
       ..state = MessageState.pending
       ..errorCode = null
       ..result = null;
-    _run(chat, turn, fallbackLanguage: fallbackLanguage, maxSources: maxSources);
+    final r = _requests[turn.id] ?? (fallbackLanguage: 'en', depth: 'standard', requestId: _uuid.v4());
+    _run(chat, turn, fallbackLanguage: r.fallbackLanguage, depth: r.depth, requestId: r.requestId);
   }
 
   void cancel(ChatTurn turn) {
     _running.remove(turn.id)?.cancel();
+    _resumeQueue.remove(turn.id);
     progress.remove(turn.id);
     turn
       ..state = MessageState.failed
@@ -101,7 +149,7 @@ class ChatController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _run(Chat chat, ChatTurn turn, {required String fallbackLanguage, required int maxSources}) {
+  void _run(Chat chat, ChatTurn turn, {required String fallbackLanguage, required String depth, required String requestId}) {
     final previous = chat.turns.takeWhile((t) => t != turn).where((t) => t.state == MessageState.done).toList();
     final history = [
       for (final t in previous.length > 3 ? previous.sublist(previous.length - 3) : previous)
@@ -112,9 +160,16 @@ class ChatController extends ChangeNotifier {
         ),
     ];
     final p = progress[turn.id] = AskProgress();
+    if (_inBackground) _sawBackground.add(turn.id);
     notifyListeners();
     final request = AskRequest(
-        question: turn.question, language: turn.language, fallbackLanguage: fallbackLanguage, scope: turn.scope, history: history, maxSources: maxSources);
+        question: turn.question,
+        language: turn.language,
+        fallbackLanguage: fallbackLanguage,
+        scope: turn.scope,
+        history: history,
+        depth: depth,
+        requestId: requestId);
     _running[turn.id] = _backend().ask(request).listen(
       (event) {
         switch (event) {
@@ -131,25 +186,36 @@ class ChatController extends ChangeNotifier {
         }
         notifyListeners();
       },
-      onError: (Object e) {
-        turn
-          ..state = MessageState.failed
-          ..errorCode = mapError(e).code;
-        _finish(chat, turn);
-      },
+      onError: (Object e) => _fail(chat, turn, mapError(e).code),
       onDone: () {
-        if (turn.state == MessageState.pending) {
-          turn
-            ..state = MessageState.failed
-            ..errorCode = 'NETWORK';
-        }
+        if (turn.state == MessageState.pending) return _fail(chat, turn, 'NETWORK');
         _finish(chat, turn);
       },
       cancelOnError: true,
     );
   }
 
+  void _fail(Chat chat, ChatTurn turn, String code) {
+    _running.remove(turn.id);
+    // The connection dropped while the app was in the background: resume
+    // the answer once the app is back (or right away if it already is).
+    if (_transientCodes.contains(code) && _sawBackground.contains(turn.id) && _autoRetried.add(turn.id)) {
+      _sawBackground.remove(turn.id);
+      if (_inBackground) {
+        _resumeQueue.add(turn.id);
+      } else {
+        _start(chat, turn);
+      }
+      return;
+    }
+    turn
+      ..state = MessageState.failed
+      ..errorCode = code;
+    _finish(chat, turn);
+  }
+
   void _finish(Chat chat, ChatTurn turn) {
+    _sawBackground.remove(turn.id);
     _running.remove(turn.id);
     progress.remove(turn.id);
     chat.updatedAt = DateTime.now();
@@ -212,6 +278,7 @@ class ChatController extends ChangeNotifier {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     for (final s in _running.values) {
       s.cancel();
     }

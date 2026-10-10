@@ -143,37 +143,197 @@ class ReadingWidth extends StatelessWidget {
 
 /// Scaffold for pushed pages: aurora background and a floating back button.
 class AuraPage extends StatelessWidget {
-  const AuraPage({super.key, required this.body, this.title, this.actions = const [], this.floating, this.bottom});
+  const AuraPage({super.key, required this.body, this.title, this.titleText, this.actions = const [], this.floating, this.bottom});
   final Widget body;
   final Widget? title;
+
+  /// Standard page title; use [title] for a custom widget.
+  final String? titleText;
   final List<Widget> actions;
   final Widget? floating;
   final Widget? bottom;
   @override
-  Widget build(BuildContext context) => Scaffold(
-        floatingActionButton: floating,
-        bottomNavigationBar: bottom,
-        body: AuroraBackground(
-          intensity: 0.8,
-          child: SafeArea(
-            bottom: false,
-            child: Column(children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-                child: Row(children: [
-                  AuraIconButton(
-                    icon: Directionality.of(context) == TextDirection.rtl ? Icons.arrow_forward_rounded : Icons.arrow_back_rounded,
-                    tooltip: MaterialLocalizations.of(context).backButtonTooltip,
-                    onTap: () => Navigator.of(context).maybePop(),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(child: title ?? const SizedBox()),
-                  ...actions,
-                ]),
-              ),
-              Expanded(child: body),
-            ]),
+  Widget build(BuildContext context) {
+    final a = context.aura;
+    return Scaffold(
+      backgroundColor: a.bg,
+      floatingActionButton: floating,
+      bottomNavigationBar: bottom,
+      body: SafeArea(
+        bottom: false,
+        child: Column(children: [
+          SizedBox(
+            height: 56,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              child: Row(children: [
+                RoundIconButton(
+                  icon: Directionality.of(context) == TextDirection.rtl ? Icons.arrow_forward_rounded : Icons.arrow_back_rounded,
+                  tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+                  onTap: () => Navigator.of(context).maybePop(),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: title ??
+                      Text(titleText ?? '', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontFamily: uiFont, fontSize: 17, fontWeight: FontWeight.w700, color: a.text)),
+                ),
+                ...actions,
+              ]),
+            ),
           ),
-        ),
-      );
+          Expanded(child: body),
+        ]),
+      ),
+    );
+  }
 }
+
+/// ChatGPT-style round icon button with a soft filled background.
+class RoundIconButton extends StatelessWidget {
+  const RoundIconButton({super.key, required this.icon, this.onTap, this.tooltip, this.size = 40, this.color, this.filled = true});
+  final IconData icon;
+  final VoidCallback? onTap;
+  final String? tooltip;
+  final double size;
+  final Color? color;
+  final bool filled;
+  @override
+  Widget build(BuildContext context) {
+    final a = context.aura;
+    final button = Pressable(
+      onTap: onTap,
+      scale: 0.9,
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(color: filled ? a.surfaceAlt : Colors.transparent, shape: BoxShape.circle),
+        child: Icon(icon, size: size * 0.5, color: color ?? a.text),
+      ),
+    );
+    return tooltip == null ? button : Tooltip(message: tooltip!, child: button);
+  }
+}
+
+/// A titled group of settings rows on one rounded surface.
+class SettingsGroup extends StatelessWidget {
+  const SettingsGroup({super.key, this.title, required this.children});
+  final String? title;
+  final List<Widget> children;
+  @override
+  Widget build(BuildContext context) {
+    final a = context.aura;
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      if (title != null)
+        Padding(
+          padding: const EdgeInsetsDirectional.fromSTEB(14, 20, 14, 8),
+          child: Text(title!, style: TextStyle(fontFamily: uiFont, fontSize: 13, fontWeight: FontWeight.w600, color: a.muted)),
+        )
+      else
+        const SizedBox(height: 12),
+      Material(
+        color: a.surface,
+        clipBehavior: Clip.antiAlias,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18), side: BorderSide(color: a.border)),
+        child: Column(children: [
+          for (var i = 0; i < children.length; i++) ...[
+            children[i],
+            if (i < children.length - 1) Padding(padding: const EdgeInsetsDirectional.only(start: 58), child: Divider(height: 1, color: a.border)),
+          ],
+        ]),
+      ),
+    ]);
+  }
+}
+
+/// One row: tinted icon, title, optional subtitle and value, chevron.
+class SettingsRow extends StatelessWidget {
+  const SettingsRow({super.key, required this.icon, required this.title, this.color, this.subtitle, this.value, this.trailing, this.onTap, this.danger = false});
+  final IconData icon;
+  final String title;
+  final Color? color;
+  final String? subtitle;
+  final String? value;
+  final Widget? trailing;
+  final VoidCallback? onTap;
+  final bool danger;
+  @override
+  Widget build(BuildContext context) {
+    final a = context.aura;
+    final tint = danger ? a.danger : (color ?? a.text);
+    return InkWell(
+      onTap: onTap,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 54),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: Row(children: [
+            Container(
+              width: 30,
+              height: 30,
+              decoration: BoxDecoration(color: tint.withValues(alpha: a.dark ? 0.18 : 0.1), borderRadius: BorderRadius.circular(9)),
+              child: Icon(icon, size: 18, color: tint),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+                Text(title, style: TextStyle(fontFamily: uiFont, fontSize: 15, fontWeight: FontWeight.w500, color: danger ? a.danger : a.text)),
+                if (subtitle != null)
+                  Text(subtitle!, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontFamily: uiFont, fontSize: 12.5, color: a.muted, height: 1.45)),
+              ]),
+            ),
+            if (value != null)
+              Padding(
+                padding: const EdgeInsetsDirectional.only(start: 8),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 150),
+                  child: Text(value!, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontFamily: uiFont, fontSize: 14, color: a.muted)),
+                ),
+              ),
+            if (trailing != null)
+              trailing!
+            else if (onTap != null)
+              Icon(Directionality.of(context) == TextDirection.rtl ? Icons.chevron_left_rounded : Icons.chevron_right_rounded, color: a.faint, size: 22),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
+/// Radio-list dialog for picking one value (languages and the like).
+Future<String?> showChoiceDialog(BuildContext context, {required String title, required Map<String, String> options, required String selected}) => showDialog<String>(
+      context: context,
+      builder: (context) {
+        final a = context.aura;
+        return Dialog(
+          insetPadding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 380),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(22, 6, 22, 10),
+                  child: Text(title, style: TextStyle(fontFamily: uiFont, fontSize: 17, fontWeight: FontWeight.w700, color: a.text)),
+                ),
+                for (final e in options.entries)
+                  InkWell(
+                    onTap: () => Navigator.of(context).pop(e.key),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 13),
+                      child: Row(children: [
+                        Expanded(child: Text(e.value, style: TextStyle(fontFamily: uiFont, fontSize: 15, color: a.text))),
+                        AnimatedOpacity(
+                          duration: const Duration(milliseconds: 150),
+                          opacity: e.key == selected ? 1 : 0,
+                          child: Icon(Icons.check_rounded, color: a.accent, size: 22),
+                        ),
+                      ]),
+                    ),
+                  ),
+              ]),
+            ),
+          ),
+        );
+      },
+    );

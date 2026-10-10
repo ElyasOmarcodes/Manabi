@@ -32,6 +32,12 @@ class SettingsController extends ChangeNotifier {
   int maxSources = 12;
   double arabicScale = 1.0;
 
+  /// 'quick', 'standard' or 'deep' – how widely questions are researched.
+  String researchDepth = 'standard';
+
+  /// User text size on top of the platform default (phones start smaller).
+  double textScale = 1.0;
+
   ManabiBackend? _backend;
 
   bool get directAvailable => !kIsWeb;
@@ -51,6 +57,8 @@ class SettingsController extends ChangeNotifier {
     c.modelOverride = prefs.getString('modelOverride') ?? '';
     c.maxSources = prefs.getInt('maxSources') ?? 12;
     c.arabicScale = prefs.getDouble('arabicScale') ?? 1.0;
+    c.researchDepth = prefs.getString('researchDepth') ?? 'standard';
+    c.textScale = prefs.getDouble('textScale') ?? 1.0;
     try {
       c.geminiKey = await secure.read(key: 'geminiKey') ?? '';
       c.accessToken = await secure.read(key: 'accessToken') ?? '';
@@ -139,6 +147,38 @@ class SettingsController extends ChangeNotifier {
     arabicScale = v;
     await _prefs.setDouble('arabicScale', v);
     _changed();
+  }
+
+  Future<void> setResearchDepth(String v) async {
+    researchDepth = v;
+    await _prefs.setString('researchDepth', v);
+    _changed();
+  }
+
+  Future<void> setTextScale(double v) async {
+    textScale = v;
+    await _prefs.setDouble('textScale', v);
+    _changed();
+  }
+
+  /// Removes every stored preference and secret (used by "Reset settings").
+  Future<void> resetAll() async {
+    await _prefs.clear();
+    for (final k in ['geminiKey', 'accessToken']) {
+      await _secureWrite(k, '');
+    }
+    themeMode = ThemeMode.system;
+    answerLanguage = 'auto';
+    serverUrl = defaultServerUrl;
+    accessToken = '';
+    geminiKey = '';
+    modelOverride = '';
+    maxSources = 12;
+    arabicScale = 1.0;
+    researchDepth = 'standard';
+    textScale = 1.0;
+    mode = serverUrl.isEmpty && directAvailable ? ConnectionMode.direct : ConnectionMode.server;
+    _changed(backendChanged: true);
   }
 
   Future<void> _secureWrite(String key, String value) async {
