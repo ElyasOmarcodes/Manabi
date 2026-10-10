@@ -1403,6 +1403,210 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Page excerpt — cited in the answer (not a word-for-word quote)'**
   String get pageExcerpt;
+
+  /// No description provided for @searchInBook.
+  ///
+  /// In en, this message translates to:
+  /// **'Search in book'**
+  String get searchInBook;
+
+  /// No description provided for @searchInBookHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search this book (Arabic)'**
+  String get searchInBookHint;
+
+  /// No description provided for @goToPage.
+  ///
+  /// In en, this message translates to:
+  /// **'Go to page'**
+  String get goToPage;
+
+  /// No description provided for @printedPage.
+  ///
+  /// In en, this message translates to:
+  /// **'Printed page'**
+  String get printedPage;
+
+  /// No description provided for @go.
+  ///
+  /// In en, this message translates to:
+  /// **'Go'**
+  String get go;
+
+  /// No description provided for @pageOf.
+  ///
+  /// In en, this message translates to:
+  /// **'{page} of {total}'**
+  String pageOf(int page, int total);
+
+  /// No description provided for @bookmarkPage.
+  ///
+  /// In en, this message translates to:
+  /// **'Bookmark page'**
+  String get bookmarkPage;
+
+  /// No description provided for @removeBookmark.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove bookmark'**
+  String get removeBookmark;
+
+  /// No description provided for @bookmarks.
+  ///
+  /// In en, this message translates to:
+  /// **'Bookmarks'**
+  String get bookmarks;
+
+  /// No description provided for @copyPage.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy page text'**
+  String get copyPage;
+
+  /// No description provided for @sharePage.
+  ///
+  /// In en, this message translates to:
+  /// **'Share page'**
+  String get sharePage;
+
+  /// No description provided for @copyCitation.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy citation'**
+  String get copyCitation;
+
+  /// No description provided for @readerDisplay.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading display'**
+  String get readerDisplay;
+
+  /// No description provided for @lineSpacing.
+  ///
+  /// In en, this message translates to:
+  /// **'Line spacing'**
+  String get lineSpacing;
+
+  /// No description provided for @paperTheme.
+  ///
+  /// In en, this message translates to:
+  /// **'Page colour'**
+  String get paperTheme;
+
+  /// No description provided for @paperWarm.
+  ///
+  /// In en, this message translates to:
+  /// **'Paper'**
+  String get paperWarm;
+
+  /// No description provided for @paperPlain.
+  ///
+  /// In en, this message translates to:
+  /// **'Plain'**
+  String get paperPlain;
+
+  /// No description provided for @paperNight.
+  ///
+  /// In en, this message translates to:
+  /// **'Night'**
+  String get paperNight;
+
+  /// No description provided for @continueReading.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue reading'**
+  String get continueReading;
+
+  /// No description provided for @recentlyRead.
+  ///
+  /// In en, this message translates to:
+  /// **'Recently read'**
+  String get recentlyRead;
+
+  /// No description provided for @footnotes.
+  ///
+  /// In en, this message translates to:
+  /// **'Footnotes'**
+  String get footnotes;
+
+  /// No description provided for @filters.
+  ///
+  /// In en, this message translates to:
+  /// **'Filters'**
+  String get filters;
+
+  /// No description provided for @sortBy.
+  ///
+  /// In en, this message translates to:
+  /// **'Sort'**
+  String get sortBy;
+
+  /// No description provided for @sortRelevance.
+  ///
+  /// In en, this message translates to:
+  /// **'Best match'**
+  String get sortRelevance;
+
+  /// No description provided for @sortTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Title'**
+  String get sortTitle;
+
+  /// No description provided for @sortAuthor.
+  ///
+  /// In en, this message translates to:
+  /// **'Author'**
+  String get sortAuthor;
+
+  /// No description provided for @anyAuthor.
+  ///
+  /// In en, this message translates to:
+  /// **'Any author'**
+  String get anyAuthor;
+
+  /// No description provided for @anyCategory.
+  ///
+  /// In en, this message translates to:
+  /// **'Any category'**
+  String get anyCategory;
+
+  /// No description provided for @anyBook.
+  ///
+  /// In en, this message translates to:
+  /// **'Any book'**
+  String get anyBook;
+
+  /// No description provided for @clearFilters.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear filters'**
+  String get clearFilters;
+
+  /// No description provided for @readBook.
+  ///
+  /// In en, this message translates to:
+  /// **'Read the book'**
+  String get readBook;
+
+  /// No description provided for @volumeShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Vol.'**
+  String get volumeShort;
+
+  /// No description provided for @pagesCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} pages'**
+  String pagesCount(int count);
+
+  /// No description provided for @noMatchesInBook.
+  ///
+  /// In en, this message translates to:
+  /// **'No matches in this book.'**
+  String get noMatchesInBook;
 }
 
 class _AppLocalizationsDelegate

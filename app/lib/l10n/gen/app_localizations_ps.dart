@@ -722,4 +722,110 @@ class AppLocalizationsPs extends AppLocalizations {
   @override
   String get pageExcerpt =>
       'د مخ برخه — دا ځای په ځواب کې یاد شوی (کلمه په کلمه نقل نه دی)';
+
+  @override
+  String get searchInBook => 'په کتاب کې لټون';
+
+  @override
+  String get searchInBookHint => 'په دې کتاب کې ولټوئ (عربي)';
+
+  @override
+  String get goToPage => 'مخ ته تګ';
+
+  @override
+  String get printedPage => 'چاپي مخ';
+
+  @override
+  String get go => 'ورشه';
+
+  @override
+  String pageOf(int page, int total) {
+    return '$page له $total';
+  }
+
+  @override
+  String get bookmarkPage => 'مخ نښه کول';
+
+  @override
+  String get removeBookmark => 'نښه لرې کول';
+
+  @override
+  String get bookmarks => 'نښه شوي مخونه';
+
+  @override
+  String get copyPage => 'د مخ متن کاپي';
+
+  @override
+  String get sharePage => 'مخ شریکول';
+
+  @override
+  String get copyCitation => 'حواله کاپي';
+
+  @override
+  String get readerDisplay => 'د لوستلو بڼه';
+
+  @override
+  String get lineSpacing => 'د کرښو واټن';
+
+  @override
+  String get paperTheme => 'د پاڼې رنګ';
+
+  @override
+  String get paperWarm => 'کاغذي';
+
+  @override
+  String get paperPlain => 'ساده';
+
+  @override
+  String get paperNight => 'شپه';
+
+  @override
+  String get continueReading => 'لوستل دوام کړئ';
+
+  @override
+  String get recentlyRead => 'وروستي لوستل شوي';
+
+  @override
+  String get footnotes => 'حاشیې';
+
+  @override
+  String get filters => 'فلټرونه';
+
+  @override
+  String get sortBy => 'ترتیب';
+
+  @override
+  String get sortRelevance => 'مناسب‌ترین';
+
+  @override
+  String get sortTitle => 'د کتاب نوم';
+
+  @override
+  String get sortAuthor => 'مؤلف';
+
+  @override
+  String get anyAuthor => 'هر مؤلف';
+
+  @override
+  String get anyCategory => 'هره ډله';
+
+  @override
+  String get anyBook => 'هر کتاب';
+
+  @override
+  String get clearFilters => 'فلټرونه پاکول';
+
+  @override
+  String get readBook => 'کتاب لوستل';
+
+  @override
+  String get volumeShort => 'ټوک';
+
+  @override
+  String pagesCount(int count) {
+    return '$count مخونه';
+  }
+
+  @override
+  String get noMatchesInBook => 'په دې کتاب کې پایله ونه موندل شوه.';
 }

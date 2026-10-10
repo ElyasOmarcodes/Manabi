@@ -159,6 +159,8 @@ class TurathClient implements PassageSearch {
     final indexes = (raw as Map)['indexes'];
     final toc = <TocEntry>[];
     var volumes = <String>[];
+    var pageMap = <String>[];
+    var bounds = <String, (int, int)>{};
     if (indexes is Map) {
       for (final h in (indexes['headings'] as List? ?? const [])) {
         if (h is Map && h['title'] is String) {
@@ -166,6 +168,8 @@ class TurathClient implements PassageSearch {
         }
       }
       volumes = (indexes['volumes'] as List?)?.whereType<String>().toList() ?? const [];
+      pageMap = (indexes['page_map'] as List?)?.map((e) => '$e').toList() ?? const [];
+      bounds = BookDetails.parseBounds(indexes['volume_bounds']);
     }
     return BookDetails(
       id: '${meta['id']}',
@@ -176,6 +180,8 @@ class TurathClient implements PassageSearch {
       toc: toc,
       volumes: volumes,
       hasPdf: meta['pdf_links'] != null && meta['pdf_links'] != false && meta['pdf_links'] != '',
+      pageMap: pageMap,
+      volumeBounds: bounds,
     );
   }
 

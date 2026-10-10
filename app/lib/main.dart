@@ -10,6 +10,7 @@ import 'l10n/fallback_localizations.dart';
 import 'l10n/gen/app_localizations.dart';
 import 'state/chat_controller.dart';
 import 'state/nav_controller.dart';
+import 'state/reading_controller.dart';
 import 'state/settings_controller.dart';
 import 'ui/home_shell.dart';
 import 'ui/screens/splash_screen.dart';
@@ -78,6 +79,7 @@ class _ManabiAppState extends State<ManabiApp> {
               ChangeNotifierProvider.value(value: services.settings),
               ChangeNotifierProvider.value(value: services.chats),
               ChangeNotifierProvider(create: (_) => NavController()),
+              ChangeNotifierProvider(create: (_) => ReadingController()..load()),
             ],
             child: const _App(),
           );

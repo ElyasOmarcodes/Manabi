@@ -6,6 +6,7 @@ import '../../core/catalog/catalog_service.dart';
 import '../../core/models/library.dart';
 import '../../core/models/scope.dart';
 import '../../state/nav_controller.dart';
+import '../../state/reading_controller.dart';
 import '../../state/settings_controller.dart';
 import '../theme.dart';
 import '../widgets/answer_card.dart' show QueryChip;
@@ -27,6 +28,25 @@ class LibraryScreen extends StatefulWidget {
 class _LibraryScreenState extends State<LibraryScreen> {
   _Tab _tab = _Tab.books;
   String _q = '';
+  CatalogCategory? _category;
+  CatalogAuthor? _author;
+  CatalogBook? _book;
+  String _sort = 'relevance';
+
+  bool get _filtered => _category != null || _author != null || _book != null;
+
+  SearchScope get _scope => SearchScope(
+        bookId: _book?.id,
+        bookTitle: _book?.title,
+        authorId: _author?.id,
+        authorName: _author?.name,
+        categoryId: _category?.id,
+        categoryTitle: _category?.title,
+      );
+
+  void _rerunFullText() {
+    if (_tab == _Tab.fullText && _q.trim().isNotEmpty) _fullText.currentState?.search(_q, scope: _scope);
+  }
   final _search = TextEditingController();
   final _fullText = GlobalKey<_FullTextState>();
 
@@ -60,7 +80,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                   rtl: _tab == _Tab.fullText,
                   onChanged: (v) => setState(() => _q = v),
                   onSubmitted: (_) {
-                    if (_tab == _Tab.fullText) _fullText.currentState?.search(_q);
+                    if (_tab == _Tab.fullText) _fullText.currentState?.search(_q, scope: _scope);
                   },
                 ),
                 const SizedBox(height: 12),
@@ -88,6 +108,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                       ),
                   ]),
                 ),
+                if (_tab == _Tab.books || _tab == _Tab.fullText) _filterBar(context),
               ]),
             ),
           ),
@@ -96,7 +117,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
           _Tab.books => _booksSlivers(context),
           _Tab.authors => _authorsSlivers(context),
           _Tab.categories => [_categoriesSliver(context)],
-          _Tab.fullText => [SliverFillRemaining(hasScrollBody: true, child: _FullText(key: _fullText, query: _q))],
+          _Tab.fullText => [SliverFillRemaining(hasScrollBody: true, child: _FullText(key: _fullText, query: _q, scope: _scope))],
         },
         const SliverToBoxAdapter(child: SizedBox(height: 32)),
       ]),
@@ -106,9 +127,23 @@ class _LibraryScreenState extends State<LibraryScreen> {
   List<Widget> _booksSlivers(BuildContext context) {
     final catalog = context.read<CatalogService>();
     final l = context.l;
-    final books = catalog.findBooks(_q, limit: _q.isEmpty ? 60 : 200);
+    final reading = context.watch<ReadingController>();
+    final home = _q.isEmpty && !_filtered;
+    final books = catalog.findBooks(_q, authorId: _author?.id, categoryId: _category?.id, limit: home ? 60 : 400);
+    if (_sort == 'title') books.sort((x, y) => x.title.compareTo(y.title));
+    if (_sort == 'author') books.sort((x, y) => (catalog.author(x.authorId)?.name ?? '').compareTo(catalog.author(y.authorId)?.name ?? ''));
     return [
-      if (_q.isEmpty)
+      if (!home)
+        SliverToBoxAdapter(
+          child: ReadingWidth(
+            maxWidth: 900,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(22, 10, 22, 4),
+              child: Text(l.matches(books.length), style: TextStyle(fontFamily: uiFont, fontSize: 12.5, color: context.aura.muted)),
+            ),
+          ),
+        ),
+      if (home)
         SliverToBoxAdapter(
           child: ReadingWidth(
             maxWidth: 900,
@@ -146,6 +181,48 @@ class _LibraryScreenState extends State<LibraryScreen> {
                     ),
                   ),
                 ]),
+                if (reading.recent.isNotEmpty || reading.bookmarks.isNotEmpty) ...[
+                  SectionLabel(l.continueReading,
+                      trailing: reading.bookmarks.isEmpty
+                          ? null
+                          : SoftButton(
+                              dense: true,
+                              icon: Icons.bookmarks_outlined,
+                              label: '${l.bookmarks} (${reading.bookmarks.length})',
+                              color: AuraHues.rose,
+                              onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const BookmarksScreen())),
+                            )),
+                  SizedBox(
+                    height: 96,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: reading.recent.length,
+                      separatorBuilder: (_, _) => const SizedBox(width: 10),
+                      itemBuilder: (context, i) {
+                        final p = reading.recent[i];
+                        final entry = catalog.book(p.bookId);
+                        return Pressable(
+                          onTap: () => openReader(context, p.bookId, p.page, title: p.bookTitle),
+                          child: Container(
+                            width: 250,
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(color: context.aura.surface, borderRadius: BorderRadius.circular(18), border: Border.all(color: context.aura.border)),
+                            child: Row(children: [
+                              BookCover(title: p.bookTitle, color: AuraHues.category(entry?.categoryId), width: 46, height: 64),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [
+                                  Text(p.bookTitle, maxLines: 2, overflow: TextOverflow.ellipsis, textDirection: TextDirection.rtl, style: arabicStyle(context, size: 14.5, weight: FontWeight.w700).copyWith(height: 1.5)),
+                                  Text('${l.turathPage} ${p.page}', style: TextStyle(fontFamily: uiFont, fontSize: 11.5, color: context.aura.muted)),
+                                ]),
+                              ),
+                            ]),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
                 SectionLabel(l.allBooks),
               ]),
             ),
@@ -162,6 +239,83 @@ class _LibraryScreenState extends State<LibraryScreen> {
           ),
         ),
     ];
+  }
+
+  /// Filter chips: category, author, book (full text) and sort (books).
+  Widget _filterBar(BuildContext context) {
+    final l = context.l;
+    final a = context.aura;
+    Widget chip(String label, IconData icon, bool active, VoidCallback onTap, {VoidCallback? onClear}) => Padding(
+          padding: const EdgeInsetsDirectional.only(end: 6),
+          child: Pressable(
+            onTap: onTap,
+            child: Container(
+              padding: const EdgeInsetsDirectional.fromSTEB(10, 6, 8, 6),
+              decoration: BoxDecoration(
+                color: active ? a.accentTint : a.surface,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: active ? a.accent.withValues(alpha: 0.5) : a.border),
+              ),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(icon, size: 15, color: active ? a.accent : a.muted),
+                const SizedBox(width: 5),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 160),
+                  child: Text(label, overflow: TextOverflow.ellipsis, style: TextStyle(fontFamily: uiFont, fontSize: 12.5, fontWeight: FontWeight.w600, color: active ? a.accent : a.text)),
+                ),
+                const SizedBox(width: 2),
+                if (active && onClear != null)
+                  GestureDetector(onTap: onClear, child: Icon(Icons.close_rounded, size: 15, color: a.accent))
+                else
+                  Icon(Icons.expand_more_rounded, size: 16, color: a.muted),
+              ]),
+            ),
+          ),
+        );
+    final sortLabel = switch (_sort) { 'title' => l.sortTitle, 'author' => l.sortAuthor, _ => l.sortRelevance };
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(children: [
+          Padding(padding: const EdgeInsetsDirectional.only(end: 6), child: Icon(Icons.tune_rounded, size: 18, color: a.muted)),
+          chip(_category?.title ?? l.anyCategory, Icons.category_outlined, _category != null, () async {
+            final c = await pickFromCatalog<CatalogCategory>(context, PickKind.category);
+            if (c != null) setState(() => _category = c);
+            _rerunFullText();
+          }, onClear: () {
+            setState(() => _category = null);
+            _rerunFullText();
+          }),
+          chip(_author?.name ?? l.anyAuthor, Icons.person_outline_rounded, _author != null, () async {
+            final x = await pickFromCatalog<CatalogAuthor>(context, PickKind.author);
+            if (x != null) setState(() => _author = x);
+            _rerunFullText();
+          }, onClear: () {
+            setState(() => _author = null);
+            _rerunFullText();
+          }),
+          if (_tab == _Tab.fullText)
+            chip(_book?.title ?? l.anyBook, Icons.menu_book_outlined, _book != null, () async {
+              final b = await pickFromCatalog<CatalogBook>(context, PickKind.book, authorId: _author?.id, categoryId: _category?.id);
+              if (b != null) setState(() => _book = b);
+              _rerunFullText();
+            }, onClear: () {
+              setState(() => _book = null);
+              _rerunFullText();
+            }),
+          if (_tab == _Tab.books)
+            PopupMenuButton<String>(
+              onSelected: (v) => setState(() => _sort = v),
+              itemBuilder: (_) => [
+                for (final (v, label) in [('relevance', l.sortRelevance), ('title', l.sortTitle), ('author', l.sortAuthor)])
+                  CheckedPopupMenuItem(value: v, checked: _sort == v, child: Text(label, style: const TextStyle(fontFamily: uiFont))),
+              ],
+              child: IgnorePointer(child: chip('${l.sortBy}: $sortLabel', Icons.sort_rounded, _sort != 'relevance', () {})),
+            ),
+        ]),
+      ),
+    );
   }
 
   List<Widget> _authorsSlivers(BuildContext context) {
@@ -289,8 +443,9 @@ class CategoryBooksScreen extends StatelessWidget {
 
 /// Live full-text search across Turath.
 class _FullText extends StatefulWidget {
-  const _FullText({super.key, required this.query});
+  const _FullText({super.key, required this.query, this.scope = SearchScope.all});
   final String query;
+  final SearchScope scope;
   @override
   State<_FullText> createState() => _FullTextState();
 }
@@ -303,7 +458,10 @@ class _FullTextState extends State<_FullText> {
   bool _loading = false;
   String? _error;
 
-  Future<void> search(String q, {bool more = false}) async {
+  SearchScope _scope = SearchScope.all;
+
+  Future<void> search(String q, {bool more = false, SearchScope? scope}) async {
+    if (scope != null) _scope = scope;
     if (q.trim().isEmpty || _loading) return;
     final backend = context.read<SettingsController>().backend;
     setState(() {
@@ -316,7 +474,7 @@ class _FullTextState extends State<_FullText> {
       }
     });
     try {
-      final r = await backend.search(_q, page: _page + 1);
+      final r = await backend.search(_q, page: _page + 1, scope: _scope);
       setState(() {
         _items.addAll(r.items);
         _total = r.totalMatches;
@@ -360,7 +518,7 @@ class _FullTextState extends State<_FullText> {
             maxWidth: 900,
             child: AuraCard(
               padding: const EdgeInsets.all(16),
-              onTap: p.internalPage == null ? () => openUrl(p.url) : () => openReader(context, p.bookId, p.internalPage!, title: p.bookTitle),
+              onTap: p.internalPage == null ? () => openUrl(p.url) : () => openReader(context, p.bookId, p.internalPage!, title: p.bookTitle, highlight: _q),
               child: Directionality(
                 textDirection: TextDirection.rtl,
                 child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -383,6 +541,44 @@ class _FullTextState extends State<_FullText> {
           ),
         );
       },
+    );
+  }
+}
+
+/// Every bookmarked page, newest first.
+class BookmarksScreen extends StatelessWidget {
+  const BookmarksScreen({super.key});
+  @override
+  Widget build(BuildContext context) {
+    final l = context.l;
+    final reading = context.watch<ReadingController>();
+    final marks = reading.bookmarks;
+    return AuraPage(
+      titleText: l.bookmarks,
+      body: marks.isEmpty
+          ? EmptyState(icon: Icons.bookmarks_outlined, text: l.bookmarks, color: AuraHues.rose)
+          : ListView.builder(
+              padding: const EdgeInsets.fromLTRB(12, 4, 12, 24),
+              itemCount: marks.length,
+              itemBuilder: (context, i) {
+                final b = marks[i];
+                return ReadingWidth(
+                  maxWidth: 800,
+                  child: Dismissible(
+                    key: ValueKey('${b.bookId}-${b.page}'),
+                    direction: DismissDirection.endToStart,
+                    onDismissed: (_) => reading.toggleBookmark(b),
+                    child: ListTile(
+                      leading: const Icon(Icons.bookmark_rounded, color: AuraHues.rose),
+                      title: Text(b.bookTitle, maxLines: 1, overflow: TextOverflow.ellipsis, textDirection: TextDirection.rtl, style: arabicStyle(context, size: 15.5, weight: FontWeight.w700).copyWith(height: 1.5)),
+                      subtitle: Text([if (b.heading != null) b.heading!, if (b.volume != null) '${l.volumeShort} ${b.volume}', '${l.page} ${b.printed ?? b.page}'].join(' · '),
+                          maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontFamily: uiFont, fontSize: 12.5)),
+                      onTap: () => openReader(context, b.bookId, b.page, title: b.bookTitle),
+                    ),
+                  ),
+                );
+              },
+            ),
     );
   }
 }

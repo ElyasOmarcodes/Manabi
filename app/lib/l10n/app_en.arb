@@ -271,5 +271,56 @@
   "aboutCredits": "With thanks to the Turath library (turath.io) and the Nusus SDK.",
   "sourceCode": "Source code",
   "dataCatalog": "Offline catalog",
-  "pageExcerpt": "Page excerpt — cited in the answer (not a word-for-word quote)"
+  "pageExcerpt": "Page excerpt — cited in the answer (not a word-for-word quote)",
+  "searchInBook": "Search in book",
+  "searchInBookHint": "Search this book (Arabic)",
+  "goToPage": "Go to page",
+  "printedPage": "Printed page",
+  "go": "Go",
+  "pageOf": "{page} of {total}",
+  "bookmarkPage": "Bookmark page",
+  "removeBookmark": "Remove bookmark",
+  "bookmarks": "Bookmarks",
+  "copyPage": "Copy page text",
+  "sharePage": "Share page",
+  "copyCitation": "Copy citation",
+  "readerDisplay": "Reading display",
+  "lineSpacing": "Line spacing",
+  "paperTheme": "Page colour",
+  "paperWarm": "Paper",
+  "paperPlain": "Plain",
+  "paperNight": "Night",
+  "continueReading": "Continue reading",
+  "recentlyRead": "Recently read",
+  "footnotes": "Footnotes",
+  "filters": "Filters",
+  "sortBy": "Sort",
+  "sortRelevance": "Best match",
+  "sortTitle": "Title",
+  "sortAuthor": "Author",
+  "anyAuthor": "Any author",
+  "anyCategory": "Any category",
+  "anyBook": "Any book",
+  "clearFilters": "Clear filters",
+  "readBook": "Read the book",
+  "volumeShort": "Vol.",
+  "pagesCount": "{count} pages",
+  "noMatchesInBook": "No matches in this book.",
+  "@pageOf": {
+    "placeholders": {
+      "page": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "@pagesCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
 }

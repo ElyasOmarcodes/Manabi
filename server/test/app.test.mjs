@@ -35,6 +35,8 @@ test("book, author and page endpoints return normalized Turath data without raw 
   assert.equal(book.title, "الأربعون النووية مع زيادات ابن رجب");
   assert.ok(book.toc.length > 10);
   assert.equal(book.raw, undefined);
+  assert.equal(book.pageMap[4], "1,5", "page map for the reader");
+  assert.deepEqual(book.volumeBounds["1"], [1, 67]);
   const author = await (await fetch(`${base}/api/authors/44`)).json();
   assert.equal(author.name, "النووي");
   const page = await (await fetch(`${base}/api/pages/147927/5`)).json();

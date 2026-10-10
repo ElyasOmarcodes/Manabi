@@ -726,4 +726,110 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get pageExcerpt =>
       'Page excerpt — cited in the answer (not a word-for-word quote)';
+
+  @override
+  String get searchInBook => 'Search in book';
+
+  @override
+  String get searchInBookHint => 'Search this book (Arabic)';
+
+  @override
+  String get goToPage => 'Go to page';
+
+  @override
+  String get printedPage => 'Printed page';
+
+  @override
+  String get go => 'Go';
+
+  @override
+  String pageOf(int page, int total) {
+    return '$page of $total';
+  }
+
+  @override
+  String get bookmarkPage => 'Bookmark page';
+
+  @override
+  String get removeBookmark => 'Remove bookmark';
+
+  @override
+  String get bookmarks => 'Bookmarks';
+
+  @override
+  String get copyPage => 'Copy page text';
+
+  @override
+  String get sharePage => 'Share page';
+
+  @override
+  String get copyCitation => 'Copy citation';
+
+  @override
+  String get readerDisplay => 'Reading display';
+
+  @override
+  String get lineSpacing => 'Line spacing';
+
+  @override
+  String get paperTheme => 'Page colour';
+
+  @override
+  String get paperWarm => 'Paper';
+
+  @override
+  String get paperPlain => 'Plain';
+
+  @override
+  String get paperNight => 'Night';
+
+  @override
+  String get continueReading => 'Continue reading';
+
+  @override
+  String get recentlyRead => 'Recently read';
+
+  @override
+  String get footnotes => 'Footnotes';
+
+  @override
+  String get filters => 'Filters';
+
+  @override
+  String get sortBy => 'Sort';
+
+  @override
+  String get sortRelevance => 'Best match';
+
+  @override
+  String get sortTitle => 'Title';
+
+  @override
+  String get sortAuthor => 'Author';
+
+  @override
+  String get anyAuthor => 'Any author';
+
+  @override
+  String get anyCategory => 'Any category';
+
+  @override
+  String get anyBook => 'Any book';
+
+  @override
+  String get clearFilters => 'Clear filters';
+
+  @override
+  String get readBook => 'Read the book';
+
+  @override
+  String get volumeShort => 'Vol.';
+
+  @override
+  String pagesCount(int count) {
+    return '$count pages';
+  }
+
+  @override
+  String get noMatchesInBook => 'No matches in this book.';
 }

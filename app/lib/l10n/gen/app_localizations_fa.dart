@@ -723,4 +723,110 @@ class AppLocalizationsFa extends AppLocalizations {
   @override
   String get pageExcerpt =>
       'بخشی از صفحه — در پاسخ به آن ارجاع شده (نقل کلمه به کلمه نیست)';
+
+  @override
+  String get searchInBook => 'جست‌وجو در کتاب';
+
+  @override
+  String get searchInBookHint => 'در این کتاب جست‌وجو کنید (عربی)';
+
+  @override
+  String get goToPage => 'رفتن به صفحه';
+
+  @override
+  String get printedPage => 'صفحهٔ چاپی';
+
+  @override
+  String get go => 'برو';
+
+  @override
+  String pageOf(int page, int total) {
+    return '$page از $total';
+  }
+
+  @override
+  String get bookmarkPage => 'نشانه‌گذاری صفحه';
+
+  @override
+  String get removeBookmark => 'حذف نشانه';
+
+  @override
+  String get bookmarks => 'صفحه‌های نشانه‌گذاری‌شده';
+
+  @override
+  String get copyPage => 'رونوشت متن صفحه';
+
+  @override
+  String get sharePage => 'اشتراک صفحه';
+
+  @override
+  String get copyCitation => 'رونوشت ارجاع';
+
+  @override
+  String get readerDisplay => 'نمای خواندن';
+
+  @override
+  String get lineSpacing => 'فاصلهٔ خطوط';
+
+  @override
+  String get paperTheme => 'رنگ صفحه';
+
+  @override
+  String get paperWarm => 'کاغذی';
+
+  @override
+  String get paperPlain => 'ساده';
+
+  @override
+  String get paperNight => 'شب';
+
+  @override
+  String get continueReading => 'ادامهٔ خواندن';
+
+  @override
+  String get recentlyRead => 'اخیراً خوانده‌شده';
+
+  @override
+  String get footnotes => 'پاورقی‌ها';
+
+  @override
+  String get filters => 'فیلترها';
+
+  @override
+  String get sortBy => 'مرتب‌سازی';
+
+  @override
+  String get sortRelevance => 'مرتبط‌ترین';
+
+  @override
+  String get sortTitle => 'نام کتاب';
+
+  @override
+  String get sortAuthor => 'مؤلف';
+
+  @override
+  String get anyAuthor => 'هر مؤلف';
+
+  @override
+  String get anyCategory => 'هر دسته';
+
+  @override
+  String get anyBook => 'هر کتاب';
+
+  @override
+  String get clearFilters => 'پاک کردن فیلترها';
+
+  @override
+  String get readBook => 'خواندن کتاب';
+
+  @override
+  String get volumeShort => 'جلد';
+
+  @override
+  String pagesCount(int count) {
+    return '$count صفحه';
+  }
+
+  @override
+  String get noMatchesInBook => 'در این کتاب نتیجه‌ای پیدا نشد.';
 }

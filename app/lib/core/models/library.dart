@@ -31,7 +31,18 @@ class TocEntry {
 }
 
 class BookDetails {
-  const BookDetails({required this.id, required this.title, this.authorId, this.categoryId, this.description, this.toc = const [], this.volumes = const [], this.hasPdf = false});
+  const BookDetails({
+    required this.id,
+    required this.title,
+    this.authorId,
+    this.categoryId,
+    this.description,
+    this.toc = const [],
+    this.volumes = const [],
+    this.hasPdf = false,
+    this.pageMap = const [],
+    this.volumeBounds = const {},
+  });
   final String id;
   final String title;
   final String? authorId;
@@ -41,7 +52,56 @@ class BookDetails {
   final List<String> volumes;
   final bool hasPdf;
 
+  /// Turath page map: entry i is internal page i + 1 as "volume,printed page".
+  final List<String> pageMap;
+
+  /// Volume → first and last internal page.
+  final Map<String, (int, int)> volumeBounds;
+
   String get url => 'https://app.turath.io/book/$id';
+
+  /// Number of internal pages, when known.
+  int? get pageCount => pageMap.isNotEmpty ? pageMap.length : (volumeBounds.isEmpty ? null : volumeBounds.values.map((b) => b.$2).reduce((a, b) => a > b ? a : b));
+
+  /// Volume and printed page of an internal page.
+  ({String? volume, int? printed}) locate(int internal) {
+    if (internal < 1 || internal > pageMap.length) return (volume: null, printed: null);
+    final parts = pageMap[internal - 1].split(',');
+    return (volume: parts.first, printed: parts.length > 1 ? int.tryParse(parts[1]) : null);
+  }
+
+  /// Internal page of a volume and printed page (the nearest one at or after it).
+  int? internalFor(String volume, int printed) {
+    int? best;
+    for (var i = 0; i < pageMap.length; i++) {
+      final parts = pageMap[i].split(',');
+      if (parts.first != volume || parts.length < 2) continue;
+      final p = int.tryParse(parts[1]);
+      if (p == null) continue;
+      if (p == printed) return i + 1;
+      if (p > printed && best == null) best = i + 1;
+    }
+    return best ?? volumeBounds[volume]?.$1;
+  }
+
+  /// The table-of-contents entry a page belongs to.
+  TocEntry? headingFor(int internal) {
+    TocEntry? found;
+    for (final e in toc) {
+      if (e.page != null && e.page! <= internal) found = e;
+    }
+    return found;
+  }
+
+  static Map<String, (int, int)> parseBounds(Object? raw) {
+    final out = <String, (int, int)>{};
+    if (raw is Map) {
+      raw.forEach((k, v) {
+        if (v is List && v.length >= 2 && v[0] is num && v[1] is num) out['$k'] = ((v[0] as num).toInt(), (v[1] as num).toInt());
+      });
+    }
+    return out;
+  }
 
   /// Accepts both the Nusus-normalized shape (server) and is produced by the
   /// direct client in the same shape.
@@ -58,6 +118,8 @@ class BookDetails {
             const [],
         volumes: (j['volumes'] as List?)?.whereType<String>().toList() ?? const [],
         hasPdf: j['hasPdf'] == true,
+        pageMap: (j['pageMap'] as List?)?.map((e) => '$e').toList() ?? const [],
+        volumeBounds: parseBounds(j['volumeBounds']),
       );
 }
 

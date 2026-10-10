@@ -724,4 +724,110 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get pageExcerpt =>
       'مقتطف من الصفحة — أُحيل إليه في الجواب (ليس نقلًا حرفيًا)';
+
+  @override
+  String get searchInBook => 'البحث في الكتاب';
+
+  @override
+  String get searchInBookHint => 'ابحث في هذا الكتاب';
+
+  @override
+  String get goToPage => 'انتقال إلى صفحة';
+
+  @override
+  String get printedPage => 'الصفحة المطبوعة';
+
+  @override
+  String get go => 'انتقال';
+
+  @override
+  String pageOf(int page, int total) {
+    return '$page من $total';
+  }
+
+  @override
+  String get bookmarkPage => 'حفظ الصفحة';
+
+  @override
+  String get removeBookmark => 'إزالة العلامة';
+
+  @override
+  String get bookmarks => 'الصفحات المحفوظة';
+
+  @override
+  String get copyPage => 'نسخ نص الصفحة';
+
+  @override
+  String get sharePage => 'مشاركة الصفحة';
+
+  @override
+  String get copyCitation => 'نسخ الإحالة';
+
+  @override
+  String get readerDisplay => 'إعدادات القراءة';
+
+  @override
+  String get lineSpacing => 'تباعد الأسطر';
+
+  @override
+  String get paperTheme => 'لون الصفحة';
+
+  @override
+  String get paperWarm => 'ورقي';
+
+  @override
+  String get paperPlain => 'عادي';
+
+  @override
+  String get paperNight => 'ليلي';
+
+  @override
+  String get continueReading => 'متابعة القراءة';
+
+  @override
+  String get recentlyRead => 'قُرئ مؤخرًا';
+
+  @override
+  String get footnotes => 'الحواشي';
+
+  @override
+  String get filters => 'التصفية';
+
+  @override
+  String get sortBy => 'الترتيب';
+
+  @override
+  String get sortRelevance => 'الأنسب';
+
+  @override
+  String get sortTitle => 'اسم الكتاب';
+
+  @override
+  String get sortAuthor => 'المؤلف';
+
+  @override
+  String get anyAuthor => 'كل المؤلفين';
+
+  @override
+  String get anyCategory => 'كل التصنيفات';
+
+  @override
+  String get anyBook => 'كل الكتب';
+
+  @override
+  String get clearFilters => 'مسح التصفية';
+
+  @override
+  String get readBook => 'قراءة الكتاب';
+
+  @override
+  String get volumeShort => 'الجزء';
+
+  @override
+  String pagesCount(int count) {
+    return '$count صفحة';
+  }
+
+  @override
+  String get noMatchesInBook => 'لا نتائج في هذا الكتاب.';
 }

@@ -127,7 +127,16 @@ export const createApp = ({ config, pipeline, turath, catalog, gemini, logger = 
       });
       return stripRaw(result);
     }],
-    ["GET", /^\/api\/books\/([1-9]\d*)$/, async (m) => stripRaw(await turath.getBook(m[1]))],
+    ["GET", /^\/api\/books\/([1-9]\d*)$/, async (m) => {
+      const book = await turath.getBook(m[1]);
+      // The reader needs Turath's page map (internal page → "volume,printed page").
+      const indexes = book.raw?.indexes ?? {};
+      return {
+        ...stripRaw(book),
+        pageMap: Array.isArray(indexes.page_map) ? indexes.page_map : undefined,
+        volumeBounds: indexes.volume_bounds && typeof indexes.volume_bounds === "object" ? indexes.volume_bounds : undefined,
+      };
+    }],
     ["GET", /^\/api\/authors\/([1-9]\d*)$/, async (m) => stripRaw(await turath.getAuthor(m[1]))],
     ["GET", /^\/api\/pages\/([1-9]\d*)\/([1-9]\d*)$/, async (m) => stripRaw(await turath.getPage(m[1], m[2]))],
     ["GET", /^\/api\/catalog\/categories$/, async () => catalog.listCategories()],
