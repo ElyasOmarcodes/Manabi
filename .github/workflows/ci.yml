@@ -62,8 +62,8 @@ jobs:
           GEMINI_API_KYA: ${{ secrets.GEMINI_API_KYA }}
         run: |
           if [ -z "$GEMINI_API_KYA" ]; then
-            echo "::error::Repository secret GEMINI_API_KYA is not set"
-            exit 1
+            echo "::warning title=GEMINI_API_KYA missing::The Actions secret GEMINI_API_KYA is not visible to this workflow (Settings → Secrets and variables → Actions → Repository secrets). Live tests skipped."
+            exit 0
           fi
           npm run test:live
 
@@ -89,6 +89,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: [server, flutter]
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    env:
+      HAS_GEMINI_KEY: ${{ secrets.GEMINI_API_KYA != '' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -122,7 +124,11 @@ jobs:
       - name: Capture UI screenshots
         working-directory: tool/screenshots
         run: node shots.mjs http://localhost:8080/ "$GITHUB_WORKSPACE/screenshots" ui
+      - name: Real answers need the Gemini key
+        if: env.HAS_GEMINI_KEY != 'true'
+        run: echo "::warning title=GEMINI_API_KYA missing::Live answer screenshots skipped – the GEMINI_API_KYA Actions secret is not available."
       - name: Capture real answers (Turath + Gemini)
+        if: env.HAS_GEMINI_KEY == 'true'
         working-directory: tool/screenshots
         env:
           MANABI_SERVER_URL: http://localhost:8787
