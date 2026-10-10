@@ -105,7 +105,11 @@ class ChatController extends ChangeNotifier {
     final previous = chat.turns.takeWhile((t) => t != turn).where((t) => t.state == MessageState.done).toList();
     final history = [
       for (final t in previous.length > 3 ? previous.sublist(previous.length - 3) : previous)
-        HistoryTurn(t.question, t.result?.summary.isNotEmpty == true ? t.result!.summary : _clip(t.result?.answer ?? '')),
+        HistoryTurn(
+          t.question,
+          t.result?.summary.isNotEmpty == true ? t.result!.summary : _clip(t.result?.answer ?? ''),
+          [for (final src in t.result?.sources ?? const []) src.bookTitle],
+        ),
     ];
     final p = progress[turn.id] = AskProgress();
     notifyListeners();

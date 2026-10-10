@@ -46,3 +46,18 @@ test("live: nonsense question is reported as not documented", { skip: !live, tim
   const result = await pipeline.ask({ question: "What is the Wi-Fi password of the moon base in 2090?", language: "en" });
   assert.equal(result.status, "insufficient");
 });
+
+test("live: Hanafi ruling with several sources, then a follow-up naming two books", { skip: !live, timeout: 300_000 }, async () => {
+  const q1 = "د حنفي مذهب علماء څه فرمايي چې کله د ميږې څخه بچی پيدا شي، او سر يې د سپي وي ايا ددی خوراک جايز دی کنه؟ پر پښتو ژبه ځواب راکړه او د اصل مرجع متن په عربي ذکر کړه";
+  const first = await pipeline.ask({ question: q1, language: "ps" });
+  await check(first);
+  assert.notEqual(first.status, "insufficient");
+  assert.ok(first.sources.length >= 3, `expected several Hanafi sources, got ${first.sources.length}`);
+  assert.ok(first.answer.split("\n").filter((l) => l.startsWith("> ")).length >= 2, "original Arabic texts are quoted inline");
+
+  const history = [{ question: q1, summary: first.summary, books: first.sources.map((s) => s.bookTitle) }];
+  const second = await pipeline.ask({ question: "نوري حوالې وګوره لکه الفقه الاسلامي للزحيلي، الموسوعة الفقهية", language: "ps", history });
+  await check(second);
+  const books = second.sources.map((s) => s.bookId);
+  assert.ok(books.includes("384") || books.includes("38056"), `requested books should be consulted, got ${second.sources.map((s) => s.bookTitle).join(" | ")}`);
+});

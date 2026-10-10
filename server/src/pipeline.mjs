@@ -1,12 +1,25 @@
-// Grounded answer pipeline:
-//   1. plan    – Gemini turns the question into literal Arabic search queries
-//   2. search  – Nusus/Turath full-text retrieval (real pages only)
-//   3. compose – Gemini answers strictly from the numbered sources
-//   4. verify  – every quote is located in the real page text; unverifiable
-//                answers are downgraded to "insufficient".
+// Grounded answer pipeline (v2):
+//   1. plan     – Gemini: literal Arabic queries, schools, requested + reference books
+//   2. search   – Nusus/Turath: general, per-book, per-school searches → candidate pool
+//   3. read     – Gemini ranks the candidates; one follow-up search round if needed
+//   4. compose  – Gemini answers only from the selected pages, quoting them inline
+//   5. verify   – every quote is located in the real page text; unverifiable
+//                 answers are downgraded to "insufficient".
 //
 // Keep in sync with app/lib/core/pipeline/answer_pipeline.dart.
-import { LANGUAGES, PLAN_SCHEMA, PLAN_SYSTEM, COMPOSE_SCHEMA, composeSystem, composePrompt, planPrompt } from "./prompts.mjs";
+import {
+  COMPOSE_SCHEMA,
+  LANGUAGES,
+  PLAN_SCHEMA,
+  PLAN_SYSTEM,
+  RERANK_SCHEMA,
+  RERANK_SYSTEM,
+  composePrompt,
+  composeSystem,
+  planPrompt,
+  rerankPrompt,
+} from "./prompts.mjs";
+import { boundText } from "./excerpt.mjs";
 import { locateQuote } from "./verify.mjs";
 
 export const INSUFFICIENT = {
@@ -16,16 +29,33 @@ export const INSUFFICIENT = {
   en: "No documented answer to this question was found in the retrieved sources. Try rephrasing the question or changing the search scope (book, author or category).",
 };
 
-const MADHHAB_CATEGORIES = ["14", "15", "16", "17"]; // Hanafi, Maliki, Shafi'i, Hanbali
-
+export const MADHHAB_CATEGORY = { hanafi: "14", maliki: "15", shafii: "16", hanbali: "17" };
 const LANG_CODES = new Set(Object.keys(LANGUAGES));
+
+export const LIMITS = {
+  generalQueries: 6,
+  hitsPerGeneral: 8,
+  requestedBooks: 3,
+  queriesPerRequested: 4,
+  hitsPerRequested: 4,
+  referenceBooks: 5,
+  queriesPerReference: 2,
+  hitsPerReference: 3,
+  queriesPerMadhhab: 3,
+  hitsPerMadhhab: 4,
+  maxSearches: 40,
+  maxCandidates: 64,
+  excerptChars: 650,
+  sourceChars: 2400,
+  maxSelected: 14,
+};
 
 const clampInt = (value, min, max, fallback) => {
   const n = Number.parseInt(value, 10);
   return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : fallback;
 };
 
-const cleanQueries = (queries) => {
+export const cleanQueries = (queries, max = 8) => {
   const seen = new Set();
   const out = [];
   for (const raw of Array.isArray(queries) ? queries : []) {
@@ -35,11 +65,14 @@ const cleanQueries = (queries) => {
     seen.add(q);
     out.push(q);
   }
-  return out.slice(0, 5);
+  return out.slice(0, max);
 };
 
+const cleanTitles = (titles, max) =>
+  [...new Set((Array.isArray(titles) ? titles : []).filter((t) => typeof t === "string").map((t) => t.trim()).filter(Boolean))].slice(0, max);
+
 /** Runs async tasks with bounded concurrency, collecting settled results. */
-const settleAll = async (tasks, concurrency = 4) => {
+const settleAll = async (tasks, concurrency = 6) => {
   const results = new Array(tasks.length);
   let cursor = 0;
   const worker = async () => {
@@ -73,13 +106,48 @@ export const scopeLabel = (scope, catalog) => {
   return parts.join(", ");
 };
 
-const toSource = (passage, key, catalog) => {
+// Works derived from another book (supplements, abridgements, indexes …)
+// rank below the main work unless the user asked for them.
+const DERIVATIVE = /^(تكملة|مختصر|تهذيب|فهرس|فهارس|تخريج|ترتيب|زوائد|منتخب|تلخيص|قرة عيون|دراسة|التعليق)/u;
+const strip = (s) => s.replace(/[ً-ٰٟـ]/g, "").replace(/[أإآٱ]/g, "ا").replace(/ى/g, "ي").trim();
+
+/** Resolves free-text book titles to catalog book ids (best match first). */
+export const resolveBooks = (titles, catalog, perTitle = 1) => {
+  const ids = [];
+  for (const title of titles) {
+    let found = [];
+    try {
+      found = catalog.findBooks(title, { limit: 12 });
+      if (!found.length) {
+        // Retry without a trailing author qualifier like "لابن قدامة" / "للزحيلي".
+        const short = title.replace(/\s+(ل|لل|لابن|للإمام)\S*(\s+\S+)?$/u, "").trim();
+        if (short && short !== title) found = catalog.findBooks(short, { limit: 12 });
+      }
+    } catch {
+      found = [];
+    }
+    const wantDerivative = DERIVATIVE.test(strip(title));
+    const ranked = found
+      .map((b, rank) => {
+        const t = strip(b.title);
+        const penalty = !wantDerivative && DERIVATIVE.test(t) ? 100 : 0;
+        return { b, score: rank + penalty + Math.max(0, t.length - strip(title).length) / 40 };
+      })
+      .sort((x, y) => x.score - y.score)
+      .slice(0, perTitle);
+    for (const { b } of ranked) if (!ids.includes(b.id)) ids.push(b.id);
+  }
+  return ids;
+};
+
+const toCandidate = (passage, catalog) => {
   const bookId = String(passage.book.id);
   const catalogBook = catalog.book(bookId);
   const authorId = passage.author?.id ?? catalogBook?.authorId;
   const categoryId = passage.category?.id ?? catalogBook?.categoryId;
+  const snippet = passage.raw?.snip ?? passage.snippet;
   return {
-    key,
+    id: `${bookId}:${passage.location?.internalPage ?? passage.text.slice(0, 40)}`,
     bookId,
     bookTitle: passage.book.title,
     authorId: authorId === undefined ? undefined : String(authorId),
@@ -93,130 +161,61 @@ const toSource = (passage, key, catalog) => {
     url: passage.url,
     shamelaUrl: passage.alternateUrls?.shamela,
     citation: passage.citation,
-    text: passage.text,
+    excerpt: boundText(passage.text, LIMITS.excerptChars, snippet).text,
+    text: boundText(passage.text, LIMITS.sourceChars, snippet).text,
     snippet: passage.snippet,
   };
 };
 
-/** Retrieves, de-duplicates and interleaves passages from several query streams. */
-export const gatherSources = async ({ turath, catalog, queries, scope, questionType, maxSources }) => {
-  const nususScope = scopeToNusus(scope);
-  const streams = queries.map((query) => ({ query, scope: nususScope, max: 4 }));
-  if (questionType === "fiqh" && !nususScope) {
-    for (const categoryId of MADHHAB_CATEGORIES) {
-      for (const query of queries.slice(0, 2)) streams.push({ query, scope: { categoryIds: [categoryId] }, max: 1 });
+/** Builds the list of searches for one retrieval round. */
+export const searchPlan = ({ queries, scope, madhhabs = [], requestedBookIds = [], referenceBookIds = [], userScoped }) => {
+  const plan = [];
+  for (const q of queries.slice(0, LIMITS.generalQueries)) plan.push({ query: q, scope, take: LIMITS.hitsPerGeneral, kind: "general" });
+  if (!userScoped) {
+    for (const id of requestedBookIds.slice(0, LIMITS.requestedBooks)) {
+      for (const q of queries.slice(0, LIMITS.queriesPerRequested)) plan.push({ query: q, scope: { bookIds: [id] }, take: LIMITS.hitsPerRequested, kind: "requested" });
+    }
+    for (const id of referenceBookIds.slice(0, LIMITS.referenceBooks)) {
+      for (const q of queries.slice(0, LIMITS.queriesPerReference)) plan.push({ query: q, scope: { bookIds: [id] }, take: LIMITS.hitsPerReference, kind: "reference" });
+    }
+    for (const m of madhhabs) {
+      const categoryId = MADHHAB_CATEGORY[m];
+      if (!categoryId) continue;
+      for (const q of queries.slice(0, LIMITS.queriesPerMadhhab)) plan.push({ query: q, scope: { categoryIds: [categoryId] }, take: LIMITS.hitsPerMadhhab, kind: "madhhab" });
     }
   }
-  const settled = await settleAll(
-    streams.map((s) => () => turath.retrieve(s.query, { maxPassages: s.max, maxCharsPerPassage: 1600, scope: s.scope })),
-  );
-  const failures = settled.filter((r) => !r.ok).map((r) => r.error);
-  const lists = settled.map((r) => (r.ok ? r.value.passages : []));
-  const totalMatches = settled.reduce((sum, r) => sum + (r.ok ? r.value.totalMatches : 0), 0);
+  return plan.slice(0, LIMITS.maxSearches);
+};
 
-  const seen = new Set();
-  const picked = [];
-  for (let round = 0; picked.length < maxSources; round += 1) {
+/** Runs searches and merges their hits into a de-duplicated, interleaved candidate pool. */
+export const collectCandidates = async ({ turath, catalog, plan, existing = [] }) => {
+  const settled = await settleAll(plan.map((s) => () => turath.search(s.query, { ...s.scope })));
+  const failures = settled.filter((r) => !r.ok).length;
+  const lists = settled.map((r, i) => (r.ok ? r.value.items.slice(0, plan[i].take) : []));
+  const totalMatches = settled.reduce((sum, r) => sum + (r.ok ? r.value.totalMatches : 0), 0);
+  const seen = new Set(existing.map((c) => c.id));
+  const pool = [];
+  // Requested books first, then interleave every list by rank.
+  const order = [...plan.keys()].sort((a, b) => Number(plan[b].kind === "requested") - Number(plan[a].kind === "requested"));
+  for (let round = 0; existing.length + pool.length < LIMITS.maxCandidates; round += 1) {
     let any = false;
-    for (const list of lists) {
-      const passage = list[round];
+    for (const i of order) {
+      const passage = lists[i][round];
       if (!passage) continue;
       any = true;
-      const id = `${passage.book.id}:${passage.location?.internalPage ?? passage.text.slice(0, 40)}`;
-      if (seen.has(id)) continue;
-      seen.add(id);
-      picked.push(passage);
-      if (picked.length >= maxSources) break;
+      const candidate = toCandidate(passage, catalog);
+      if (seen.has(candidate.id)) continue;
+      seen.add(candidate.id);
+      pool.push(candidate);
+      if (existing.length + pool.length >= LIMITS.maxCandidates) break;
     }
     if (!any) break;
   }
-  if (!picked.length && failures.length && failures.length === settled.length) {
-    const error = new Error("The Turath library could not be reached");
-    error.code = "TURATH_UNAVAILABLE";
-    error.cause = failures[0];
-    throw error;
-  }
-  return { sources: picked.map((p, i) => toSource(p, `S${i + 1}`, catalog)), totalMatches };
+  return { candidates: pool, totalMatches, failed: plan.length > 0 && failures === plan.length };
 };
 
 const MARKER = /\[\s*(S\d+(?:\s*[,،;]\s*S?\d+)*)\s*\]/gi;
-
-/** Verifies citations, renumbers markers to [1], [2] … and builds the public result. */
-export const finalize = ({ composed, sources, language }) => {
-  const byKey = new Map(sources.map((s) => [s.key, s]));
-  const quotes = new Map();
-  for (const citation of Array.isArray(composed?.citations) ? composed.citations : []) {
-    const key = String(citation?.sourceId ?? "").trim().toUpperCase();
-    const source = byKey.get(key);
-    if (!source) continue;
-    const located = locateQuote(source.text, citation.quote);
-    if (!located) continue;
-    const list = quotes.get(key) ?? [];
-    if (list.length < 2 && !list.some((q) => q.text === located.text)) {
-      list.push({ ...located, relevance: typeof citation.relevance === "string" ? citation.relevance : undefined });
-    }
-    quotes.set(key, list);
-  }
-
-  const status = ["answered", "partial", "insufficient"].includes(composed?.status) ? composed.status : "insufficient";
-  const related = sources.slice(0, 6).map(publicSource({}));
-  if (status === "insufficient" || quotes.size === 0) {
-    const modelNote = status === "insufficient" && typeof composed?.answer === "string" ? composed.answer.trim() : "";
-    return {
-      status: "insufficient",
-      answer: INSUFFICIENT[language] ?? INSUFFICIENT.en,
-      detail: modelNote,
-      sources: [],
-      related,
-      opinions: [],
-    };
-  }
-
-  const order = [];
-  const number = (key) => {
-    if (!byKey.has(key)) return undefined;
-    let n = order.indexOf(key);
-    if (n < 0) {
-      order.push(key);
-      n = order.length - 1;
-    }
-    return n + 1;
-  };
-  const answer = String(composed.answer ?? "")
-    .replace(MARKER, (_, inner) => {
-      const nums = inner
-        .split(/[,،;]/)
-        .map((part) => part.trim().toUpperCase())
-        .map((part) => (part.startsWith("S") ? part : `S${part}`))
-        .map(number)
-        .filter((n) => n !== undefined);
-      return [...new Set(nums)].map((n) => `[${n}]`).join("");
-    })
-    .trim();
-  for (const key of quotes.keys()) number(key);
-
-  const numbered = order.map((key, i) => publicSource(quotes)(byKey.get(key), i));
-  const keyToNumber = new Map(order.map((key, i) => [key, i + 1]));
-  const opinions = (Array.isArray(composed.opinions) ? composed.opinions : [])
-    .map((o) => ({
-      holder: String(o?.holder ?? "").trim(),
-      view: String(o?.view ?? "").trim(),
-      sources: (Array.isArray(o?.sourceIds) ? o.sourceIds : [])
-        .map((id) => keyToNumber.get(String(id).trim().toUpperCase()))
-        .filter((n) => n !== undefined),
-    }))
-    .filter((o) => o.holder && o.view && o.sources.length);
-
-  return {
-    status: status === "partial" ? "partial" : "answered",
-    answer,
-    summary: typeof composed.summary === "string" ? composed.summary.trim() : "",
-    notes: typeof composed.notes === "string" ? composed.notes.trim() : "",
-    sources: numbered,
-    related: [],
-    opinions,
-  };
-};
+const QUOTE_MARKER = /\[\[\s*(Q\d+)\s*\]\]/gi;
 
 const publicSource = (quotes) => (source, index) => ({
   n: index + 1,
@@ -237,24 +236,99 @@ const publicSource = (quotes) => (source, index) => ({
   excerpt: (source.snippet || source.text || "").slice(0, 600),
 });
 
+/** Verifies citations, renders inline quotes, renumbers markers to [1], [2] … */
+export const finalize = ({ composed, sources, language }) => {
+  const byKey = new Map(sources.map((s) => [s.key, s]));
+  const quotes = new Map(); // source key → verified quotes
+  const inline = new Map(); // Q id → { key, text }
+  for (const [i, citation] of (Array.isArray(composed?.citations) ? composed.citations : []).entries()) {
+    const key = String(citation?.sourceId ?? "").trim().toUpperCase();
+    const source = byKey.get(key);
+    if (!source) continue;
+    const located = locateQuote(source.text, citation.quote);
+    if (!located) continue;
+    const qid = String(citation.id ?? `Q${i + 1}`).trim().toUpperCase();
+    inline.set(qid, { key, text: located.text });
+    const list = quotes.get(key) ?? [];
+    if (list.length < 3 && !list.some((q) => q.text === located.text)) {
+      list.push({ ...located, relevance: typeof citation.relevance === "string" ? citation.relevance : undefined });
+    }
+    quotes.set(key, list);
+  }
+
+  const status = ["answered", "partial", "insufficient"].includes(composed?.status) ? composed.status : "insufficient";
+  const related = sources.slice(0, 6).map(publicSource({}));
+  if (status === "insufficient" || quotes.size === 0) {
+    const modelNote = status === "insufficient" && typeof composed?.answer === "string" ? composed.answer.replace(QUOTE_MARKER, "").trim() : "";
+    return { status: "insufficient", answer: INSUFFICIENT[language] ?? INSUFFICIENT.en, detail: modelNote, sources: [], related, opinions: [] };
+  }
+
+  const order = [];
+  const number = (key) => {
+    if (!byKey.has(key)) return undefined;
+    let n = order.indexOf(key);
+    if (n < 0) {
+      order.push(key);
+      n = order.length - 1;
+    }
+    return n + 1;
+  };
+  const answer = String(composed.answer ?? "")
+    // Verified quotes become Arabic block quotes with their source number;
+    // unverifiable ones disappear.
+    .replace(QUOTE_MARKER, (_, qid) => {
+      const q = inline.get(qid.toUpperCase());
+      if (!q) return "";
+      return `\n> ${q.text.replace(/\s*\n\s*/g, " ")} [S${q.key.slice(1)}]\n`;
+    })
+    .replace(MARKER, (_, inner) => {
+      const nums = inner
+        .split(/[,،;]/)
+        .map((part) => part.trim().toUpperCase())
+        .map((part) => (part.startsWith("S") ? part : `S${part}`))
+        .map(number)
+        .filter((n) => n !== undefined);
+      return [...new Set(nums)].map((n) => `[${n}]`).join("");
+    })
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  for (const key of quotes.keys()) number(key);
+
+  const numbered = order.map((key, i) => publicSource(quotes)(byKey.get(key), i));
+  const keyToNumber = new Map(order.map((key, i) => [key, i + 1]));
+  const opinions = (Array.isArray(composed.opinions) ? composed.opinions : [])
+    .map((o) => ({
+      holder: String(o?.holder ?? "").trim(),
+      view: String(o?.view ?? "").trim(),
+      sources: (Array.isArray(o?.sourceIds) ? o.sourceIds : []).map((id) => keyToNumber.get(String(id).trim().toUpperCase())).filter((n) => n !== undefined),
+    }))
+    .filter((o) => o.holder && o.view && o.sources.length);
+
+  return {
+    status: status === "partial" ? "partial" : "answered",
+    answer,
+    summary: typeof composed.summary === "string" ? composed.summary.trim() : "",
+    notes: typeof composed.notes === "string" ? composed.notes.trim() : "",
+    sources: numbered,
+    related: [],
+    opinions,
+  };
+};
+
+const error = (code, message) => Object.assign(new Error(message), { code });
+
 export const createPipeline = ({ gemini, turath, catalog }) => {
   const ask = async (input, onEvent = () => {}) => {
     const started = Date.now();
     const question = String(input?.question ?? "").trim();
-    if (!question) {
-      const error = new Error("question must not be empty");
-      error.code = "INVALID_ARGUMENT";
-      throw error;
-    }
-    if (question.length > 2000) {
-      const error = new Error("question is too long (max 2000 characters)");
-      error.code = "INVALID_ARGUMENT";
-      throw error;
-    }
+    if (!question) throw error("INVALID_ARGUMENT", "question must not be empty");
+    if (question.length > 2000) throw error("INVALID_ARGUMENT", "question is too long (max 2000 characters)");
     const scope = input.scope ?? {};
+    const nususScope = scopeToNusus(scope);
     const history = Array.isArray(input.history) ? input.history.slice(-3) : [];
-    const maxSources = clampInt(input.maxSources, 3, 16, 10);
+    const maxSources = clampInt(input.maxSources, 3, LIMITS.maxSelected, 12);
 
+    // 1. plan
     onEvent("stage", { stage: "planning" });
     const plan = await gemini.generateJson({
       system: PLAN_SYSTEM,
@@ -262,48 +336,94 @@ export const createPipeline = ({ gemini, turath, catalog }) => {
       schema: PLAN_SCHEMA,
       temperature: 0.1,
     });
-    const queries = cleanQueries(plan.data.queries);
+    const p = plan.data ?? {};
+    const queries = cleanQueries(p.queries);
     const requested = LANG_CODES.has(input.language) ? input.language : undefined;
-    const detected = LANG_CODES.has(plan.data.detectedLanguage) ? plan.data.detectedLanguage : undefined;
+    const detected = LANG_CODES.has(p.detectedLanguage) ? p.detectedLanguage : undefined;
     const language = requested ?? detected ?? (LANG_CODES.has(input.fallbackLanguage) ? input.fallbackLanguage : "en");
-    onEvent("plan", { queries, questionType: plan.data.questionType, language });
+    const madhhabs = (Array.isArray(p.madhhabs) ? p.madhhabs : []).filter((m) => MADHHAB_CATEGORY[m]);
+    const requestedBookIds = resolveBooks(cleanTitles(p.requestedBooks, LIMITS.requestedBooks), catalog, 2);
+    const referenceBookIds = resolveBooks(cleanTitles(p.referenceBooks, 6), catalog, 1).filter((id) => !requestedBookIds.includes(id));
+    const standalone = typeof p.standaloneQuestion === "string" && p.standaloneQuestion.trim() ? p.standaloneQuestion.trim() : question;
+    onEvent("plan", { queries, language, books: [...requestedBookIds, ...referenceBookIds].map((id) => catalog.book(id)?.title).filter(Boolean) });
 
-    if (!queries.length) {
-      return { ...finalize({ composed: { status: "insufficient" }, sources: [], language }), queries, language, model: plan.model, elapsedMs: Date.now() - started };
-    }
+    const done = (result, extra = {}) => ({ ...result, queries, language, model: plan.model, elapsedMs: Date.now() - started, ...extra });
+    if (!queries.length) return done(finalize({ composed: { status: "insufficient" }, sources: [], language }));
 
+    // 2. search
     onEvent("stage", { stage: "searching" });
-    const { sources, totalMatches } = await gatherSources({
+    const first = await collectCandidates({
       turath,
       catalog,
-      queries,
-      scope,
-      questionType: plan.data.questionType,
-      maxSources,
+      plan: searchPlan({ queries, scope: nususScope, madhhabs, requestedBookIds, referenceBookIds, userScoped: Boolean(nususScope) }),
     });
-    onEvent("sources", { count: sources.length, totalMatches });
-    if (!sources.length) {
-      return {
-        ...finalize({ composed: { status: "insufficient" }, sources, language }),
-        queries,
-        language,
-        totalMatches,
-        model: plan.model,
-        elapsedMs: Date.now() - started,
-      };
-    }
+    if (first.failed) throw error("TURATH_UNAVAILABLE", "The Turath library could not be reached");
+    let candidates = first.candidates.map((c, i) => ({ ...c, key: `C${i + 1}` }));
+    let totalMatches = first.totalMatches;
+    onEvent("sources", { count: candidates.length, totalMatches });
+    if (!candidates.length) return done(finalize({ composed: { status: "insufficient" }, sources: [], language }), { totalMatches });
 
+    // 3. read: rank, optionally one follow-up round
+    onEvent("stage", { stage: "reading" });
+    const rank = async (pool, usedQueries) =>
+      (
+        await gemini.generateJson({
+          system: RERANK_SYSTEM,
+          prompt: rerankPrompt({ question: standalone, candidates: pool, queries: usedQueries }),
+          schema: RERANK_SCHEMA,
+          temperature: 0.1,
+        })
+      ).data ?? {};
+    let usedQueries = [...queries];
+    let ranking = await rank(candidates, usedQueries);
+    const followQueries = cleanQueries(ranking.followUpQueries, 5).filter((q) => !usedQueries.includes(q));
+    const followBooks = resolveBooks(cleanTitles(ranking.followUpBooks, 4), catalog, 1);
+    if (ranking.coverage !== "full" && (followQueries.length || followBooks.length)) {
+      onEvent("stage", { stage: "searching" });
+      const selectedFirst = new Set((ranking.selected ?? []).map((k) => String(k).toUpperCase()));
+      const keep = candidates.filter((c) => selectedFirst.has(c.key));
+      const extra = await collectCandidates({
+        turath,
+        catalog,
+        existing: keep,
+        plan: searchPlan({
+          queries: followQueries.length ? followQueries : queries.slice(0, 3),
+          scope: nususScope,
+          requestedBookIds: followBooks,
+          madhhabs: [],
+          userScoped: Boolean(nususScope),
+        }),
+      });
+      totalMatches += extra.totalMatches;
+      if (extra.candidates.length) {
+        usedQueries = [...usedQueries, ...followQueries];
+        candidates = [...keep, ...extra.candidates].map((c, i) => ({ ...c, key: `C${i + 1}` }));
+        onEvent("sources", { count: candidates.length, totalMatches });
+        onEvent("stage", { stage: "reading" });
+        ranking = await rank(candidates, usedQueries);
+      }
+    }
+    const byKey = new Map(candidates.map((c) => [c.key, c]));
+    let selected = [...new Set((ranking.selected ?? []).map((k) => String(k).trim().toUpperCase()))].map((k) => byKey.get(k)).filter(Boolean);
+    if (!selected.length && ranking.coverage !== "none") selected = candidates.slice(0, Math.min(6, candidates.length));
+    selected = selected.slice(0, maxSources);
+    if (!selected.length) {
+      return done(finalize({ composed: { status: "insufficient" }, sources: candidates.slice(0, 6).map((c, i) => ({ ...c, key: `S${i + 1}` })), language }), { totalMatches });
+    }
+    const sources = selected.map((c, i) => ({ ...c, key: `S${i + 1}` }));
+
+    // 4. compose
     onEvent("stage", { stage: "composing" });
     const composed = await gemini.generateJson({
       system: composeSystem(LANGUAGES[language]),
-      prompt: composePrompt({ question: plan.data.standaloneQuestion || question, history, sources, languageName: LANGUAGES[language] }),
+      prompt: composePrompt({ question: standalone, history, sources, languageName: LANGUAGES[language], missing: ranking.coverage === "full" ? "" : ranking.missing }),
       schema: COMPOSE_SCHEMA,
       temperature: 0.2,
     });
 
+    // 5. verify
     onEvent("stage", { stage: "verifying" });
-    const result = finalize({ composed: composed.data, sources, language });
-    return { ...result, queries, language, totalMatches, model: composed.model, elapsedMs: Date.now() - started };
+    return done(finalize({ composed: composed.data, sources, language }), { totalMatches, model: composed.model });
   };
   return { ask };
 };

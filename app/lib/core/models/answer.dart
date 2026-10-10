@@ -212,7 +212,7 @@ class AnswerResult {
 }
 
 /// Progress events while an answer is being prepared.
-enum AskStage { planning, searching, composing, verifying }
+enum AskStage { planning, searching, reading, composing, verifying }
 
 sealed class AskEvent {
   const AskEvent();

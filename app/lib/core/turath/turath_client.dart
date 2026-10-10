@@ -9,7 +9,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../models/library.dart';
-import '../pipeline/answer_pipeline.dart' show PassageRetriever;
+import '../pipeline/answer_pipeline.dart' show PassageSearch, SearchHits;
 import 'excerpt.dart';
 
 class TurathException implements Exception {
@@ -67,7 +67,7 @@ class RetrievedPassages {
   final int totalMatches;
 }
 
-class TurathClient implements PassageRetriever {
+class TurathClient implements PassageSearch {
   TurathClient({http.Client? client, this.baseUrl = 'https://api.turath.io/', this.timeout = const Duration(seconds: 15)})
       : _http = client ?? http.Client();
 
@@ -238,9 +238,14 @@ class TurathClient implements PassageRetriever {
   Future<SearchResultPage> search(String query, {int page = 1, String? bookId, String? authorId, String? categoryId}) async =>
       (await _searchRaw(query, page: page, bookId: bookId, authorId: authorId, categoryId: categoryId)).$1;
 
+  @override
+  Future<SearchHits> searchHits(String query, {String? bookId, String? authorId, String? categoryId}) async {
+    final (page, snips) = await _searchRaw(query, bookId: bookId, authorId: authorId, categoryId: categoryId);
+    return SearchHits(page.items, snips, page.totalMatches);
+  }
+
   /// Like Nusus `retrieve()`: top hits, each as the full page text bounded
   /// to a match-centred window.
-  @override
   Future<RetrievedPassages> retrieve(String query,
       {int maxPassages = 4, int maxChars = 1600, String? bookId, String? authorId, String? categoryId}) async {
     final (first, snips) = await _searchRaw(query, bookId: bookId, authorId: authorId, categoryId: categoryId);

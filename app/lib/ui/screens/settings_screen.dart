@@ -64,7 +64,7 @@ class SettingsScreen extends StatelessWidget {
                   Expanded(child: Text(l.maxSources, style: TextStyle(fontFamily: uiFont, fontWeight: FontWeight.w700, color: a.text))),
                   GradientText('${s.maxSources}', style: const TextStyle(fontFamily: uiFont, fontSize: 20, fontWeight: FontWeight.w800)),
                 ]),
-                Slider(value: s.maxSources.toDouble(), min: 4, max: 16, divisions: 12, onChanged: (v) => s.setMaxSources(v.round())),
+                Slider(value: s.maxSources.clamp(4, 14).toDouble(), min: 4, max: 14, divisions: 10, onChanged: (v) => s.setMaxSources(v.round())),
                 Row(children: [
                   const IconTile(icon: Icons.text_fields_rounded, color: AuraHues.violet),
                   const SizedBox(width: 12),

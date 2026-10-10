@@ -29,7 +29,7 @@ class SettingsController extends ChangeNotifier {
   String accessToken = '';
   String geminiKey = '';
   String modelOverride = '';
-  int maxSources = 10;
+  int maxSources = 12;
   double arabicScale = 1.0;
 
   ManabiBackend? _backend;
@@ -49,7 +49,7 @@ class SettingsController extends ChangeNotifier {
     c.mode = savedMode ?? (c.serverUrl.isEmpty && c.directAvailable ? ConnectionMode.direct : ConnectionMode.server);
     if (!c.directAvailable) c.mode = ConnectionMode.server;
     c.modelOverride = prefs.getString('modelOverride') ?? '';
-    c.maxSources = prefs.getInt('maxSources') ?? 10;
+    c.maxSources = prefs.getInt('maxSources') ?? 12;
     c.arabicScale = prefs.getDouble('arabicScale') ?? 1.0;
     try {
       c.geminiKey = await secure.read(key: 'geminiKey') ?? '';

@@ -37,6 +37,9 @@ jobs:
         run: |
           node scripts/export-catalog.mjs /tmp/catalog.json
           cmp /tmp/catalog.json ../app/assets/catalog/catalog.json
+      - name: Dart prompts match the server prompts
+        run: python3 ../tool/sync_prompts.py --check
+        working-directory: .
       - name: Docker image builds
         run: docker build -t manabi-server:ci .
 

@@ -61,10 +61,11 @@ test("search and catalog endpoints", async () => {
 test("ask streams stages then a verified result", async () => {
   gemini.prompts.length = 0;
   const queue = [
-    { standaloneQuestion: "q", detectedLanguage: "ar", questionType: "hadith", isIslamicStudies: true, queries: ["النيات"] },
+    { standaloneQuestion: "q", detectedLanguage: "ar", questionType: "hadith", isIslamicStudies: true, queries: ["النيات"], madhhabs: [], requestedBooks: [], referenceBooks: [] },
+    (request) => ({ selected: [/\[(C\d+)\] Book: [^\n]*Page: 5\b/.exec(request.prompt)[1]], coverage: "full", followUpQueries: [], followUpBooks: [] }),
     (request) => {
       const key = /\[(S\d+)\] Book: [^\n]*Page: 5\b/.exec(request.prompt)[1];
-      return { status: "answered", answer: `نص [${key}]`, citations: [{ sourceId: key, quote: "إنما الأعمال بالنيات وإنما لكل امرئ ما نوى" }] };
+      return { status: "answered", answer: `نص [${key}]`, citations: [{ id: "Q1", sourceId: key, quote: "إنما الأعمال بالنيات وإنما لكل امرئ ما نوى" }] };
     },
   ];
   gemini.generateJson = async (request) => {
@@ -79,7 +80,7 @@ test("ask streams stages then a verified result", async () => {
   assert.equal(res.headers.get("content-type"), "text/event-stream; charset=utf-8");
   const text = await res.text();
   const events = [...text.matchAll(/event: (\w+)\ndata: (.*)\n/g)].map((m) => [m[1], JSON.parse(m[2])]);
-  assert.deepEqual(events.filter(([e]) => e === "stage").map(([, d]) => d.stage), ["planning", "searching", "composing", "verifying"]);
+  assert.deepEqual(events.filter(([e]) => e === "stage").map(([, d]) => d.stage), ["planning", "searching", "reading", "composing", "verifying"]);
   const [, result] = events.find(([e]) => e === "result");
   assert.equal(result.status, "answered");
   assert.equal(result.answer, "نص [1]");

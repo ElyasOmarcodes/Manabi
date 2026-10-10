@@ -72,9 +72,12 @@ Map<String, dynamic> plan({String type = 'hadith', String lang = 'ps'}) => {
       'questionType': type,
       'isIslamicStudies': true,
       'queries': ['إنما الأعمال بالنيات', 'النية'],
+      'madhhabs': <String>[],
+      'requestedBooks': <String>[],
+      'referenceBooks': <String>[],
     };
 
-String keyForPage(String prompt, int page) => RegExp(r'\[(S\d+)\] Book: [^\n]*Page: ' '$page' r'\b').firstMatch(prompt)!.group(1)!;
+String keyFor(String prompt, int page, String prefix) => RegExp('\\[($prefix\\d+)\\] Book: [^\\n]*Page: $page\\b').firstMatch(prompt)!.group(1)!;
 
 void main() {
   late CatalogService catalog;
@@ -126,17 +129,21 @@ void main() {
   });
 
   group('pipeline', () {
-    test('grounded answer: metadata from Turath, quotes verified, markers renumbered', () async {
+    Map<String, dynamic> Function(String) rankPage(int page) =>
+        (prompt) => {'selected': [keyFor(prompt, page, 'C')], 'coverage': 'full', 'followUpQueries': [], 'followUpBooks': []};
+
+    test('grounded answer: metadata from Turath, inline verified quotes, markers renumbered', () async {
       final model = ScriptedModel([
         plan(),
+        rankPage(5),
         (String prompt) {
-          final key = keyForPage(prompt, 5);
+          final key = keyFor(prompt, 5, 'S');
           return {
             'status': 'answered',
-            'answer': 'دا حدیث [$key] کې راغلی. [S77]',
+            'answer': 'دا حدیث [$key] کې راغلی.\n[[Q1]]\n[[Q2]]\n[S77]',
             'citations': [
-              {'sourceId': key, 'quote': 'إنما الأعمال بالنيات وإنما لكل امرئ ما نوى'},
-              {'sourceId': key, 'quote': 'هذا كلام مختلق لا يوجد في هذا الكتاب'},
+              {'id': 'Q1', 'sourceId': key, 'quote': 'إنما الأعمال بالنيات وإنما لكل امرئ ما نوى'},
+              {'id': 'Q2', 'sourceId': key, 'quote': 'هذا كلام مختلق لا يوجد في هذا الكتاب أبدا'},
             ],
             'opinions': [
               {'holder': 'x', 'view': 'y', 'sourceIds': [key]}
@@ -146,12 +153,17 @@ void main() {
       ]);
       final pipeline = AnswerPipeline(model: model, turath: TurathClient(client: turathMock()), catalog: catalog);
       final events = await pipeline.ask(const AskRequest(question: 'د نیت حدیث', language: 'ps')).toList();
-      final stages = events.whereType<AskStageEvent>().map((e) => e.stage).toList();
+      final stages = events.whereType<AskStageEvent>().map((e) => e.stage).toSet().toList();
       expect(stages, AskStage.values);
       final r = (events.last as AskResultEvent).result;
       expect(r.status, AnswerStatus.answered);
-      expect(r.answer, 'دا حدیث [1] کې راغلی.');
-      expect(r.sources, hasLength(1));
+      final lines = r.answer.split('\n');
+      expect(lines.first, 'دا حدیث [1] کې راغلی.');
+      final quotes = lines.where((l) => l.startsWith('> ')).toList();
+      expect(quotes, hasLength(1));
+      expect(quotes.single.endsWith(' [1]'), isTrue);
+      expect((page5['text'] as String).contains(quotes.single.substring(2, quotes.single.length - 4)), isTrue);
+      expect(r.answer.contains('[['), isFalse);
       final s = r.sources.single;
       expect(s.bookId, '147927');
       expect(s.authorName, 'النووي');
@@ -159,18 +171,18 @@ void main() {
       expect(s.printedPage, 5);
       expect(s.url, 'https://app.turath.io/book/147927?page=5');
       expect(s.quotes, hasLength(1));
-      expect((page5['text'] as String).contains(s.quotes.single.text), isTrue);
       expect(r.opinions.single.sources, [1]);
     });
 
     test('unverifiable answer becomes insufficient', () async {
       final model = ScriptedModel([
         plan(lang: 'en'),
+        rankPage(5),
         {
           'status': 'answered',
-          'answer': 'Made up [S1]',
+          'answer': 'Made up [S1]\n[[Q1]]',
           'citations': [
-            {'sourceId': 'S1', 'quote': 'قال رسول الله من غش فليس منا والمكر والخداع في النار'}
+            {'id': 'Q1', 'sourceId': 'S1', 'quote': 'قال رسول الله من غش فليس منا والمكر والخداع في النار'}
           ],
         },
       ]);
@@ -182,7 +194,7 @@ void main() {
       expect(r.related, isNotEmpty);
     });
 
-    test('no matches: compose step never runs', () async {
+    test('no matches: reading and compose never run', () async {
       final model = ScriptedModel([plan(lang: 'fa')]);
       final pipeline = AnswerPipeline(model: model, turath: TurathClient(client: turathMock(empty: true)), catalog: catalog);
       final r = ((await pipeline.ask(const AskRequest(question: 'q', language: 'fa')).toList()).last as AskResultEvent).result;
@@ -191,22 +203,57 @@ void main() {
       expect(model.prompts, hasLength(1));
     });
 
+    test('follow-up round searches new queries', () async {
+      final log = <Uri>[];
+      final model = ScriptedModel([
+        {...plan(), 'queries': ['الإسلام']},
+        {'selected': [], 'coverage': 'partial', 'missing': 'x', 'followUpQueries': ['النيات'], 'followUpBooks': []},
+        rankPage(5),
+        (String prompt) {
+          final key = keyFor(prompt, 5, 'S');
+          return {
+            'status': 'answered',
+            'answer': 'x [$key]\n[[Q1]]',
+            'citations': [
+              {'id': 'Q1', 'sourceId': key, 'quote': 'إنما الأعمال بالنيات وإنما لكل امرئ ما نوى'}
+            ]
+          };
+        },
+      ]);
+      final pipeline = AnswerPipeline(model: model, turath: TurathClient(client: turathMock(log: log)), catalog: catalog);
+      final r = ((await pipeline.ask(const AskRequest(question: 'q', language: 'ar')).toList()).last as AskResultEvent).result;
+      expect(log.any((u) => u.path == '/search' && u.queryParameters['q'] == 'النيات'), isTrue);
+      expect(r.status, AnswerStatus.answered);
+      expect(model.prompts, hasLength(4));
+    });
+
     test('Turath outage is reported', () async {
       final model = ScriptedModel([plan()]);
       final pipeline = AnswerPipeline(model: model, turath: TurathClient(client: turathMock(fail: true)), catalog: catalog);
       expect(pipeline.ask(const AskRequest(question: 'q')).toList(), throwsA(isA<PipelineException>().having((e) => e.code, 'code', 'TURATH_UNAVAILABLE')));
     });
 
-    test('book scope is applied to every search', () async {
-      final queries = <Uri>[];
-      final client = turathMock(log: queries);
-      final model = ScriptedModel([plan(type: 'fiqh'), {'status': 'insufficient', 'answer': '', 'citations': []}]);
-      final pipeline = AnswerPipeline(model: model, turath: TurathClient(client: client), catalog: catalog);
+    test('a user scope is strict: every search stays inside the book', () async {
+      final log = <Uri>[];
+      final model = ScriptedModel([
+        {...plan(type: 'fiqh'), 'madhhabs': ['hanafi'], 'referenceBooks': ['رد المحتار']},
+        {'selected': [], 'coverage': 'none', 'followUpQueries': [], 'followUpBooks': []},
+      ]);
+      final pipeline = AnswerPipeline(model: model, turath: TurathClient(client: turathMock(log: log)), catalog: catalog);
       await pipeline.ask(const AskRequest(question: 'q', scope: SearchScope(bookId: '12836'))).toList();
-      final searches = queries.where((u) => u.path == '/search');
+      final searches = log.where((u) => u.path == '/search');
       expect(searches, isNotEmpty);
       expect(searches.every((u) => u.queryParameters['book'] == '12836'), isTrue);
       expect(model.prompts.first, contains('الأربعون النووية'));
+    });
+
+    test('search plan and book resolution match the server', () {
+      final p = searchPlan(queries: ['a', 'b', 'c', 'd'], madhhabs: ['hanafi', 'shafii'], requestedBookIds: ['1'], referenceBookIds: ['2', '3']);
+      expect(p.any((s) => s.kind == 'requested' && s.bookId == '1'), isTrue);
+      expect(p.where((s) => s.kind == 'madhhab').map((s) => s.categoryId).toSet(), {'14', '16'});
+      expect(resolveBooks(['رد المحتار'], catalog), ['21613']);
+      expect(resolveBooks(['الفقه الاسلامي وأدلته'], catalog), ['384']);
+      expect(resolveBooks(['الموسوعة الفقهية'], catalog), ['38056']);
     });
   });
 

@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { catalog } from "../src/catalog.mjs";
-import { createPipeline, INSUFFICIENT } from "../src/pipeline.mjs";
-import { fixtures, fixtureTurath, scriptedGemini } from "./helpers.mjs";
+import { createPipeline, INSUFFICIENT, resolveBooks, searchPlan } from "../src/pipeline.mjs";
 import { normalizeArabic } from "../src/verify.mjs";
+import { fixtures, fixtureTurath, scriptedGemini } from "./helpers.mjs";
 
 const plan = (over = {}) => ({
   standaloneQuestion: "د نیت حدیث څه دی؟",
@@ -11,25 +11,30 @@ const plan = (over = {}) => ({
   questionType: "hadith",
   isIslamicStudies: true,
   queries: ["إنما الأعمال بالنيات", "النية"],
+  madhhabs: [],
+  requestedBooks: [],
+  referenceBooks: [],
   ...over,
 });
 
-const findKey = (request, page) => {
-  const m = new RegExp(`\\[(S\\d+)\\] Book: [^\\n]*Page: ${page}\\b`).exec(request.prompt);
-  assert.ok(m, `source for page ${page} not in prompt`);
+const keyFor = (prompt, page, prefix) => {
+  const m = new RegExp(`\\[(${prefix}\\d+)\\] Book: [^\\n]*Page: ${page}\\b`).exec(prompt);
+  assert.ok(m, `candidate for page ${page} not in prompt`);
   return m[1];
 };
 
-test("answer is grounded: metadata comes from Turath and quotes from the real page", async () => {
-  const gemini = scriptedGemini(plan(), (request) => {
-    const key = findKey(request, 5);
+const selectPage = (page) => (request) => ({ selected: [keyFor(request.prompt, page, "C")], coverage: "full", followUpQueries: [], followUpBooks: [] });
+
+test("grounded answer: metadata from Turath, quotes inline and verified", async () => {
+  const gemini = scriptedGemini(plan(), selectPage(5), (request) => {
+    const key = keyFor(request.prompt, 5, "S");
     return {
       status: "answered",
-      answer: `دا حدیث په الأربعون النووية کې راغلی دی [${key}]. [S99]`,
+      answer: `دا حدیث په الأربعون النووية کې راغلی دی [${key}].\n[[Q1]]\n[[Q2]]\nپای [S99].`,
       summary: "د نیت حدیث",
       citations: [
-        { sourceId: key, quote: "إنما الأعمال بالنيات وإنما لكل امرئ ما نوى", relevance: "اصلي متن" },
-        { sourceId: key, quote: "هذا نص مختلق لا يوجد في الكتاب أصلا", relevance: "x" },
+        { id: "Q1", sourceId: key, quote: "إنما الأعمال بالنيات وإنما لكل امرئ ما نوى", relevance: "اصلي متن" },
+        { id: "Q2", sourceId: key, quote: "هذا نص مختلق لا يوجد في الكتاب أصلا ولا في غيره", relevance: "x" },
       ],
       opinions: [],
     };
@@ -40,74 +45,95 @@ test("answer is grounded: metadata comes from Turath and quotes from the real pa
 
   assert.equal(result.status, "answered");
   assert.equal(result.language, "ps");
-  assert.match(result.answer, /\[1\]/);
-  assert.doesNotMatch(result.answer, /S99|\[S/);
+  assert.match(result.answer, /^دا حدیث .*\[1\]\./);
+  assert.doesNotMatch(result.answer, /S99|\[S|\[\[/);
+  const quoteLines = result.answer.split("\n").filter((l) => l.startsWith("> "));
+  assert.equal(quoteLines.length, 1, "verified quote inline, fabricated one removed");
+  assert.match(quoteLines[0], / \[1\]$/);
+  assert.ok(fixtures.page5.text.includes(quoteLines[0].slice(2).replace(/ \[1\]$/, "")), "inline quote is a verbatim slice of the page");
   assert.equal(result.sources.length, 1);
   const [source] = result.sources;
-  assert.equal(source.n, 1);
-  assert.equal(source.bookId, "147927");
   assert.equal(source.bookTitle, "الأربعون النووية مع زيادات ابن رجب");
   assert.equal(source.authorName, "النووي");
   assert.equal(source.volume, "1");
   assert.equal(source.printedPage, 5);
-  assert.equal(source.internalPage, 5);
   assert.equal(source.url, "https://app.turath.io/book/147927?page=5");
-  assert.equal(source.shamelaUrl, "https://shamela.ws/book/147927/5");
-  assert.equal(source.quotes.length, 1, "fabricated quote must be dropped");
+  assert.equal(source.quotes.length, 1);
   assert.equal(normalizeArabic(source.quotes[0].text), "انما الاعمال بالنيات وانما لكل امري ما نوي");
-  assert.ok(fixtures.page5.text.includes(source.quotes[0].text));
   assert.deepEqual(
-    events.filter(([e]) => e === "stage").map(([, d]) => d.stage),
-    ["planning", "searching", "composing", "verifying"],
+    [...new Set(events.filter(([e]) => e === "stage").map(([, d]) => d.stage))],
+    ["planning", "searching", "reading", "composing", "verifying"],
   );
 });
 
 test("an answer whose quotes cannot be verified is downgraded to insufficient", async () => {
-  const gemini = scriptedGemini(plan({ detectedLanguage: "en" }), {
+  const gemini = scriptedGemini(plan({ detectedLanguage: "en" }), selectPage(5), {
     status: "answered",
-    answer: "Invented answer [S1].",
-    citations: [{ sourceId: "S1", quote: "قال رسول الله صلى الله عليه وسلم من غش فليس منا والمكر والخداع في النار" }],
+    answer: "Invented answer [S1].\n[[Q1]]",
+    citations: [{ id: "Q1", sourceId: "S1", quote: "قال رسول الله صلى الله عليه وسلم من غش فليس منا والمكر والخداع في النار" }],
   });
-  const pipeline = createPipeline({ gemini, turath: fixtureTurath(), catalog });
-  const result = await pipeline.ask({ question: "What is the hadith of intention?", language: "auto" });
+  const result = await createPipeline({ gemini, turath: fixtureTurath(), catalog }).ask({ question: "What is the hadith of intention?", language: "auto" });
   assert.equal(result.status, "insufficient");
   assert.equal(result.answer, INSUFFICIENT.en);
   assert.equal(result.sources.length, 0);
-  assert.ok(result.related.length > 0, "searched sources are still listed for inspection");
+  assert.ok(result.related.length > 0);
 });
 
-test("no Turath matches means no Gemini answer at all", async () => {
+test("no Turath matches means no reading or composing", async () => {
   const gemini = scriptedGemini(plan({ detectedLanguage: "fa" }));
-  const pipeline = createPipeline({ gemini, turath: fixtureTurath({ emptySearch: true }), catalog });
-  const result = await pipeline.ask({ question: "سوال", language: "fa" });
+  const result = await createPipeline({ gemini, turath: fixtureTurath({ emptySearch: true }), catalog }).ask({ question: "سوال", language: "fa" });
   assert.equal(result.status, "insufficient");
   assert.equal(result.answer, INSUFFICIENT.fa);
-  assert.equal(gemini.prompts.length, 1, "compose step must not run without sources");
+  assert.equal(gemini.prompts.length, 1);
 });
 
-test("fiqh questions also search the four madhhab categories", async () => {
-  const scopes = [];
+test("reading step can trigger one follow-up search round", async () => {
+  const searches = [];
   const turath = fixtureTurath();
-  const spy = { ...turath, retrieve: (q, o) => (scopes.push(o.scope), turath.retrieve(q, o)) };
-  const gemini = scriptedGemini(plan({ questionType: "fiqh" }), { status: "insufficient", answer: "", citations: [] });
-  await createPipeline({ gemini, turath: spy, catalog }).ask({ question: "q", language: "ar" });
-  const cats = scopes.filter((s) => s?.categoryIds).map((s) => s.categoryIds[0]);
-  assert.deepEqual([...new Set(cats)].sort(), ["14", "15", "16", "17"]);
+  const spy = { ...turath, search: (q, o) => (searches.push(q), turath.search(q, o)) };
+  const compose = (request) => {
+    const key = keyFor(request.prompt, 5, "S");
+    return { status: "answered", answer: `x [${key}]\n[[Q1]]`, citations: [{ id: "Q1", sourceId: key, quote: "إنما الأعمال بالنيات وإنما لكل امرئ ما نوى" }] };
+  };
+  const gemini = scriptedGemini(
+    plan({ queries: ["الإسلام"] }),
+    { selected: [], coverage: "partial", missing: "intention", followUpQueries: ["النيات"], followUpBooks: [] },
+    selectPage(5),
+    compose,
+  );
+  const result = await createPipeline({ gemini, turath: spy, catalog }).ask({ question: "q", language: "ar" });
+  assert.ok(searches.includes("النيات"), "follow-up query was searched");
+  assert.equal(result.status, "answered");
+  assert.equal(gemini.prompts.length, 4);
 });
 
-test("scope restricts the search to one book", async () => {
+test("search plan covers requested books, reference books and schools", () => {
+  const p = searchPlan({ queries: ["a", "b", "c", "d"], madhhabs: ["hanafi", "shafii"], requestedBookIds: ["1"], referenceBookIds: ["2", "3"], userScoped: false });
+  assert.ok(p.some((s) => s.kind === "requested" && s.scope.bookIds[0] === "1"));
+  assert.ok(p.some((s) => s.kind === "reference" && s.scope.bookIds[0] === "3"));
+  assert.deepEqual([...new Set(p.filter((s) => s.kind === "madhhab").map((s) => s.scope.categoryIds[0]))], ["14", "16"]);
+  const scoped = searchPlan({ queries: ["a"], scope: { bookIds: ["9"] }, madhhabs: ["hanafi"], requestedBookIds: ["1"], userScoped: true });
+  assert.ok(scoped.every((s) => s.kind === "general" && s.scope.bookIds[0] === "9"), "a user scope is strict");
+});
+
+test("book titles resolve through the offline catalog", () => {
+  const [id] = resolveBooks(["الأربعون النووية"], catalog);
+  assert.equal(id, "12836");
+  assert.deepEqual(resolveBooks(["كتاب لا وجود له إطلاقا في الفهرس"], catalog), []);
+});
+
+test("scope restricts every search", async () => {
   const scopes = [];
   const turath = fixtureTurath();
-  const spy = { ...turath, retrieve: (q, o) => (scopes.push(o.scope), turath.retrieve(q, o)) };
-  const gemini = scriptedGemini(plan({ questionType: "fiqh" }), { status: "insufficient", answer: "", citations: [] });
+  const spy = { ...turath, search: (q, o) => (scopes.push(o), turath.search(q, o)) };
+  const gemini = scriptedGemini(plan({ questionType: "fiqh", madhhabs: ["hanafi"], referenceBooks: ["رد المحتار"] }), { selected: [], coverage: "none", followUpQueries: [], followUpBooks: [] });
   await createPipeline({ gemini, turath: spy, catalog }).ask({ question: "q", scope: { bookId: "12836" } });
-  assert.ok(scopes.every((s) => s?.bookIds?.[0] === "12836"));
+  assert.ok(scopes.length > 0 && scopes.every((s) => s.bookIds?.[0] === "12836"));
   assert.match(gemini.prompts[0].prompt, /الأربعون النووية/);
 });
 
 test("Turath outage surfaces as TURATH_UNAVAILABLE", async () => {
-  const gemini = scriptedGemini(plan());
-  const pipeline = createPipeline({ gemini, turath: fixtureTurath({ fail: true }), catalog });
+  const pipeline = createPipeline({ gemini: scriptedGemini(plan()), turath: fixtureTurath({ fail: true }), catalog });
   await assert.rejects(pipeline.ask({ question: "q" }), (e) => e.code === "TURATH_UNAVAILABLE");
 });
 
