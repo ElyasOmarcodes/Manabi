@@ -30,6 +30,16 @@ export const INSUFFICIENT = {
 };
 
 export const MADHHAB_CATEGORY = { hanafi: "14", maliki: "15", shafii: "16", hanbali: "17" };
+
+const MADHHAB_NAMES = {
+  hanafi: /حنف|احناف|أحناف|hanaf/i,
+  maliki: /مالكي|مالكية|malik(?:i|ite)/i,
+  shafii: /شافع|shafi/i,
+  hanbali: /حنبل|hanbal/i,
+};
+
+/** Schools the question names explicitly (a safety net for the planner). */
+export const namedMadhhabs = (text) => Object.keys(MADHHAB_NAMES).filter((m) => MADHHAB_NAMES[m].test(text ?? ""));
 const LANG_CODES = new Set(Object.keys(LANGUAGES));
 
 export const LIMITS = {
@@ -365,7 +375,7 @@ export const createPipeline = ({ gemini, turath, catalog }) => {
     const requested = LANG_CODES.has(input.language) ? input.language : undefined;
     const detected = LANG_CODES.has(p.detectedLanguage) ? p.detectedLanguage : undefined;
     const language = requested ?? detected ?? (LANG_CODES.has(input.fallbackLanguage) ? input.fallbackLanguage : "en");
-    const madhhabs = (Array.isArray(p.madhhabs) ? p.madhhabs : []).filter((m) => MADHHAB_CATEGORY[m]);
+    const madhhabs = [...new Set([...(Array.isArray(p.madhhabs) ? p.madhhabs : []), ...namedMadhhabs(question)])].filter((m) => MADHHAB_CATEGORY[m]);
     const requestedBookIds = resolveBooks(cleanTitles(p.requestedBooks, LIMITS.requestedBooks), catalog, 2);
     const referenceBookIds = resolveBooks(cleanTitles(p.referenceBooks, 6), catalog, 1).filter((id) => !requestedBookIds.includes(id));
     const standalone = typeof p.standaloneQuestion === "string" && p.standaloneQuestion.trim() ? p.standaloneQuestion.trim() : question;
@@ -396,7 +406,6 @@ export const createPipeline = ({ gemini, turath, catalog }) => {
           prompt: rerankPrompt({ question: standalone, candidates: pool, queries: usedQueries }),
           schema: RERANK_SCHEMA,
           temperature: 0.1,
-          tier: "fast",
         })
       ).data ?? {};
     let usedQueries = [...queries];

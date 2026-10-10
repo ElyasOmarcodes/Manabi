@@ -59,7 +59,7 @@ docker build -t manabi-server server && docker run -p 8787:8787 -e GEMINI_API_KE
 
 ### Gemini quota
 
-Each answer takes 3–4 Gemini calls: planning and ranking go to the light model (Flash-Lite), writing the answer goes to the main model (Flash). Each model has its own daily quota. When one model's quota runs out, the server (and the app in direct mode) moves on to the next model automatically. The free tier allows only about 20 requests per model per day, so a public deployment needs billing enabled on the Google AI project.
+Each answer takes 3–4 Gemini calls: planning goes to the light model (Flash-Lite); ranking the passages and writing the answer go to the main model (Flash), because they decide the quality of the sources. Each model has its own daily quota. When one model's quota runs out, the server (and the app in direct mode) moves on to the next model automatically. The free tier allows only about 20 requests per model per day, so a public deployment needs billing enabled on the Google AI project.
 
 Optional env: `GEMINI_MODEL` (pins one model and turns off the fallback; default: the newest available Flash / Flash-Lite), `ALLOWED_ORIGINS`, `ASK_LIMIT`/`ASK_WINDOW_MIN` (rate limit), `TRUST_PROXY=1`, `ACCESS_TOKEN`. Any Docker/Node host works (Cloud Run, Fly.io, Render, a VPS). Then set `MANABI_SERVER_URL` in *Settings → Secrets and variables → Actions → Variables*.
 

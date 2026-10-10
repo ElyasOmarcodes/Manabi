@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { catalog } from "../src/catalog.mjs";
-import { createPipeline, INSUFFICIENT, resolveBooks, searchPlan } from "../src/pipeline.mjs";
+import { createPipeline, INSUFFICIENT, namedMadhhabs, resolveBooks, searchPlan } from "../src/pipeline.mjs";
 import { normalizeArabic } from "../src/verify.mjs";
 import { fixtures, fixtureTurath, scriptedGemini } from "./helpers.mjs";
 
@@ -153,4 +153,10 @@ test("the page after a selected source is added as its own source", async () => 
   await createPipeline({ gemini, turath: fixtureTurath(), catalog }).ask({ question: "q", language: "ar" });
   assert.match(composePrompt, /\[S1\] Book: [^\n]*Page: 5\b/);
   assert.match(composePrompt, /\[S2\] Book: [^\n]*Page: 6\b/, "continuation page 6 follows page 5");
+});
+
+test("schools named in the question are detected", () => {
+  assert.deepEqual(namedMadhhabs("د حنفي مذهب علماء څه فرمايي"), ["hanafi"]);
+  assert.deepEqual(namedMadhhabs("What do the Shafi'is and Hanbalis say?"), ["shafii", "hanbali"]);
+  assert.deepEqual(namedMadhhabs("حدیث نیت"), []);
 });

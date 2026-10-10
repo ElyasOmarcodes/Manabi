@@ -304,4 +304,10 @@ void main() {
     expect(RegExp(r'\[S1\] Book: [^\n]*Page: 5\b').hasMatch(composePromptText), isTrue);
     expect(RegExp(r'\[S2\] Book: [^\n]*Page: 6\b').hasMatch(composePromptText), isTrue);
   });
+
+  test('schools named in the question are detected', () {
+    expect(namedMadhhabs('د حنفي مذهب علماء څه فرمايي'), ['hanafi']);
+    expect(namedMadhhabs('What do the Shafi\'is and Hanbalis say?'), ['shafii', 'hanbali']);
+    expect(namedMadhhabs('حدیث نیت'), isEmpty);
+  });
 }

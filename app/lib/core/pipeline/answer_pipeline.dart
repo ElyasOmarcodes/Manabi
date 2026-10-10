@@ -20,6 +20,16 @@ const insufficientMessages = {
 
 const madhhabCategory = {'hanafi': '14', 'maliki': '15', 'shafii': '16', 'hanbali': '17'};
 
+final _madhhabNames = {
+  'hanafi': RegExp('حنف|احناف|أحناف|hanaf', caseSensitive: false),
+  'maliki': RegExp('مالكي|مالكية|malik(?:i|ite)', caseSensitive: false),
+  'shafii': RegExp('شافع|shafi', caseSensitive: false),
+  'hanbali': RegExp('حنبل|hanbal', caseSensitive: false),
+};
+
+/// Schools the question names explicitly (a safety net for the planner).
+List<String> namedMadhhabs(String text) => [for (final e in _madhhabNames.entries) if (e.value.hasMatch(text)) e.key];
+
 class Limits {
   static const generalQueries = 6;
   static const hitsPerGeneral = 8;
@@ -445,7 +455,6 @@ class AnswerPipeline {
         prompt: rerankPrompt(question: question, candidates: [for (final c in pool) c.prompt(full: false)], queries: queries),
         schema: rerankSchema,
         temperature: 0.1,
-        tier: ModelTier.fast,
       ))
           .data;
 
@@ -473,7 +482,7 @@ class AnswerPipeline {
         : languageNames.containsKey(detected)
             ? detected as String
             : (languageNames.containsKey(request.fallbackLanguage) ? request.fallbackLanguage : 'en');
-    final madhhabs = (p['madhhabs'] as List? ?? const []).whereType<String>().where(madhhabCategory.containsKey).toList();
+    final madhhabs = {...(p['madhhabs'] as List? ?? const []).whereType<String>(), ...namedMadhhabs(question)}.where(madhhabCategory.containsKey).toList();
     final requestedIds = resolveBooks(_titles(p['requestedBooks'], Limits.requestedBooks), catalog, perTitle: 2);
     final referenceIds = resolveBooks(_titles(p['referenceBooks'], 6), catalog).where((id) => !requestedIds.contains(id)).toList();
     final standalone = (p['standaloneQuestion'] as String?)?.trim().isNotEmpty == true ? (p['standaloneQuestion'] as String).trim() : question;
