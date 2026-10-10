@@ -62,7 +62,7 @@ jobs:
       - run: npm ci
       - name: End-to-end questions against api.turath.io and Gemini
         env:
-          GEMINI_API_KYA: ${{ secrets.GEMINI_API_KYA }}
+          GEMINI_API_KYA: ${{ secrets.GEMINI_API_KEY || secrets.GEMINI_API_KYA }}
         run: |
           if [ -z "$GEMINI_API_KYA" ]; then
             echo "::warning title=GEMINI_API_KYA missing::The Actions secret GEMINI_API_KYA is not visible to this workflow (Settings → Secrets and variables → Actions → Repository secrets). Live tests skipped."
@@ -93,7 +93,7 @@ jobs:
     needs: [server, flutter]
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     env:
-      HAS_GEMINI_KEY: ${{ secrets.GEMINI_API_KYA != '' }}
+      HAS_GEMINI_KEY: ${{ secrets.GEMINI_API_KEY != '' || secrets.GEMINI_API_KYA != '' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -110,7 +110,7 @@ jobs:
       - name: Start Manabi server (key from secret, never written to disk)
         working-directory: server
         env:
-          GEMINI_API_KYA: ${{ secrets.GEMINI_API_KYA }}
+          GEMINI_API_KYA: ${{ secrets.GEMINI_API_KEY || secrets.GEMINI_API_KYA }}
         run: |
           npm ci
           nohup node src/index.mjs > ../server.log 2>&1 &

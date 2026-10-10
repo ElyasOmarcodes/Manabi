@@ -35,9 +35,9 @@ Chat with live progress steps · scope to a **book**, **author** or **category**
 | `tool/screenshots/` | Playwright screenshot driver used in CI |
 | `installers/windows/` | Inno Setup script for the Windows `.exe` installer |
 
-## The Gemini key (`GEMINI_API_KYA`) and security
+## The Gemini key (`GEMINI_API_KEY`) and security
 
-The key is stored as the repository secret **`GEMINI_API_KYA`**. It is used only:
+The key is stored as the repository secret **`GEMINI_API_KEY`** (the older name `GEMINI_API_KYA` is accepted too). It is used only:
 
 1. in CI, by the live tests and the screenshot job (passed as an environment variable to the server process), and
 2. by a deployed **Manabi server** (`server/`), as an environment variable.
@@ -52,9 +52,9 @@ It is **never compiled into the apps.** The repository is public, and a key insi
 ```bash
 cd server
 npm ci
-GEMINI_API_KYA=... npm start            # http://localhost:8787/api/health
+GEMINI_API_KEY=... npm start            # http://localhost:8787/api/health
 # or
-docker build -t manabi-server server && docker run -p 8787:8787 -e GEMINI_API_KYA=... manabi-server
+docker build -t manabi-server server && docker run -p 8787:8787 -e GEMINI_API_KEY=... manabi-server
 ```
 
 Optional env: `GEMINI_MODEL` (default: newest available Gemini Flash), `ALLOWED_ORIGINS`, `ASK_LIMIT`/`ASK_WINDOW_MIN` (rate limit), `TRUST_PROXY=1`, `ACCESS_TOKEN`. Any Docker/Node host works (Cloud Run, Fly.io, Render, a VPS). Then set `MANABI_SERVER_URL` in *Settings → Secrets and variables → Actions → Variables*.
@@ -65,7 +65,7 @@ API: `POST /api/ask` (JSON or SSE stream), `GET /api/search`, `/api/books/:id`, 
 
 ```bash
 cd server && npm ci && npm test                         # 18 tests (recorded Turath responses)
-GEMINI_API_KYA=... npm run test:live                    # real Turath + Gemini
+GEMINI_API_KEY=... npm run test:live                    # real Turath + Gemini
 cd app && flutter pub get && flutter analyze && flutter test
 flutter run -d chrome --dart-define=MANABI_SERVER_URL=http://localhost:8787
 ```

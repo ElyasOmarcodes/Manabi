@@ -5,7 +5,7 @@ name: Build & Release
 #   - tags v*            → a normal release named after the tag
 #   - pushes to branches → the rolling "nightly" pre-release (replaced each time)
 #
-# The Gemini key (GEMINI_API_KYA) is NEVER put into app binaries – the
+# The Gemini key (GEMINI_API_KEY) is NEVER put into app binaries – the
 # repository is public and anyone could extract it. Apps reach Gemini through
 # the Manabi server (MANABI_SERVER_URL repository variable) or a key the user
 # enters on their own device.
@@ -285,7 +285,7 @@ jobs:
             | Linux | `Manabi-linux-x64.tar.gz` |
             | iOS | `Manabi-ios-unsigned.ipa` (needs re-signing) |
             | Web | `Manabi-web.zip` |
-            | Server | `Manabi-server.tar.gz` (Node.js 20+, set `GEMINI_API_KYA`) |
+            | Server | `Manabi-server.tar.gz` (Node.js 20+, set `GEMINI_API_KEY`) |
 
             **Signing:** Android files are signed with the release keystore only if the `ANDROID_KEYSTORE_*` secrets are set (otherwise debug-signed, fine for side-loading). iOS and macOS builds are unsigned: installing on iPhone/iPad or distributing through the App Store / notarization requires an Apple Developer account, certificates and provisioning profiles. Windows binaries are not code-signed (SmartScreen may warn).
 
