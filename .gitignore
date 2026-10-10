@@ -1,0 +1,9 @@
+# Secrets never go in the repo
+.env
+*.env
+key.properties
+*.jks
+*.keystore
+.DS_Store
+.idea/
+.vscode/
