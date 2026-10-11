@@ -1157,4 +1157,64 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get moreActions => 'بیشتر';
+
+  @override
+  String get matnSection => 'متن و شرح';
+
+  @override
+  String get matnSeparate => 'متن را در این کتاب جدا کن';
+
+  @override
+  String get matnMarkersLabel => 'متن میان این نشانه‌هاست';
+
+  @override
+  String get bracesVerses => 'آکولادها برای آیات قرآن است';
+
+  @override
+  String get detectAuto => 'تشخیص';
+
+  @override
+  String get detectAi => 'تشخیص با هوش مصنوعی';
+
+  @override
+  String get detecting => 'خواندن صفحه‌ها…';
+
+  @override
+  String get detectedNone => 'در این صفحه‌ها نشانهٔ متن یافت نشد';
+
+  @override
+  String get layersSourceAuto => 'از صفحه‌ها تشخیص داده شد';
+
+  @override
+  String get layersSourceAi => 'با هوش مصنوعی تشخیص داده شد';
+
+  @override
+  String get quranSection => 'آیات قرآن';
+
+  @override
+  String get styleQuran => 'نمایش آیات به سبک مصحف';
+
+  @override
+  String get quranFontLabel => 'قلم آیات';
+
+  @override
+  String get fontAmiriQuran => 'امیری قرآن';
+
+  @override
+  String get fontBookFace => 'قلم کتاب';
+
+  @override
+  String get quranColorLabel => 'رنگ آیات';
+
+  @override
+  String get matnColorLabel => 'رنگ متن';
+
+  @override
+  String get matnBoldLabel => 'متن پررنگ';
+
+  @override
+  String get textFormatting => 'قالب‌بندی متن';
+
+  @override
+  String get textFormattingSub => 'آیات، متن و شرح';
 }

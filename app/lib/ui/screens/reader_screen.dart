@@ -13,6 +13,7 @@ import '../../core/catalog/catalog_service.dart';
 import '../../core/models/library.dart';
 import '../../core/models/scope.dart';
 import '../../core/turath/arabic_match.dart';
+import '../../core/turath/text_layers.dart';
 import '../../l10n/gen/app_localizations.dart';
 import '../../state/nav_controller.dart';
 import '../../state/reading_controller.dart';
@@ -292,12 +293,21 @@ class _ReaderScreenState extends State<ReaderScreen> {
         isScrollControlled: true,
         builder: (_) => _ToolsSheet(
           book: _book,
+          bookId: widget.bookId,
+          title: _title,
+          samples: _layerSamples(),
           current: _page,
           onGo: _jump,
           onShare: () => _pageAction('share', _page),
           onFullScreen: _toggleImmersive,
         ),
       );
+
+  /// Page texts around the current page, for detecting the book's layers.
+  List<String> _layerSamples() {
+    final pages = _loaded.keys.toList()..sort((a, b) => (a - _page).abs().compareTo((b - _page).abs()));
+    return [for (final p in pages.take(6)) _loaded[p]!.text];
+  }
 
   /// Opens Turath's scanned edition at the printed page of the current page.
   Future<void> _openPdf() async {
@@ -822,26 +832,61 @@ class _PageBlock extends StatelessWidget {
 
   TextSpan _marked(BuildContext context, String text, String? query, List<Highlight> highlights, TextStyle style) {
     final dark = context.aura.dark;
+    final reading = context.read<ReadingController>();
     final ranges = <(int, int, TextStyle)>[
+      // Lowest first: verses and matn, then highlights, then search matches.
+      ...textLayerRanges(reading, reading.layersOf(book?.id ?? ''), text, dark: dark),
       for (final h in highlights)
         for (final (s, e) in arabicMatches(text, h.text))
           (s, e, TextStyle(backgroundColor: highlightColors[h.color.clamp(0, highlightColors.length - 1)].withValues(alpha: dark ? 0.38 : 0.45))),
       for (final (s, e) in arabicMatches(text, query))
         (s, e, TextStyle(color: dark ? const Color(0xFFFF8A80) : const Color(0xFFC62828), backgroundColor: AuraHues.rose.withValues(alpha: dark ? 0.12 : 0.08))),
-    ]..sort((x, y) => x.$1.compareTo(y.$1));
-    if (ranges.isEmpty) return TextSpan(text: text, style: style);
-    final spans = <TextSpan>[];
-    var at = 0;
-    for (final (s, e, st) in ranges) {
-      if (s < at) continue;
-      spans
-        ..add(TextSpan(text: text.substring(at, s)))
-        ..add(TextSpan(text: text.substring(s, e), style: st));
-      at = e;
-    }
-    spans.add(TextSpan(text: text.substring(at)));
-    return TextSpan(style: style, children: spans);
+    ];
+    return layeredSpan(text, style, ranges);
   }
+}
+
+/// Verse and matn styles for a page text, from the reading settings and the
+/// book's layers.
+List<(int, int, TextStyle)> textLayerRanges(ReadingController r, BookLayers layers, String text, {required bool dark}) {
+  final out = <(int, int, TextStyle)>[];
+  final verses = r.styleQuran ? quranRanges(text, extra: layers.bracesAreVerses ? const ['{}'] : const []) : const <(int, int)>[];
+  if (verses.isNotEmpty) {
+    final c = quranColors[r.quranColor.clamp(0, quranColors.length - 1)];
+    final style = TextStyle(color: dark ? c.$2 : c.$1, fontFamily: r.quranFont == 'quran' ? 'AmiriQuran' : null);
+    for (final (s, e) in verses) {
+      out.add((s, e, style));
+    }
+  }
+  if (layers.enabled && layers.matn.isNotEmpty) {
+    final c = matnColors[r.matnColor.clamp(0, matnColors.length - 1)];
+    final style = TextStyle(color: dark ? c.$2 : c.$1, fontWeight: r.matnBold ? FontWeight.w700 : null);
+    for (final m in layers.matn) {
+      if (m == '{}' && layers.bracesAreVerses) continue;
+      for (final (s, e) in markerRanges(text, m, exclude: verses)) {
+        out.add((s, e, style));
+      }
+    }
+  }
+  return out;
+}
+
+/// A text span where each range adds its style on top of [base]; ranges may
+/// overlap and later ones win.
+TextSpan layeredSpan(String text, TextStyle base, List<(int, int, TextStyle)> ranges) {
+  final valid = [for (final r in ranges) if (r.$1 < r.$2 && r.$1 >= 0 && r.$2 <= text.length) r];
+  if (valid.isEmpty) return TextSpan(text: text, style: base);
+  final cuts = <int>{0, text.length, for (final r in valid) ...[r.$1, r.$2]}.toList()..sort();
+  final spans = <TextSpan>[];
+  for (var i = 0; i + 1 < cuts.length; i++) {
+    final a = cuts[i], b = cuts[i + 1];
+    TextStyle? style;
+    for (final (s, e, st) in valid) {
+      if (s <= a && e >= b) style = style == null ? st : style.merge(st);
+    }
+    spans.add(TextSpan(text: text.substring(a, b), style: style));
+  }
+  return TextSpan(style: base, children: spans);
 }
 
 /// The text currently selected on a page (for the selection menu).
@@ -1129,8 +1174,12 @@ class HighlightTile extends StatelessWidget {
 /// Turath-style reading tools: text size, paper, toggles, go to a page and
 /// quick actions.
 class _ToolsSheet extends StatefulWidget {
-  const _ToolsSheet({required this.book, required this.current, required this.onGo, required this.onShare, required this.onFullScreen});
+  const _ToolsSheet(
+      {required this.book, required this.bookId, required this.title, required this.samples, required this.current, required this.onGo, required this.onShare, required this.onFullScreen});
   final BookDetails? book;
+  final String bookId;
+  final String title;
+  final List<String> samples;
   final int current;
   final void Function(int page, {String? mark}) onGo;
   final VoidCallback onShare;
@@ -1199,6 +1248,8 @@ class _ToolsSheetState extends State<_ToolsSheet> {
             const SizedBox(height: 10),
             FontPicker(reading: r),
             const Divider(height: 22),
+            LayersPanel(bookId: widget.bookId, title: widget.title, samples: widget.samples),
+            const Divider(height: 22),
             toggle(l.justifyText, Icons.format_align_justify_rounded, r.justify, r.setJustify),
             toggle(l.hideDiacritics, Icons.text_format_rounded, r.hideDiacritics, r.setHideDiacritics),
             toggle(l.showFootnotes, Icons.notes_rounded, r.showFootnotes, r.setShowFootnotes),
@@ -1247,6 +1298,115 @@ class _ToolsSheetState extends State<_ToolsSheet> {
         ),
       ),
     );
+  }
+}
+
+/// Matn and commentary for one book: switch, markers, and detection from
+/// the pages (counting delimiters) or by the model.
+class LayersPanel extends StatefulWidget {
+  const LayersPanel({super.key, required this.bookId, required this.title, required this.samples});
+  final String bookId;
+  final String title;
+  final List<String> samples;
+  @override
+  State<LayersPanel> createState() => _LayersPanelState();
+}
+
+class _LayersPanelState extends State<LayersPanel> {
+  bool _busy = false;
+  String? _note;
+
+  static String glyph(String m) {
+    final (open, close) = layerMarkers[m]!;
+    return '$open … $close';
+  }
+
+  Future<void> _detect() async {
+    final r = context.read<ReadingController>();
+    final braces = bracesAreVerses(widget.samples);
+    final found = detectMatnMarkers(widget.samples, quranMarkers: braces ? const ['{}'] : const []);
+    final l = context.l;
+    await r.setLayers(widget.bookId, r.layersOf(widget.bookId).copyWith(enabled: found.isNotEmpty, matn: found, bracesAreVerses: braces, source: 'auto'));
+    setState(() => _note = found.isEmpty ? l.detectedNone : '${l.layersSourceAuto}: ${found.map(glyph).join('  ')}');
+  }
+
+  Future<void> _detectAi() async {
+    final r = context.read<ReadingController>();
+    final backend = context.read<SettingsController>().backend;
+    final l = context.l;
+    setState(() => _busy = true);
+    try {
+      final g = await backend.detectLayers(widget.title, widget.samples);
+      final matn = [for (final m in g.matn) if (layerMarkers.containsKey(m)) m];
+      await r.setLayers(widget.bookId, BookLayers(enabled: matn.isNotEmpty, matn: matn, bracesAreVerses: g.quran.contains('{}'), source: 'ai'));
+      if (mounted) setState(() => _note = matn.isEmpty ? (g.note.isEmpty ? l.detectedNone : g.note) : '${l.layersSourceAi}: ${matn.map(glyph).join('  ')}${g.note.isEmpty ? '' : ' — ${g.note}'}');
+    } catch (e) {
+      if (mounted) setState(() => _note = errorText(l, mapError(e).code));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final r = context.watch<ReadingController>();
+    final l = context.l;
+    final a = context.aura;
+    final layers = r.layersOf(widget.bookId);
+    void update(BookLayers v) => r.setLayers(widget.bookId, v.copyWith(source: 'manual'));
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Text(l.matnSection, style: TextStyle(fontFamily: uiFont, fontSize: 14, fontWeight: FontWeight.w800, color: a.text)),
+      SwitchListTile.adaptive(
+        dense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+        secondary: Icon(Icons.format_quote_rounded, size: 20, color: a.muted),
+        title: Text(l.matnSeparate, style: TextStyle(fontFamily: uiFont, fontSize: 14.5, color: a.text)),
+        value: layers.enabled,
+        onChanged: (v) => update(layers.copyWith(enabled: v, matn: v && layers.matn.isEmpty ? const ['()'] : layers.matn)),
+      ),
+      if (layers.enabled) ...[
+        Padding(
+          padding: const EdgeInsetsDirectional.only(start: 4, bottom: 6),
+          child: Text(l.matnMarkersLabel, style: TextStyle(fontFamily: uiFont, fontSize: 12.5, color: a.muted)),
+        ),
+        Wrap(spacing: 6, runSpacing: 6, children: [
+          for (final m in matnMarkerIds)
+            FilterChip(
+              label: Text(glyph(m), textDirection: TextDirection.rtl, style: const TextStyle(fontFamily: arabicFont, fontSize: 15)),
+              selected: layers.matn.contains(m),
+              onSelected: (on) => update(layers.copyWith(matn: on ? [...layers.matn, m] : [for (final x in layers.matn) if (x != m) x])),
+            ),
+        ]),
+        SwitchListTile.adaptive(
+          dense: true,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+          title: Text('${l.bracesVerses}  { }', style: TextStyle(fontFamily: uiFont, fontSize: 13.5, color: a.text)),
+          value: layers.bracesAreVerses,
+          onChanged: (v) => update(layers.copyWith(bracesAreVerses: v)),
+        ),
+      ],
+      const SizedBox(height: 6),
+      Row(children: [
+        Expanded(child: SoftButton(icon: Icons.manage_search_rounded, label: l.detectAuto, onTap: widget.samples.isEmpty || _busy ? null : _detect)),
+        const SizedBox(width: 8),
+        Expanded(
+          child: SoftButton(
+            icon: Icons.auto_awesome_rounded,
+            color: AuraHues.violet,
+            label: _busy ? l.detecting : l.detectAi,
+            onTap: widget.samples.isEmpty || _busy ? null : _detectAi,
+          ),
+        ),
+      ]),
+      if (_note != null || layers.source != 'manual')
+        Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Text(
+            _note ?? (layers.source == 'ai' ? l.layersSourceAi : l.layersSourceAuto),
+            style: TextStyle(fontFamily: uiFont, fontSize: 12, color: a.muted, height: 1.5),
+          ),
+        ),
+    ]);
   }
 }
 

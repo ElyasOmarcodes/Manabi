@@ -9,6 +9,8 @@ import '../models/answer.dart';
 import '../models/library.dart';
 import '../models/scope.dart';
 import '../pipeline/answer_pipeline.dart';
+import '../pipeline/prompt_texts.dart' show layersSystem;
+import '../pipeline/prompts.dart' show layersPrompt, layersSchema;
 import '../turath/turath_client.dart';
 
 /// Error codes the UI knows how to explain.
@@ -63,7 +65,12 @@ abstract class ManabiBackend {
 
   /// Returns the Gemini model in use, or throws a [BackendException].
   Future<String> check();
+
+  /// Asks the model which delimiters hold the matn and the verses of a book.
+  Future<LayersGuess> detectLayers(String title, List<String> pages);
 }
+
+List<String> _layerSamples(List<String> pages) => [for (final p in pages.where((p) => p.trim().isNotEmpty).take(4)) p.length > 1800 ? p.substring(0, 1800) : p];
 
 class ServerBackend implements ManabiBackend {
   ServerBackend(String baseUrl, {this.accessToken, http.Client? client})
@@ -176,6 +183,20 @@ class ServerBackend implements ManabiBackend {
   Future<PagePassage> page(String bookId, int page) async => PagePassage.fromJson(await _get('/api/pages/$bookId/$page'));
 
   @override
+  Future<LayersGuess> detectLayers(String title, List<String> pages) async {
+    http.Response res;
+    try {
+      res = await _http
+          .post(Uri.parse('$baseUrl/api/layers'),
+              headers: {..._headers, 'content-type': 'application/json'}, body: jsonEncode({'title': title, 'pages': _layerSamples(pages)}))
+          .timeout(const Duration(seconds: 90));
+    } catch (e) {
+      throw BackendException('NETWORK', '$e');
+    }
+    return LayersGuess.fromJson(_decode(res.statusCode, utf8.decode(res.bodyBytes)));
+  }
+
+  @override
   Future<String> check() async {
     final health = await _get('/api/health');
     if (health['gemini'] != true) throw const BackendException('GEMINI_AUTH', 'Server has no Gemini key');
@@ -226,6 +247,16 @@ class DirectBackend implements ManabiBackend {
 
   @override
   Future<String> check() => _wrap(_gemini.check);
+
+  @override
+  Future<LayersGuess> detectLayers(String title, List<String> pages) => _wrap(() async => LayersGuess.fromJson((await _gemini.generateJson(
+        system: layersSystem,
+        prompt: layersPrompt(title: title, pages: _layerSamples(pages)),
+        schema: layersSchema,
+        temperature: 0,
+        tier: ModelTier.fast,
+      ))
+          .data));
 }
 
 /// Used until the user configures a server or a key.
@@ -245,4 +276,6 @@ class UnconfiguredBackend implements ManabiBackend {
   Future<PagePassage> page(String bookId, int page) async => _fail();
   @override
   Future<String> check() async => _fail();
+  @override
+  Future<LayersGuess> detectLayers(String title, List<String> pages) async => _fail();
 }

@@ -1,6 +1,7 @@
 // HTTP API for the Manabi app. No framework: node:http, JSON and SSE.
 import { createServer } from "node:http";
 import { NususError } from "nusus";
+import { LAYERS_SCHEMA, LAYERS_SYSTEM, layersPrompt } from "./prompts.mjs";
 import { decodingTurath } from "./text.mjs";
 
 const VERSION = "1.0.0";
@@ -246,6 +247,25 @@ export const createApp = ({ config, pipeline, turath: client, catalog, gemini, l
     }
   };
 
+  // Which delimiters hold a commentary's base text (matn) and its verses,
+  // judged by the model from a few sample pages.
+  const handleLayers = async (req, res, cors) => {
+    if (!gemini) return json(res, 503, { error: { code: "GEMINI_AUTH", message: "GEMINI_API_KEY is not configured on the server" } }, cors);
+    const limited = askLimiter(clientKey(req));
+    if (!limited.ok) return json(res, 429, { error: { code: "RATE_LIMITED", message: "Too many requests, please wait" } }, { ...cors, "retry-after": String(limited.retryAfter) });
+    const body = await readJson(req);
+    const pages = (Array.isArray(body?.pages) ? body.pages : []).filter((p) => typeof p === "string" && p.trim()).slice(0, 4).map((p) => p.slice(0, 1800));
+    if (!pages.length) throw Object.assign(new Error("pages are required"), { code: "INVALID_ARGUMENT" });
+    const result = await gemini.generateJson({
+      system: LAYERS_SYSTEM,
+      prompt: layersPrompt({ title: typeof body.title === "string" ? body.title.slice(0, 200) : "", pages }),
+      schema: LAYERS_SCHEMA,
+      temperature: 0,
+      tier: "fast",
+    });
+    return json(res, 200, { ...result.data, model: result.model, usage: result.usage }, cors);
+  };
+
   const handler = async (req, res) => {
     const cors = corsHeaders(req);
     const url = new URL(req.url ?? "/", "http://localhost");
@@ -262,6 +282,7 @@ export const createApp = ({ config, pipeline, turath: client, catalog, gemini, l
         }
       }
       if (req.method === "POST" && url.pathname === "/api/ask") return await handleAsk(req, res, cors);
+      if (req.method === "POST" && url.pathname === "/api/layers") return await handleLayers(req, res, cors);
       for (const [method, pattern, fn] of routes) {
         const match = pattern.exec(url.pathname);
         if (!match) continue;

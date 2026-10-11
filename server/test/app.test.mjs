@@ -135,3 +135,30 @@ test("rate limiter window resets", () => {
   t = 1000;
   assert.equal(limit("a").ok, true);
 });
+
+test("layers: the model names the matn delimiters of sample pages", async () => {
+  const calls = [];
+  const gemini = {
+    resolveModel: async () => "m",
+    generateJson: async (r) => {
+      calls.push(r);
+      return { data: { isCommentary: true, matnMarkers: ["()"], quranMarkers: ["﴿﴾"], confidence: 0.9, note: "x" }, model: "m", usage: { input: 10, output: 5, thoughts: 0 } };
+    },
+  };
+  const app = createApp({ config: { allowedOrigins: ["*"], askLimit: 10, askWindowMs: 60_000, readLimit: 100, trustProxy: false }, pipeline: {}, turath: fixtureTurath(), catalog, gemini, logger: { info() {}, error() {} } });
+  const server = await app.listen(0, "127.0.0.1");
+  try {
+    const url = `http://127.0.0.1:${server.address().port}/api/layers`;
+    const res = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ title: "مرقاة المفاتيح", pages: ["(قال) أي ...", "x".repeat(5000)] }) });
+    const body = await res.json();
+    assert.equal(res.status, 200);
+    assert.deepEqual(body.matnMarkers, ["()"]);
+    assert.equal(calls[0].tier, "fast");
+    assert.ok(calls[0].prompt.includes("مرقاة المفاتيح"));
+    assert.ok(calls[0].prompt.length < 4500, "pages are trimmed");
+    const bad = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ pages: [] }) });
+    assert.equal(bad.status, 400);
+  } finally {
+    server.close();
+  }
+});

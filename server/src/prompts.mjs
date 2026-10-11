@@ -148,3 +148,26 @@ export const sourceBlock = (sources) => sources.map((s) => `[${s.key}] ${meta(s)
 
 export const composePrompt = ({ question, history, sources, languageName, missing }) =>
   `${historyBlock(history)}ANSWER LANGUAGE: ${languageName}\n${missing ? `NOTE FROM THE READING STEP (what may be missing): ${missing}\n` : ""}\nSOURCES:\n${sourceBlock(sources)}\n\nUSER QUESTION:\n${question}`;
+
+export const LAYERS_SYSTEM = `You look at sample pages of one classical Arabic book and tell how its text is layered.
+In commentaries (شروح) and glosses (حواشي) the base text being explained (المتن) is set off by delimiters, and the commentary (الشرح) runs between them, e.g. (قال رسول الله) أي ... (إنما الأعمال بالنيات) جمع نية ...
+Common matn delimiters: parentheses ( ), guillemets « », straight quotes " ", curly quotes “ ”, brackets [ ], braces { }.
+Quran verses are usually set in ﴿ ﴾, sometimes in { } or ( ) with full vowels. Hadith wording is often in « » even in books that are not commentaries.
+Do not take footnote numbers like (١), page or volume references, or a single quoted word for matn.
+Report only what the pages show. If the book is not a commentary on a base text, return no matn markers.`;
+
+export const LAYERS_SCHEMA = {
+  type: "OBJECT",
+  properties: {
+    isCommentary: { type: "BOOLEAN" },
+    matnMarkers: { type: "ARRAY", items: { type: "STRING", enum: ["()", "«»", '""', "“”", "[]", "{}"] } },
+    quranMarkers: { type: "ARRAY", items: { type: "STRING", enum: ["﴿﴾", "{}", "()", "«»"] } },
+    confidence: { type: "NUMBER" },
+    note: { type: "STRING" },
+  },
+  required: ["isCommentary", "matnMarkers", "quranMarkers", "confidence"],
+  propertyOrdering: ["isCommentary", "matnMarkers", "quranMarkers", "confidence", "note"],
+};
+
+export const layersPrompt = ({ title, pages }) =>
+  `BOOK: ${title || "(unknown)"}\n\n${pages.map((p, i) => `PAGE ${i + 1}\n<<<\n${p}\n>>>`).join("\n\n")}\n\nWhich delimiters enclose the matn, and which enclose Quran verses? Give "note" as one short sentence.`;

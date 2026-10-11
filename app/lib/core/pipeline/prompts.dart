@@ -153,3 +153,34 @@ String composePrompt({
   String missing = '',
 }) =>
     '${_historyBlock(history)}ANSWER LANGUAGE: $languageName\n${missing.isNotEmpty ? 'NOTE FROM THE READING STEP (what may be missing): $missing\n' : ''}\nSOURCES:\n${sourceBlock(sources)}\n\nUSER QUESTION:\n$question';
+
+/// Mirrors LAYERS_SCHEMA in server/src/prompts.mjs.
+const layersSchema = {
+  'type': 'OBJECT',
+  'properties': {
+    'isCommentary': {'type': 'BOOLEAN'},
+    'matnMarkers': {
+      'type': 'ARRAY',
+      'items': {
+        'type': 'STRING',
+        'enum': ['()', '«»', '""', '“”', '[]', '{}']
+      }
+    },
+    'quranMarkers': {
+      'type': 'ARRAY',
+      'items': {
+        'type': 'STRING',
+        'enum': ['﴿﴾', '{}', '()', '«»']
+      }
+    },
+    'confidence': {'type': 'NUMBER'},
+    'note': {'type': 'STRING'},
+  },
+  'required': ['isCommentary', 'matnMarkers', 'quranMarkers', 'confidence'],
+  'propertyOrdering': ['isCommentary', 'matnMarkers', 'quranMarkers', 'confidence', 'note'],
+};
+
+/// Mirrors layersPrompt in server/src/prompts.mjs.
+String layersPrompt({required String title, required List<String> pages}) =>
+    'BOOK: ${title.isEmpty ? '(unknown)' : title}\n\n${[for (var i = 0; i < pages.length; i++) 'PAGE ${i + 1}\n<<<\n${pages[i]}\n>>>'].join('\n\n')}\n\n'
+    'Which delimiters enclose the matn, and which enclose Quran verses? Give "note" as one short sentence.';

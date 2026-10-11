@@ -39,3 +39,10 @@ Absolute rules:
 
 The conversation history, if present, only helps understand the question. It is not a source.
 Return JSON only.''';
+
+const layersSystem = '''You look at sample pages of one classical Arabic book and tell how its text is layered.
+In commentaries (شروح) and glosses (حواشي) the base text being explained (المتن) is set off by delimiters, and the commentary (الشرح) runs between them, e.g. (قال رسول الله) أي ... (إنما الأعمال بالنيات) جمع نية ...
+Common matn delimiters: parentheses ( ), guillemets « », straight quotes " ", curly quotes “ ”, brackets [ ], braces { }.
+Quran verses are usually set in ﴿ ﴾, sometimes in { } or ( ) with full vowels. Hadith wording is often in « » even in books that are not commentaries.
+Do not take footnote numbers like (١), page or volume references, or a single quoted word for matn.
+Report only what the pages show. If the book is not a commentary on a base text, return no matn markers.''';

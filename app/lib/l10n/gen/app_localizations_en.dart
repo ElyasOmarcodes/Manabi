@@ -1159,4 +1159,64 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get moreActions => 'More';
+
+  @override
+  String get matnSection => 'Matn and commentary';
+
+  @override
+  String get matnSeparate => 'Set the matn apart in this book';
+
+  @override
+  String get matnMarkersLabel => 'The matn is between';
+
+  @override
+  String get bracesVerses => 'Curly braces hold Quran verses';
+
+  @override
+  String get detectAuto => 'Detect';
+
+  @override
+  String get detectAi => 'Detect with AI';
+
+  @override
+  String get detecting => 'Reading the pages…';
+
+  @override
+  String get detectedNone => 'No matn markers found on these pages';
+
+  @override
+  String get layersSourceAuto => 'Detected from the pages';
+
+  @override
+  String get layersSourceAi => 'Detected by AI';
+
+  @override
+  String get quranSection => 'Quran verses';
+
+  @override
+  String get styleQuran => 'Show verses in the Quran style';
+
+  @override
+  String get quranFontLabel => 'Verse font';
+
+  @override
+  String get fontAmiriQuran => 'Amiri Quran';
+
+  @override
+  String get fontBookFace => 'Book font';
+
+  @override
+  String get quranColorLabel => 'Verse colour';
+
+  @override
+  String get matnColorLabel => 'Matn colour';
+
+  @override
+  String get matnBoldLabel => 'Matn in bold';
+
+  @override
+  String get textFormatting => 'Text formatting';
+
+  @override
+  String get textFormattingSub => 'Verses, matn and commentary';
 }

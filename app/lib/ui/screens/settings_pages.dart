@@ -14,7 +14,7 @@ import '../widgets/chat_list.dart' show confirmDialog;
 import '../widgets/common.dart';
 import '../widgets/depth_picker.dart';
 import 'chat_screen.dart' show languageLabels;
-import 'reader_screen.dart' show ModePicker, PaperPicker, ReaderTextControls, bookTextStyle, readerColors, readerFonts;
+import 'reader_screen.dart' show ModePicker, PaperPicker, ReaderTextControls, bookTextStyle, layeredSpan, readerColors, readerFonts, textLayerRanges;
 
 /// Shared frame of a settings sub-page.
 class _SettingsPage extends StatelessWidget {
@@ -423,9 +423,79 @@ class DataSettingsPage extends StatelessWidget {
 
 // ── Reading & library ───────────────────────────────────────────────────
 
-const _sampleText = 'قَالَ رَسُولُ اللَّهِ ﷺ: «إِنَّمَا الْأَعْمَالُ بِالنِّيَّاتِ، وَإِنَّمَا لِكُلِّ امْرِئٍ مَا نَوَى».';
+const _sampleText = '(قَالَ رَسُولُ اللَّهِ ﷺ: «إِنَّمَا الْأَعْمَالُ بِالنِّيَّاتِ») أَيْ: صِحَّتُهَا بِالنِّيَّةِ، '
+    'قَالَ تَعَالَى: ﴿وَمَا أُمِرُوا إِلَّا لِيَعْبُدُوا اللَّهَ مُخْلِصِينَ لَهُ الدِّينَ﴾.';
 
-/// Everything about the reader and the library, with a live preview page.
+/// A small page in the current reader settings: chapter title, a matn in
+/// parentheses with its commentary, a verse and a highlight.
+class ReaderPreview extends StatelessWidget {
+  const ReaderPreview({super.key});
+  @override
+  Widget build(BuildContext context) {
+    final r = context.watch<ReadingController>();
+    final a = context.aura;
+    final l = context.l;
+    final c = readerColors(context, r.paper);
+    final sample = r.hideDiacritics ? stripDiacritics(_sampleText) : _sampleText;
+    final base = bookTextStyle(context, r, color: c.text);
+    final mark = arabicMatches(sample, 'صحتها بالنية').firstOrNull;
+    final ranges = [
+      ...textLayerRanges(r, const BookLayers(enabled: true, matn: ['()']), sample, dark: a.dark),
+      if (mark != null) (mark.$1, mark.$2, TextStyle(backgroundColor: highlightColors[r.highlightColor].withValues(alpha: a.dark ? 0.38 : 0.45))),
+    ];
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 220),
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 10),
+      decoration: BoxDecoration(color: c.bg, borderRadius: BorderRadius.circular(18), border: Border.all(color: a.border)),
+      child: Directionality(
+        textDirection: TextDirection.rtl,
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Text('بَابُ النِّيَّةِ', style: bookTextStyle(context, r, size: 16, weight: FontWeight.w700, color: a.accent).copyWith(height: 1.7)),
+          Text.rich(layeredSpan(sample, base, ranges), textAlign: r.justify ? TextAlign.justify : TextAlign.start),
+          const SizedBox(height: 4),
+          Text('${l.volumeShort} ${readerDigits(1, r.digits)} · ${l.page} ${readerDigits(6, r.digits)}',
+              textAlign: TextAlign.center, style: TextStyle(fontFamily: uiFont, fontSize: 12, color: c.muted)),
+        ]),
+      ),
+    );
+  }
+}
+
+/// Colour swatches (light/dark pairs) with the chosen one ringed.
+class _Swatches extends StatelessWidget {
+  const _Swatches({required this.colors, required this.selected, required this.onSelect});
+  final List<Color> colors;
+  final int selected;
+  final ValueChanged<int> onSelect;
+  @override
+  Widget build(BuildContext context) {
+    final a = context.aura;
+    return Wrap(spacing: 10, runSpacing: 10, children: [
+      for (var i = 0; i < colors.length; i++)
+        Pressable(
+          onTap: () => onSelect(i),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(color: colors[i], shape: BoxShape.circle, border: Border.all(color: selected == i ? a.text : a.border, width: selected == i ? 2.5 : 1)),
+            child: selected == i ? Icon(Icons.check_rounded, color: colors[i].computeLuminance() > 0.5 ? Colors.black87 : Colors.white, size: 19) : null,
+          ),
+        ),
+    ]);
+  }
+}
+
+Widget _switchRow(IconData icon, Color color, String title, bool value, ValueChanged<bool> onChanged, {String? subtitle}) => SettingsRow(
+      icon: icon,
+      color: color,
+      title: title,
+      subtitle: subtitle,
+      trailing: Switch.adaptive(value: value, onChanged: onChanged),
+      onTap: () => onChanged(!value),
+    );
+
+/// Reading & library hub: a preview, then one row per area.
 class ReadingSettingsPage extends StatelessWidget {
   const ReadingSettingsPage({super.key});
   @override
@@ -433,43 +503,72 @@ class ReadingSettingsPage extends StatelessWidget {
     final r = context.watch<ReadingController>();
     final l = context.l;
     final a = context.aura;
-    final c = readerColors(context, r.paper);
-    final sample = r.hideDiacritics ? stripDiacritics(_sampleText) : _sampleText;
-    final mark = arabicMatches(sample, 'إنما الأعمال بالنيات').firstOrNull ?? (0, 0);
-    Widget toggle(IconData icon, Color color, String title, bool value, ValueChanged<bool> onChanged, {String? subtitle}) => SettingsRow(
-          icon: icon,
-          color: color,
-          title: title,
-          subtitle: subtitle,
-          trailing: Switch.adaptive(value: value, onChanged: onChanged),
-          onTap: () => onChanged(!value),
-        );
-    final tabs = {'books': l.books, 'authors': l.authors, 'categories': l.categories, 'favorites': l.tabFavorites, 'search': l.fullTextSearch};
+    void push(Widget page) => Navigator.of(context).push(MaterialPageRoute(builder: (_) => page));
+    final paper = switch (r.paper) { 'sepia' => l.paperSepia, 'plain' => l.paperPlain, 'night' => l.paperNight, _ => l.paperWarm };
+    final font = readerFonts(l).where((f) => f.$1 == r.fontFamily).firstOrNull?.$3 ?? '';
     return _SettingsPage(title: l.readingSettings, children: [
-      _Label(l.readerPreview),
-      AnimatedContainer(
-        duration: const Duration(milliseconds: 220),
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
-        decoration: BoxDecoration(color: c.bg, borderRadius: BorderRadius.circular(18), border: Border.all(color: a.border)),
-        child: Directionality(
-          textDirection: TextDirection.rtl,
-          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Text('بَابُ بَدْءِ الْوَحْيِ', style: bookTextStyle(context, r, size: 16, weight: FontWeight.w700, color: a.accent).copyWith(height: 1.7)),
-            Text.rich(
-              TextSpan(children: [
-                TextSpan(text: sample.substring(0, mark.$1)),
-                TextSpan(text: sample.substring(mark.$1, mark.$2), style: TextStyle(backgroundColor: highlightColors[r.highlightColor].withValues(alpha: a.dark ? 0.38 : 0.45))),
-                TextSpan(text: sample.substring(mark.$2)),
-              ]),
-              textAlign: r.justify ? TextAlign.justify : TextAlign.start,
-              style: bookTextStyle(context, r, color: c.text),
-            ),
-            const SizedBox(height: 6),
-            Text('${l.volumeShort} ${readerDigits(1, r.digits)} · ${l.page} ${readerDigits(6, r.digits)}',
-                textAlign: TextAlign.center, style: TextStyle(fontFamily: uiFont, fontSize: 12, color: c.muted)),
-          ]),
+      const SizedBox(height: 8),
+      const ReaderPreview(),
+      SettingsGroup(title: l.reader, children: [
+        SettingsRow(
+          icon: Icons.chrome_reader_mode_outlined,
+          color: AuraHues.teal,
+          title: l.readerDisplay,
+          subtitle: '${r.readingMode == 'pages' ? l.modePages : l.modeScroll} · $paper · $font',
+          onTap: () => push(const ReaderDisplaySettingsPage()),
         ),
+        SettingsRow(
+          icon: Icons.format_color_text_rounded,
+          color: AuraHues.violet,
+          title: l.textFormatting,
+          subtitle: l.textFormattingSub,
+          onTap: () => push(const TextFormattingSettingsPage()),
+        ),
+      ]),
+      SettingsGroup(title: l.readingData, children: [
+        SettingsRow(
+          icon: Icons.insights_rounded,
+          color: AuraHues.blue,
+          title: '${l.bookmarks} · ${l.highlights} · ${l.tabFavorites}',
+          value: '${r.bookmarks.length} · ${r.highlights.length} · ${r.favorites.length}',
+        ),
+        SettingsRow(
+          icon: Icons.history_toggle_off_rounded,
+          title: l.clearReadingHistory,
+          danger: true,
+          onTap: () async {
+            if (await confirmDialog(context, l.clearReadingHistoryConfirm) && context.mounted) await r.clearHistory();
+          },
+        ),
+        SettingsRow(
+          icon: Icons.delete_forever_outlined,
+          title: l.clearReadingData,
+          danger: true,
+          onTap: () async {
+            if (await confirmDialog(context, l.clearReadingDataConfirm) && context.mounted) await r.clearAll();
+          },
+        ),
+        SettingsRow(icon: Icons.restart_alt_rounded, title: l.resetReader, danger: true, onTap: r.resetDisplay),
+      ]),
+      Padding(
+        padding: const EdgeInsetsDirectional.fromSTEB(14, 14, 14, 0),
+        child: Text(l.shortcutsHint, style: TextStyle(fontFamily: uiFont, fontSize: 12, color: a.faint, height: 1.5)),
       ),
+    ]);
+  }
+}
+
+/// Page and text: mode, paper, size, face and reading toggles.
+class ReaderDisplaySettingsPage extends StatelessWidget {
+  const ReaderDisplaySettingsPage({super.key});
+  @override
+  Widget build(BuildContext context) {
+    final r = context.watch<ReadingController>();
+    final l = context.l;
+    final a = context.aura;
+    return _SettingsPage(title: l.readerDisplay, children: [
+      const SizedBox(height: 8),
+      const ReaderPreview(),
       _Label(l.readingMode),
       ModePicker(reading: r),
       Padding(
@@ -495,10 +594,10 @@ class ReadingSettingsPage extends StatelessWidget {
           ),
       ]),
       SettingsGroup(title: l.reader, children: [
-        toggle(Icons.format_align_justify_rounded, AuraHues.blue, l.justifyText, r.justify, r.setJustify),
-        toggle(Icons.text_format_rounded, AuraHues.teal, l.hideDiacritics, r.hideDiacritics, r.setHideDiacritics),
-        toggle(Icons.notes_rounded, AuraHues.green, l.showFootnotes, r.showFootnotes, r.setShowFootnotes),
-        toggle(Icons.light_mode_outlined, AuraHues.amber, l.keepScreenOn, r.keepAwake, r.setKeepAwake),
+        _switchRow(Icons.format_align_justify_rounded, AuraHues.blue, l.justifyText, r.justify, r.setJustify),
+        _switchRow(Icons.text_format_rounded, AuraHues.teal, l.hideDiacritics, r.hideDiacritics, r.setHideDiacritics),
+        _switchRow(Icons.notes_rounded, AuraHues.green, l.showFootnotes, r.showFootnotes, r.setShowFootnotes),
+        _switchRow(Icons.light_mode_outlined, AuraHues.amber, l.keepScreenOn, r.keepAwake, r.setKeepAwake),
         SettingsRow(
           icon: Icons.pin_outlined,
           color: AuraHues.rose,
@@ -510,67 +609,52 @@ class ReadingSettingsPage extends StatelessWidget {
           },
         ),
       ]),
-      _Label(l.highlightColor),
-      Row(children: [
-        for (var i = 0; i < highlightColors.length; i++)
-          Padding(
-            padding: const EdgeInsetsDirectional.only(start: 10),
-            child: Pressable(
-              onTap: () => r.setHighlightColor(i),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: highlightColors[i],
-                  shape: BoxShape.circle,
-                  border: Border.all(color: r.highlightColor == i ? a.text : Colors.transparent, width: 2.5),
-                ),
-                child: r.highlightColor == i ? const Icon(Icons.check_rounded, color: Colors.black87, size: 20) : null,
-              ),
-            ),
-          ),
-      ]),
-      SettingsGroup(title: l.library, children: [
+    ]);
+  }
+}
+
+/// Verses, matn and highlight colours.
+class TextFormattingSettingsPage extends StatelessWidget {
+  const TextFormattingSettingsPage({super.key});
+  @override
+  Widget build(BuildContext context) {
+    final r = context.watch<ReadingController>();
+    final l = context.l;
+    final a = context.aura;
+    final dark = a.dark;
+    return _SettingsPage(title: l.textFormatting, children: [
+      const SizedBox(height: 8),
+      const ReaderPreview(),
+      SettingsGroup(title: l.quranSection, children: [
+        _switchRow(Icons.menu_book_rounded, AuraHues.blue, l.styleQuran, r.styleQuran, r.setStyleQuran),
         SettingsRow(
-          icon: Icons.local_library_outlined,
-          color: AuraHues.teal,
-          title: l.libraryStartTab,
-          value: tabs[r.libraryTab] ?? l.books,
+          icon: Icons.font_download_outlined,
+          color: AuraHues.blue,
+          title: l.quranFontLabel,
+          value: r.quranFont == 'quran' ? l.fontAmiriQuran : l.fontBookFace,
           onTap: () async {
-            final v = await showChoiceDialog(context, title: l.libraryStartTab, options: tabs, selected: r.libraryTab);
-            if (v != null) await r.setLibraryTab(v);
+            final v = await showChoiceDialog(context, title: l.quranFontLabel, options: {'quran': l.fontAmiriQuran, 'book': l.fontBookFace}, selected: r.quranFont);
+            if (v != null) await r.setQuranFont(v);
           },
         ),
       ]),
-      SettingsGroup(title: l.readingData, children: [
-        SettingsRow(
-          icon: Icons.insights_rounded,
-          color: AuraHues.violet,
-          title: '${l.bookmarks} · ${l.highlights} · ${l.tabFavorites}',
-          value: '${r.bookmarks.length} · ${r.highlights.length} · ${r.favorites.length}',
-        ),
-        SettingsRow(
-          icon: Icons.history_toggle_off_rounded,
-          title: l.clearReadingHistory,
-          danger: true,
-          onTap: () async {
-            if (await confirmDialog(context, l.clearReadingHistoryConfirm) && context.mounted) await r.clearHistory();
-          },
-        ),
-        SettingsRow(
-          icon: Icons.delete_forever_outlined,
-          title: l.clearReadingData,
-          danger: true,
-          onTap: () async {
-            if (await confirmDialog(context, l.clearReadingDataConfirm) && context.mounted) await r.clearAll();
-          },
-        ),
-        SettingsRow(icon: Icons.restart_alt_rounded, title: l.resetReader, danger: true, onTap: r.resetDisplay),
-      ]),
+      _Label(l.quranColorLabel),
       Padding(
-        padding: const EdgeInsetsDirectional.fromSTEB(14, 14, 14, 0),
-        child: Text(l.shortcutsHint, style: TextStyle(fontFamily: uiFont, fontSize: 12, color: a.faint, height: 1.5)),
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: _Swatches(colors: [for (final c in quranColors) dark ? c.$2 : c.$1], selected: r.quranColor, onSelect: r.setQuranColor),
+      ),
+      SettingsGroup(title: l.matnSection, children: [
+        _switchRow(Icons.format_bold_rounded, AuraHues.rose, l.matnBoldLabel, r.matnBold, r.setMatnBold, subtitle: l.matnSeparate),
+      ]),
+      _Label(l.matnColorLabel),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: _Swatches(colors: [for (final c in matnColors) dark ? c.$2 : c.$1], selected: r.matnColor, onSelect: r.setMatnColor),
+      ),
+      _Label(l.highlightColor),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: _Swatches(colors: highlightColors, selected: r.highlightColor, onSelect: r.setHighlightColor),
       ),
     ]);
   }

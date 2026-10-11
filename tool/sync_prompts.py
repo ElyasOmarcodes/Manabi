@@ -19,6 +19,8 @@ const planSystem = '''{dart_raw(tpl('PLAN_SYSTEM'))}''';
 const rerankSystem = '''{dart_raw(tpl('RERANK_SYSTEM'))}''';
 
 String composeSystem(String languageName) => '''{dart_raw(compose).replace('\\${languageName}', '$languageName')}''';
+
+const layersSystem = '''{dart_raw(tpl('LAYERS_SYSTEM'))}''';
 """
 path = 'app/lib/core/pipeline/prompt_texts.dart'
 if '--check' in sys.argv:

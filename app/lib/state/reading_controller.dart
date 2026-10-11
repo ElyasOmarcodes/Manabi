@@ -70,6 +70,35 @@ class Highlight {
       );
 }
 
+/// How one book's text is layered: whether its matn (the base text of a
+/// commentary) is set apart, by which delimiters, and whether braces hold
+/// verses in it.
+class BookLayers {
+  const BookLayers({this.enabled = false, this.matn = const [], this.bracesAreVerses = false, this.source = 'manual'});
+  final bool enabled;
+  final List<String> matn;
+  final bool bracesAreVerses;
+
+  /// 'manual', 'auto' (detected from the pages) or 'ai'.
+  final String source;
+
+  BookLayers copyWith({bool? enabled, List<String>? matn, bool? bracesAreVerses, String? source}) => BookLayers(
+        enabled: enabled ?? this.enabled,
+        matn: matn ?? this.matn,
+        bracesAreVerses: bracesAreVerses ?? this.bracesAreVerses,
+        source: source ?? this.source,
+      );
+
+  Map<String, dynamic> toJson() => {'enabled': enabled, 'matn': matn, 'braces': bracesAreVerses, 'source': source};
+
+  factory BookLayers.fromJson(Map<String, dynamic> j) => BookLayers(
+        enabled: j['enabled'] == true,
+        matn: [for (final m in j['matn'] as List? ?? const []) '$m'],
+        bracesAreVerses: j['braces'] == true,
+        source: j['source'] as String? ?? 'manual',
+      );
+}
+
 /// A book the reader starred.
 class FavoriteBook {
   const FavoriteBook({required this.bookId, required this.title, required this.at});
@@ -95,6 +124,9 @@ class ReadingController extends ChangeNotifier {
   final List<Highlight> highlights = [];
   final List<FavoriteBook> favorites = [];
   final Map<String, ReadingPosition> _positions = {};
+
+  /// Matn / verse layers per book.
+  final Map<String, BookLayers> _layers = {};
 
   /// Pages visited per book, newest first (the reader's "history" tab).
   final Map<String, List<int>> _visited = {};
@@ -134,6 +166,17 @@ class ReadingController extends ChangeNotifier {
   /// The library tab opened first: 'books', 'authors', 'categories', 'search'.
   String libraryTab = 'books';
 
+  /// Verses (﴿…﴾) in the Quran face and colour.
+  bool styleQuran = true;
+  int quranColor = 0;
+
+  /// 'quran' (Amiri Quran) or 'book' (the book face).
+  String quranFont = 'quran';
+
+  /// Colour and weight of the matn in commentaries.
+  int matnColor = 0;
+  bool matnBold = true;
+
   Future<void> load() async {
     final prefs = _prefs = await SharedPreferences.getInstance();
     try {
@@ -153,6 +196,10 @@ class ReadingController extends ChangeNotifier {
               title: m['title'] as String? ?? '',
               at: DateTime.tryParse(m['at'] as String? ?? '') ?? DateTime.now(),
             )));
+      final layers = jsonDecode(prefs.getString('bookLayers') ?? '{}') as Map;
+      layers.forEach((k, v) {
+        if (v is Map) _layers['$k'] = BookLayers.fromJson(v.cast<String, dynamic>());
+      });
       final visited = jsonDecode(prefs.getString('visitedPages') ?? '{}') as Map;
       visited.forEach((k, v) {
         if (v is List) _visited['$k'] = [for (final p in v) if (p is num) p.toInt()];
@@ -183,6 +230,37 @@ class ReadingController extends ChangeNotifier {
     digits = prefs.getString('readerDigits') ?? 'arabic';
     highlightColor = prefs.getInt('readerHighlightColor') ?? 0;
     libraryTab = prefs.getString('libraryTab') ?? 'books';
+    styleQuran = prefs.getBool('readerStyleQuran') ?? true;
+    quranColor = prefs.getInt('readerQuranColor') ?? 0;
+    quranFont = prefs.getString('readerQuranFont') ?? 'quran';
+    matnColor = prefs.getInt('readerMatnColor') ?? 0;
+    matnBold = prefs.getBool('readerMatnBold') ?? true;
+    notifyListeners();
+  }
+
+  // ── Text layers ────────────────────────────────────────────────────
+
+  BookLayers layersOf(String bookId) => _layers[bookId] ?? const BookLayers();
+
+  Future<void> setLayers(String bookId, BookLayers value) async {
+    _layers[bookId] = value;
+    await _prefs?.setString('bookLayers', jsonEncode({for (final e in _layers.entries) e.key: e.value.toJson()}));
+    notifyListeners();
+  }
+
+  Future<void> setStyleQuran(bool v) => _setBool('readerStyleQuran', v, () => styleQuran = v);
+  Future<void> setQuranFont(String v) => _setString('readerQuranFont', v, () => quranFont = v);
+  Future<void> setMatnBold(bool v) => _setBool('readerMatnBold', v, () => matnBold = v);
+
+  Future<void> setQuranColor(int v) async {
+    quranColor = v;
+    await _prefs?.setInt('readerQuranColor', v);
+    notifyListeners();
+  }
+
+  Future<void> setMatnColor(int v) async {
+    matnColor = v;
+    await _prefs?.setInt('readerMatnColor', v);
     notifyListeners();
   }
 
@@ -327,7 +405,10 @@ class ReadingController extends ChangeNotifier {
 
   /// Puts every reader setting back to its default.
   Future<void> resetDisplay() async {
-    for (final k in ['readerFontScale', 'readerLineHeight', 'readerPaper', 'readerMode', 'readerFont', 'readerJustify', 'readerHideDiacritics', 'readerFootnotes', 'readerKeepAwake', 'readerDigits', 'readerHighlightColor']) {
+    for (final k in [
+      'readerFontScale', 'readerLineHeight', 'readerPaper', 'readerMode', 'readerFont', 'readerJustify', 'readerHideDiacritics', 'readerFootnotes', //
+      'readerKeepAwake', 'readerDigits', 'readerHighlightColor', 'readerStyleQuran', 'readerQuranColor', 'readerQuranFont', 'readerMatnColor', 'readerMatnBold',
+    ]) {
       await _prefs?.remove(k);
     }
     fontScale = 1.0;
@@ -341,6 +422,11 @@ class ReadingController extends ChangeNotifier {
     keepAwake = false;
     digits = 'arabic';
     highlightColor = 0;
+    styleQuran = true;
+    quranColor = 0;
+    quranFont = 'quran';
+    matnColor = 0;
+    matnBold = true;
     notifyListeners();
   }
 
@@ -356,6 +442,24 @@ class ReadingController extends ChangeNotifier {
     notifyListeners();
   }
 }
+
+/// Verse colours (light, dark): blue as in Turath, green, teal, violet, ink.
+const quranColors = [
+  (Color(0xFF1565C0), Color(0xFF82B1FF)),
+  (Color(0xFF2E7D32), Color(0xFF81C784)),
+  (Color(0xFF00897B), Color(0xFF4DB6AC)),
+  (Color(0xFF6C5CE7), Color(0xFFA29BFE)),
+  (Color(0xFF2B2620), Color(0xFFE8E1D3)),
+];
+
+/// Matn colours (light, dark): the red of printed commentaries, brown, violet, teal, ink.
+const matnColors = [
+  (Color(0xFFB3261E), Color(0xFFFF8A80)),
+  (Color(0xFF8D5524), Color(0xFFE0A86B)),
+  (Color(0xFF6C5CE7), Color(0xFFA29BFE)),
+  (Color(0xFF00796B), Color(0xFF4DB6AC)),
+  (Color(0xFF2B2620), Color(0xFFE8E1D3)),
+];
 
 /// Highlight colours: amber, green, blue, rose.
 const highlightColors = [Color(0xFFF5C451), Color(0xFF6FD39A), Color(0xFF7CB8F7), Color(0xFFF59AB8)];

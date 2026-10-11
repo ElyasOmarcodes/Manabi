@@ -1155,4 +1155,64 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get moreActions => 'المزيد';
+
+  @override
+  String get matnSection => 'المتن والشرح';
+
+  @override
+  String get matnSeparate => 'تمييز المتن في هذا الكتاب';
+
+  @override
+  String get matnMarkersLabel => 'المتن بين';
+
+  @override
+  String get bracesVerses => 'الأقواس المعقوفة للآيات';
+
+  @override
+  String get detectAuto => 'اكتشاف';
+
+  @override
+  String get detectAi => 'اكتشاف بالذكاء الاصطناعي';
+
+  @override
+  String get detecting => 'قراءة الصفحات…';
+
+  @override
+  String get detectedNone => 'لم تُعثر على علامات للمتن في هذه الصفحات';
+
+  @override
+  String get layersSourceAuto => 'اكتُشف من الصفحات';
+
+  @override
+  String get layersSourceAi => 'اكتشفه الذكاء الاصطناعي';
+
+  @override
+  String get quranSection => 'الآيات القرآنية';
+
+  @override
+  String get styleQuran => 'إظهار الآيات بخط المصحف';
+
+  @override
+  String get quranFontLabel => 'خط الآيات';
+
+  @override
+  String get fontAmiriQuran => 'أميري قرآن';
+
+  @override
+  String get fontBookFace => 'خط الكتاب';
+
+  @override
+  String get quranColorLabel => 'لون الآيات';
+
+  @override
+  String get matnColorLabel => 'لون المتن';
+
+  @override
+  String get matnBoldLabel => 'المتن بخط عريض';
+
+  @override
+  String get textFormatting => 'تنسيق النص';
+
+  @override
+  String get textFormattingSub => 'الآيات والمتن والشرح';
 }

@@ -2201,6 +2201,126 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'More'**
   String get moreActions;
+
+  /// No description provided for @matnSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Matn and commentary'**
+  String get matnSection;
+
+  /// No description provided for @matnSeparate.
+  ///
+  /// In en, this message translates to:
+  /// **'Set the matn apart in this book'**
+  String get matnSeparate;
+
+  /// No description provided for @matnMarkersLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'The matn is between'**
+  String get matnMarkersLabel;
+
+  /// No description provided for @bracesVerses.
+  ///
+  /// In en, this message translates to:
+  /// **'Curly braces hold Quran verses'**
+  String get bracesVerses;
+
+  /// No description provided for @detectAuto.
+  ///
+  /// In en, this message translates to:
+  /// **'Detect'**
+  String get detectAuto;
+
+  /// No description provided for @detectAi.
+  ///
+  /// In en, this message translates to:
+  /// **'Detect with AI'**
+  String get detectAi;
+
+  /// No description provided for @detecting.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading the pages…'**
+  String get detecting;
+
+  /// No description provided for @detectedNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No matn markers found on these pages'**
+  String get detectedNone;
+
+  /// No description provided for @layersSourceAuto.
+  ///
+  /// In en, this message translates to:
+  /// **'Detected from the pages'**
+  String get layersSourceAuto;
+
+  /// No description provided for @layersSourceAi.
+  ///
+  /// In en, this message translates to:
+  /// **'Detected by AI'**
+  String get layersSourceAi;
+
+  /// No description provided for @quranSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Quran verses'**
+  String get quranSection;
+
+  /// No description provided for @styleQuran.
+  ///
+  /// In en, this message translates to:
+  /// **'Show verses in the Quran style'**
+  String get styleQuran;
+
+  /// No description provided for @quranFontLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Verse font'**
+  String get quranFontLabel;
+
+  /// No description provided for @fontAmiriQuran.
+  ///
+  /// In en, this message translates to:
+  /// **'Amiri Quran'**
+  String get fontAmiriQuran;
+
+  /// No description provided for @fontBookFace.
+  ///
+  /// In en, this message translates to:
+  /// **'Book font'**
+  String get fontBookFace;
+
+  /// No description provided for @quranColorLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Verse colour'**
+  String get quranColorLabel;
+
+  /// No description provided for @matnColorLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Matn colour'**
+  String get matnColorLabel;
+
+  /// No description provided for @matnBoldLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Matn in bold'**
+  String get matnBoldLabel;
+
+  /// No description provided for @textFormatting.
+  ///
+  /// In en, this message translates to:
+  /// **'Text formatting'**
+  String get textFormatting;
+
+  /// No description provided for @textFormattingSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Verses, matn and commentary'**
+  String get textFormattingSub;
 }
 
 class _AppLocalizationsDelegate

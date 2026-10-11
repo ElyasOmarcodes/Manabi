@@ -282,3 +282,22 @@ class SearchResultPage {
         effectiveQuery: j['effectiveQuery'] as String?,
       );
 }
+
+/// The model's reading of a book's layers: which delimiters hold the matn
+/// (base text of a commentary) and which hold Quran verses.
+class LayersGuess {
+  const LayersGuess({this.isCommentary = false, this.matn = const [], this.quran = const [], this.confidence = 0, this.note = ''});
+  final bool isCommentary;
+  final List<String> matn;
+  final List<String> quran;
+  final double confidence;
+  final String note;
+
+  factory LayersGuess.fromJson(Map<String, dynamic> j) => LayersGuess(
+        isCommentary: j['isCommentary'] == true,
+        matn: [for (final m in j['matnMarkers'] as List? ?? const []) '$m'],
+        quran: [for (final m in j['quranMarkers'] as List? ?? const []) '$m'],
+        confidence: (j['confidence'] as num?)?.toDouble() ?? 0,
+        note: j['note'] as String? ?? '',
+      );
+}

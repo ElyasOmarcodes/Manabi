@@ -1155,4 +1155,64 @@ class AppLocalizationsPs extends AppLocalizations {
 
   @override
   String get moreActions => 'نور';
+
+  @override
+  String get matnSection => 'متن او شرح';
+
+  @override
+  String get matnSeparate => 'په دې کتاب کې متن جلا کړه';
+
+  @override
+  String get matnMarkersLabel => 'متن د دې نښو ترمنځ دی';
+
+  @override
+  String get bracesVerses => 'منحني قوسونه قرآني آیتونه لري';
+
+  @override
+  String get detectAuto => 'پېژندنه';
+
+  @override
+  String get detectAi => 'د AI پېژندنه';
+
+  @override
+  String get detecting => 'مخونه لوستل کیږي…';
+
+  @override
+  String get detectedNone => 'په دې مخونو کې د متن نښې ونه موندل شوې';
+
+  @override
+  String get layersSourceAuto => 'له مخونو وپېژندل شو';
+
+  @override
+  String get layersSourceAi => 'د AI له لارې وپېژندل شو';
+
+  @override
+  String get quranSection => 'قرآني آیتونه';
+
+  @override
+  String get styleQuran => 'آیتونه په قرآني بڼه ښکاره کړه';
+
+  @override
+  String get quranFontLabel => 'د آیتونو لیکبڼه';
+
+  @override
+  String get fontAmiriQuran => 'امیري قرآن';
+
+  @override
+  String get fontBookFace => 'د کتاب لیکبڼه';
+
+  @override
+  String get quranColorLabel => 'د آیتونو رنګ';
+
+  @override
+  String get matnColorLabel => 'د متن رنګ';
+
+  @override
+  String get matnBoldLabel => 'متن غټ';
+
+  @override
+  String get textFormatting => 'د متن بڼه';
+
+  @override
+  String get textFormattingSub => 'آیتونه، متن او شرح';
 }

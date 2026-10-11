@@ -1,3 +1,3 @@
 Vazirmatn (https://github.com/rastikerdar/vazirmatn), Noto Naskh Arabic (https://fonts.google.com/noto/specimen/Noto+Naskh+Arabic),
-Amiri (https://www.amirifont.org), Scheherazade New (https://software.sil.org/scheherazade) and
+Amiri and Amiri Quran (https://www.amirifont.org), Scheherazade New (https://software.sil.org/scheherazade) and
 IBM Plex Sans Arabic (https://github.com/IBM/plex) are licensed under the SIL Open Font License 1.1: https://openfontlicense.org/open-font-license-official-text/
