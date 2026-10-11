@@ -57,6 +57,9 @@ class PdfLinks {
     if (v != null) {
       final prefix = '${v.toString().padLeft(2, '0')}_';
       pick = whole.where((f) => f.startsWith(prefix)).firstOrNull ?? files.where((f) => f.startsWith(prefix)).firstOrNull;
+    } else if (volume != null && volume.trim().isNotEmpty) {
+      // A named volume such as المقدمة is the "00_" file.
+      pick = whole.where((f) => f.startsWith('00_')).firstOrNull;
     }
     pick ??= (whole.length == 1 ? whole.first : null) ?? whole.where((f) => !f.startsWith('00_')).firstOrNull ?? files.first;
     final path = '$root/${name(pick)}'.replaceAll(RegExp(r'/+'), '/');

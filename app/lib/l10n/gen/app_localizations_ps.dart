@@ -1292,4 +1292,36 @@ class AppLocalizationsPs extends AppLocalizations {
   String pagesShort(int count) {
     return '$count مخ';
   }
+
+  @override
+  String get pdfView => 'PDF';
+
+  @override
+  String get textView => 'متن';
+
+  @override
+  String get showPdf => 'چاپي PDF وښایه';
+
+  @override
+  String get showText => 'بېرته متن ته';
+
+  @override
+  String get pdfAlign => 'له متن سره برابرول';
+
+  @override
+  String get pdfAlignHint =>
+      'که د PDF پاڼه له متن سره سمه نه وي، دلته یې وښوروه؛ د دې کتاب لپاره ساتل کېږي.';
+
+  @override
+  String pdfPage(String page) {
+    return 'د PDF پاڼه $page';
+  }
+
+  @override
+  String get pdfOpenOutside => 'په براوزر کې پرانیستل';
+
+  @override
+  String pdfLoadingBytes(String size) {
+    return 'PDF پورته کېږي… $size';
+  }
 }

@@ -613,5 +613,28 @@
         "type": "int"
       }
     }
+  },
+  "pdfView": "PDF",
+  "textView": "Text",
+  "showPdf": "Show the printed PDF",
+  "showText": "Back to the text",
+  "pdfAlign": "Align with the text",
+  "pdfAlignHint": "If the PDF page does not match the text, shift it here; it is remembered for this book.",
+  "pdfPage": "PDF page {page}",
+  "@pdfPage": {
+    "placeholders": {
+      "page": {
+        "type": "String"
+      }
+    }
+  },
+  "pdfOpenOutside": "Open in the browser",
+  "pdfLoadingBytes": "Loading the PDF… {size}",
+  "@pdfLoadingBytes": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
   }
 }

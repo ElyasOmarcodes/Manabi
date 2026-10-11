@@ -1296,4 +1296,36 @@ class AppLocalizationsEn extends AppLocalizations {
   String pagesShort(int count) {
     return '$count p.';
   }
+
+  @override
+  String get pdfView => 'PDF';
+
+  @override
+  String get textView => 'Text';
+
+  @override
+  String get showPdf => 'Show the printed PDF';
+
+  @override
+  String get showText => 'Back to the text';
+
+  @override
+  String get pdfAlign => 'Align with the text';
+
+  @override
+  String get pdfAlignHint =>
+      'If the PDF page does not match the text, shift it here; it is remembered for this book.';
+
+  @override
+  String pdfPage(String page) {
+    return 'PDF page $page';
+  }
+
+  @override
+  String get pdfOpenOutside => 'Open in the browser';
+
+  @override
+  String pdfLoadingBytes(String size) {
+    return 'Loading the PDF… $size';
+  }
 }

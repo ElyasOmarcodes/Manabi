@@ -1292,4 +1292,36 @@ class AppLocalizationsAr extends AppLocalizations {
   String pagesShort(int count) {
     return '$count ص';
   }
+
+  @override
+  String get pdfView => 'PDF';
+
+  @override
+  String get textView => 'النص';
+
+  @override
+  String get showPdf => 'عرض نسخة PDF المصورة';
+
+  @override
+  String get showText => 'العودة إلى النص';
+
+  @override
+  String get pdfAlign => 'مطابقة مع النص';
+
+  @override
+  String get pdfAlignHint =>
+      'إن لم تطابق صفحة PDF النص فحرّكها من هنا؛ تُحفظ لهذا الكتاب.';
+
+  @override
+  String pdfPage(String page) {
+    return 'صفحة PDF $page';
+  }
+
+  @override
+  String get pdfOpenOutside => 'فتح في المتصفح';
+
+  @override
+  String pdfLoadingBytes(String size) {
+    return 'جارٍ تحميل PDF… $size';
+  }
 }

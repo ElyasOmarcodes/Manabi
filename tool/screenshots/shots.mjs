@@ -115,7 +115,7 @@ await run("06", async () => {
 await run("08", async () => {
   const { ctx, page } = await section(desktop, "کتابتون");
   await shot(page, "08-library-home");
-  await tap(page, "مؤلفین", { exact: true });
+  await tap(page, "مؤلفین");
   await shot(page, "09-library-authors");
   await ctx.close();
 });

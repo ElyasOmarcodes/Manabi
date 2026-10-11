@@ -445,5 +445,14 @@
   "narratorDeath": "وفات",
   "findInTexts": "یافتن در متن‌ها",
   "librarySections": "بخش‌ها",
-  "pagesShort": "{count} ص"
+  "pagesShort": "{count} ص",
+  "pdfView": "PDF",
+  "textView": "متن",
+  "showPdf": "نمایش PDF چاپی",
+  "showText": "بازگشت به متن",
+  "pdfAlign": "هم‌ترازی با متن",
+  "pdfAlignHint": "اگر صفحهٔ PDF با متن نمی‌خواند، از اینجا جابه‌جا کنید؛ برای این کتاب ذخیره می‌شود.",
+  "pdfPage": "صفحهٔ PDF {page}",
+  "pdfOpenOutside": "باز کردن در مرورگر",
+  "pdfLoadingBytes": "در حال بارگذاری PDF… {size}"
 }

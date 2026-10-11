@@ -2447,6 +2447,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count} p.'**
   String pagesShort(int count);
+
+  /// No description provided for @pdfView.
+  ///
+  /// In en, this message translates to:
+  /// **'PDF'**
+  String get pdfView;
+
+  /// No description provided for @textView.
+  ///
+  /// In en, this message translates to:
+  /// **'Text'**
+  String get textView;
+
+  /// No description provided for @showPdf.
+  ///
+  /// In en, this message translates to:
+  /// **'Show the printed PDF'**
+  String get showPdf;
+
+  /// No description provided for @showText.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to the text'**
+  String get showText;
+
+  /// No description provided for @pdfAlign.
+  ///
+  /// In en, this message translates to:
+  /// **'Align with the text'**
+  String get pdfAlign;
+
+  /// No description provided for @pdfAlignHint.
+  ///
+  /// In en, this message translates to:
+  /// **'If the PDF page does not match the text, shift it here; it is remembered for this book.'**
+  String get pdfAlignHint;
+
+  /// No description provided for @pdfPage.
+  ///
+  /// In en, this message translates to:
+  /// **'PDF page {page}'**
+  String pdfPage(String page);
+
+  /// No description provided for @pdfOpenOutside.
+  ///
+  /// In en, this message translates to:
+  /// **'Open in the browser'**
+  String get pdfOpenOutside;
+
+  /// No description provided for @pdfLoadingBytes.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading the PDF… {size}'**
+  String pdfLoadingBytes(String size);
 }
 
 class _AppLocalizationsDelegate

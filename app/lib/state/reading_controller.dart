@@ -128,6 +128,9 @@ class ReadingController extends ChangeNotifier {
   /// Matn / verse layers per book.
   final Map<String, BookLayers> _layers = {};
 
+  /// Per book: PDF page minus printed page, when the scan's numbering differs.
+  final Map<String, int> _pdfOffsets = {};
+
   /// Pages visited per book, newest first (the reader's "history" tab).
   final Map<String, List<int>> _visited = {};
 
@@ -200,6 +203,10 @@ class ReadingController extends ChangeNotifier {
       layers.forEach((k, v) {
         if (v is Map) _layers['$k'] = BookLayers.fromJson(v.cast<String, dynamic>());
       });
+      final offsets = jsonDecode(prefs.getString('pdfOffsets') ?? '{}') as Map;
+      offsets.forEach((k, v) {
+        if (v is num) _pdfOffsets['$k'] = v.toInt();
+      });
       final visited = jsonDecode(prefs.getString('visitedPages') ?? '{}') as Map;
       visited.forEach((k, v) {
         if (v is List) _visited['$k'] = [for (final p in v) if (p is num) p.toInt()];
@@ -245,6 +252,18 @@ class ReadingController extends ChangeNotifier {
   Future<void> setLayers(String bookId, BookLayers value) async {
     _layers[bookId] = value;
     await _prefs?.setString('bookLayers', jsonEncode({for (final e in _layers.entries) e.key: e.value.toJson()}));
+    notifyListeners();
+  }
+
+  int pdfOffsetOf(String bookId) => _pdfOffsets[bookId] ?? 0;
+
+  Future<void> setPdfOffset(String bookId, int value) async {
+    if (value == 0) {
+      _pdfOffsets.remove(bookId);
+    } else {
+      _pdfOffsets[bookId] = value;
+    }
+    await _prefs?.setString('pdfOffsets', jsonEncode(_pdfOffsets));
     notifyListeners();
   }
 

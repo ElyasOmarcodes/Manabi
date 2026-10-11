@@ -445,5 +445,14 @@
   "narratorDeath": "الوفاة",
   "findInTexts": "البحث عنه في النصوص",
   "librarySections": "الأقسام",
-  "pagesShort": "{count} ص"
+  "pagesShort": "{count} ص",
+  "pdfView": "PDF",
+  "textView": "النص",
+  "showPdf": "عرض نسخة PDF المصورة",
+  "showText": "العودة إلى النص",
+  "pdfAlign": "مطابقة مع النص",
+  "pdfAlignHint": "إن لم تطابق صفحة PDF النص فحرّكها من هنا؛ تُحفظ لهذا الكتاب.",
+  "pdfPage": "صفحة PDF {page}",
+  "pdfOpenOutside": "فتح في المتصفح",
+  "pdfLoadingBytes": "جارٍ تحميل PDF… {size}"
 }

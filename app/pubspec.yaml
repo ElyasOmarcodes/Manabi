@@ -29,6 +29,7 @@ dependencies:
   wakelock_plus: ^1.8.1
   flutter_foreground_task: ^11.0.3
   lottie: ^3.6.1
+  pdfrx: ^2.6.5
 
 dev_dependencies:
   flutter_test:

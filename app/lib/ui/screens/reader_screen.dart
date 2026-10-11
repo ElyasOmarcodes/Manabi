@@ -22,6 +22,7 @@ import '../../state/reading_controller.dart';
 import '../../state/settings_controller.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
+import '../widgets/pdf_pane.dart';
 import '../widgets/save_offline.dart';
 import 'library_screen.dart' show showNarrator;
 import 'settings_pages.dart' show ReadingSettingsPage;
@@ -126,6 +127,12 @@ class _ReaderScreenState extends State<ReaderScreen> {
   int? _markPage;
   bool _immersive = false;
   bool _panel = true;
+
+  /// The printed PDF is shown instead of the text, at [_pdfPage] of the
+  /// file for [_pdfVolume]; both follow the text page and back.
+  bool _pdf = false;
+  int _pdfPage = 1;
+  String? _pdfVolume;
   bool _wake = false;
   Timer? _scrollTick;
 
@@ -206,6 +213,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
       _mark = mark;
       _markPage = mark == null ? null : target;
       _page = target;
+      if (_pdf) _syncPdfToText();
       if (_modeInUse == 'pages') {
         if (_pages.hasClients) _pages.jumpToPage(target - 1);
       } else {
@@ -313,13 +321,73 @@ class _ReaderScreenState extends State<ReaderScreen> {
     return [for (final p in pages.take(6)) _loaded[p]!.text];
   }
 
-  /// Opens Turath's scanned edition at the printed page of the current page.
-  Future<void> _openPdf() async {
-    final pdf = _book?.pdf;
-    if (pdf == null) return toast(context, context.l.noPdf);
-    final at = _book!.locate(_page);
-    final printed = at.printed ?? _loaded[_page]?.printedPage;
-    await openUrl('${pdf.url(at.volume ?? _loaded[_page]?.volume)}${printed == null ? '' : '#page=$printed'}');
+  /// Points the PDF at the printed page of the current text page (as Turath
+  /// does), shifted by the book's alignment.
+  void _syncPdfToText() {
+    final at = _book?.locate(_page);
+    _pdfVolume = at?.volume ?? _loaded[_page]?.volume;
+    final printed = at?.printed ?? _loaded[_page]?.printedPage ?? 1;
+    _pdfPage = printed + _reading.pdfOffsetOf(widget.bookId);
+    if (_pdfPage < 1) _pdfPage = 1;
+  }
+
+  /// Switches between the text and Turath's scanned edition, in place.
+  void _togglePdf() {
+    if (_book?.pdf == null) return toast(context, context.l.noPdf);
+    if (!_pdf) {
+      setState(() {
+        _syncPdfToText();
+        _pdf = true;
+      });
+      return;
+    }
+    // Back to the text, at the page the PDF reached.
+    final oldScroll = _scroll;
+    final oldPages = _pages;
+    setState(() {
+      _pdf = false;
+      _anchor = _page;
+      _scroll = ScrollController();
+      _pages = PageController(initialPage: _page - 1);
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      oldScroll.dispose();
+      oldPages.dispose();
+    });
+  }
+
+  /// The PDF was scrolled: the text page follows.
+  void _onPdfPage(int n) {
+    _pdfPage = n;
+    final volume = _pdfVolume;
+    final book = _book;
+    if (volume == null || book == null) return;
+    final internal = book.internalFor(volume, n - _reading.pdfOffsetOf(widget.bookId));
+    if (internal != null) _setPage(internal);
+  }
+
+  Future<void> _setPdfOffset(int value) async {
+    await _reading.setPdfOffset(widget.bookId, value);
+    if (mounted) setState(_syncPdfToText);
+  }
+
+  Widget _pdfView(ReaderColors c) {
+    final reading = context.read<ReadingController>();
+    final url = _book!.pdf!.url(_pdfVolume);
+    return PdfPane(
+      key: ValueKey(url),
+      url: url,
+      page: _pdfPage,
+      onPage: _onPdfPage,
+      offset: reading.pdfOffsetOf(widget.bookId),
+      onOffset: _setPdfOffset,
+      onShowText: _togglePdf,
+      background: c.bg,
+      bar: c.bar,
+      text: c.text,
+      muted: c.muted,
+      digits: (n) => readerDigits(n, reading.digits),
+    );
   }
 
   void _toggleImmersive() {
@@ -439,7 +507,13 @@ class _ReaderScreenState extends State<ReaderScreen> {
           child: _immersive ? const SizedBox(width: double.infinity) : ValueListenableBuilder<int>(valueListenable: _bars, builder: (context, _, _) => _topBar(context, c, wide)),
         ),
         Expanded(child: Stack(children: [
-          Positioned.fill(child: reading.readingMode == 'pages' ? _pagesView(c) : _scrollView(c)),
+          Positioned.fill(
+            child: _pdf && _book?.pdf != null
+                ? _pdfView(c)
+                : reading.readingMode == 'pages'
+                    ? _pagesView(c)
+                    : _scrollView(c),
+          ),
           if (_immersive)
             PositionedDirectional(
               end: 14,
@@ -588,7 +662,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
           tool(Icons.manage_search_rounded, l.searchInBook, _openSearch),
           tool(Icons.tune_rounded, l.readerTools, _openTools),
           tool(Icons.fullscreen_rounded, l.fullScreen, _toggleImmersive),
-          if (_book?.pdf != null) tool(Icons.picture_as_pdf_outlined, l.openPdf, _openPdf),
+          if (_book?.pdf != null) tool(_pdf ? Icons.picture_as_pdf_rounded : Icons.picture_as_pdf_outlined, _pdf ? l.showText : l.showPdf, _togglePdf, active: _pdf),
           Expanded(
             child: count != null && count > 1
                 ? SliderTheme(
