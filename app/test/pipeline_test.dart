@@ -366,4 +366,9 @@ void main() {
     expect(namedMadhhabs('What do the Shafi\'is and Hanbalis say?'), ['shafii', 'hanbali']);
     expect(namedMadhhabs('حدیث نیت'), isEmpty);
   });
+
+  test('title search ignores punctuation', () {
+    expect(normalizeForSearch('جمع الجوامع...'), 'جمع الجوامع');
+    expect(normalizeForSearch('«الأربعون» (النووية)'), 'الاربعون النوويه');
+  });
 }

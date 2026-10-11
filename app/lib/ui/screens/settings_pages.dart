@@ -14,7 +14,7 @@ import '../widgets/chat_list.dart' show confirmDialog;
 import '../widgets/common.dart';
 import '../widgets/depth_picker.dart';
 import 'chat_screen.dart' show languageLabels;
-import 'reader_screen.dart' show ModePicker, PaperPicker, ReaderTextControls, bookTextStyle, readerColors;
+import 'reader_screen.dart' show ModePicker, PaperPicker, ReaderTextControls, bookTextStyle, readerColors, readerFonts;
 
 /// Shared frame of a settings sub-page.
 class _SettingsPage extends StatelessWidget {
@@ -481,17 +481,16 @@ class ReadingSettingsPage extends StatelessWidget {
       _Label(l.textSize),
       ReaderTextControls(reading: r),
       SettingsGroup(title: l.bookFont, children: [
-        for (final (value, name, family) in [('naskh', l.fontNaskh, arabicFont), ('vazir', l.fontModern, uiFont)])
+        for (final (value, family, name) in readerFonts(l))
           SettingsRow(
             icon: Icons.font_download_outlined,
             color: AuraHues.violet,
             title: name,
-            value: 'بسم الله',
-            trailing: Padding(
-              padding: const EdgeInsetsDirectional.only(start: 8),
-              child: Icon(r.fontFamily == value ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded, color: r.fontFamily == value ? a.accent : a.faint, size: 22),
-            ),
-            subtitle: family == arabicFont ? 'Noto Naskh Arabic' : 'Vazirmatn',
+            trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+              Text('بسم الله الرحمن الرحيم', textDirection: TextDirection.rtl, style: TextStyle(fontFamily: family, fontSize: 16, height: 1.6, color: a.text)),
+              const SizedBox(width: 10),
+              Icon(r.fontFamily == value ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded, color: r.fontFamily == value ? a.accent : a.faint, size: 22),
+            ]),
             onTap: () => r.setFontFamily(value),
           ),
       ]),

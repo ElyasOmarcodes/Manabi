@@ -13,6 +13,7 @@ import '../../core/catalog/catalog_service.dart';
 import '../../core/models/library.dart';
 import '../../core/models/scope.dart';
 import '../../core/turath/arabic_match.dart';
+import '../../l10n/gen/app_localizations.dart';
 import '../../state/nav_controller.dart';
 import '../../state/reading_controller.dart';
 import '../../state/settings_controller.dart';
@@ -43,11 +44,29 @@ ReaderColors readerColors(BuildContext context, String paper) {
   };
 }
 
+/// Book faces: id, font family, display name. Amiri follows the classic
+/// Naskh of printed editions (like Dar al-Kutub al-Ilmiyya's books).
+List<(String, String, String)> readerFonts(AppLocalizations l) => [
+      ('amiri', 'Amiri', l.fontAmiri),
+      ('naskh', arabicFont, l.fontNotoNaskh),
+      ('scheherazade', 'ScheherazadeNew', l.fontScheherazade),
+      ('plex', 'IBMPlexSansArabic', l.fontPlex),
+      ('vazir', uiFont, l.fontVazir),
+    ];
+
+String readerFontFamily(String id) => switch (id) {
+      'amiri' => 'Amiri',
+      'scheherazade' => 'ScheherazadeNew',
+      'plex' => 'IBMPlexSansArabic',
+      'vazir' => uiFont,
+      _ => arabicFont,
+    };
+
 /// The book text style for the reader settings.
 TextStyle bookTextStyle(BuildContext context, ReadingController r, {double size = 20, required Color color, FontWeight weight = FontWeight.w400}) {
-  final scale = context.read<SettingsController>().arabicScale * r.fontScale;
+  final scale = context.read<SettingsController>().arabicScale * r.fontScale * (r.fontFamily == 'amiri' || r.fontFamily == 'scheherazade' ? 1.08 : 1.0);
   return TextStyle(
-    fontFamily: r.fontFamily == 'vazir' ? uiFont : arabicFont,
+    fontFamily: readerFontFamily(r.fontFamily),
     fontSize: size * scale,
     height: r.lineHeight,
     fontWeight: weight,
@@ -259,6 +278,15 @@ class _ReaderScreenState extends State<ReaderScreen> {
           onFullScreen: _toggleImmersive,
         ),
       );
+
+  /// Opens Turath's scanned edition at the printed page of the current page.
+  Future<void> _openPdf() async {
+    final pdf = _book?.pdf;
+    if (pdf == null) return toast(context, context.l.noPdf);
+    final at = _book!.locate(_page);
+    final printed = at.printed ?? _loaded[_page]?.printedPage;
+    await openUrl('${pdf.url(at.volume ?? _loaded[_page]?.volume)}${printed == null ? '' : '#page=$printed'}');
+  }
 
   void _toggleImmersive() {
     setState(() => _immersive = !_immersive);
@@ -504,6 +532,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
           tool(Icons.manage_search_rounded, l.searchInBook, _openSearch),
           tool(Icons.tune_rounded, l.readerTools, _openTools),
           tool(Icons.fullscreen_rounded, l.fullScreen, _toggleImmersive),
+          if (_book?.pdf != null) tool(Icons.picture_as_pdf_outlined, l.openPdf, _openPdf),
           Expanded(
             child: count != null && count > 1
                 ? SliderTheme(
@@ -668,6 +697,7 @@ class _PageBlock extends StatelessWidget {
         }
         final marks = reading.highlightsOf(p.bookId, page);
         final bookmarked = reading.isBookmarked(p.bookId, page);
+        final selection = _Selection();
         final style = bookTextStyle(context, reading, color: colors.text);
         final align = reading.justify ? TextAlign.justify : TextAlign.start;
         return Container(
@@ -676,28 +706,30 @@ class _PageBlock extends StatelessWidget {
           child: ReadingWidth(
             maxWidth: 760,
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              if (title != null)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Text(title, style: bookTextStyle(context, reading, size: 17, weight: FontWeight.w700, color: a.accent).copyWith(height: 1.7)),
-                ),
-              SelectableText.rich(
-                _marked(context, body, mark, marks, style),
-                textDirection: TextDirection.rtl,
-                textAlign: align,
-                contextMenuBuilder: (context, state) => _menu(context, state),
+              // One selection area for the title, text and footnotes: it keeps
+              // Arabic (right-to-left) selection in reading order.
+              SelectionArea(
+                onSelectionChanged: (c) => selection.text = c?.plainText ?? '',
+                contextMenuBuilder: (context, state) => _menu(context, state, selection.text),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                  if (title != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Text(title, textDirection: TextDirection.rtl, style: bookTextStyle(context, reading, size: 17, weight: FontWeight.w700, color: a.accent).copyWith(height: 1.7)),
+                    ),
+                  Text.rich(_marked(context, body, mark, marks, style), textDirection: TextDirection.rtl, textAlign: align),
+                  if (notes.isNotEmpty && reading.showFootnotes) ...[
+                    const SizedBox(height: 14),
+                    Align(alignment: AlignmentDirectional.centerStart, child: SizedBox(width: 90, child: Divider(color: colors.muted.withValues(alpha: 0.5)))),
+                    const SizedBox(height: 4),
+                    Text.rich(
+                      _marked(context, notes, mark, marks, bookTextStyle(context, reading, size: 15.5, color: colors.muted).copyWith(height: reading.lineHeight * 0.88)),
+                      textDirection: TextDirection.rtl,
+                      textAlign: align,
+                    ),
+                  ],
+                ]),
               ),
-              if (notes.isNotEmpty && reading.showFootnotes) ...[
-                const SizedBox(height: 14),
-                Align(alignment: AlignmentDirectional.centerStart, child: SizedBox(width: 90, child: Divider(color: colors.muted.withValues(alpha: 0.5)))),
-                const SizedBox(height: 4),
-                SelectableText.rich(
-                  _marked(context, notes, mark, marks, bookTextStyle(context, reading, size: 15.5, color: colors.muted).copyWith(height: reading.lineHeight * 0.88)),
-                  textDirection: TextDirection.rtl,
-                  textAlign: align,
-                  contextMenuBuilder: (context, state) => _menu(context, state),
-                ),
-              ],
               const SizedBox(height: 10),
               Row(children: [
                 SizedBox(
@@ -734,10 +766,8 @@ class _PageBlock extends StatelessWidget {
   }
 
   /// Text selection menu: highlight and copy with citation come first.
-  Widget _menu(BuildContext context, EditableTextState state) {
+  Widget _menu(BuildContext context, SelectableRegionState state, String selected) {
     final l = context.l;
-    final value = state.textEditingValue;
-    final selected = value.selection.isValid && !value.selection.isCollapsed ? value.selection.textInside(value.text) : '';
     final items = [
       if (selected.trim().isNotEmpty) ...[
         ContextMenuButtonItem(label: l.highlight, onPressed: () {
@@ -761,7 +791,7 @@ class _PageBlock extends StatelessWidget {
         for (final (s, e) in arabicMatches(text, h.text))
           (s, e, TextStyle(backgroundColor: highlightColors[h.color.clamp(0, highlightColors.length - 1)].withValues(alpha: dark ? 0.38 : 0.45))),
       for (final (s, e) in arabicMatches(text, query))
-        (s, e, TextStyle(backgroundColor: AuraHues.amber.withValues(alpha: dark ? 0.42 : 0.38), decoration: TextDecoration.underline, decorationColor: AuraHues.amber)),
+        (s, e, TextStyle(color: dark ? const Color(0xFFFF8A80) : const Color(0xFFC62828), backgroundColor: AuraHues.rose.withValues(alpha: dark ? 0.12 : 0.08))),
     ]..sort((x, y) => x.$1.compareTo(y.$1));
     if (ranges.isEmpty) return TextSpan(text: text, style: style);
     final spans = <TextSpan>[];
@@ -776,6 +806,11 @@ class _PageBlock extends StatelessWidget {
     spans.add(TextSpan(text: text.substring(at)));
     return TextSpan(style: style, children: spans);
   }
+}
+
+/// The text currently selected on a page (for the selection menu).
+class _Selection {
+  String text = '';
 }
 
 /// The book side panel: contents, bookmarks, highlights and visited pages.
@@ -1125,6 +1160,8 @@ class _ToolsSheetState extends State<_ToolsSheet> {
             PaperPicker(reading: r),
             const SizedBox(height: 6),
             ModePicker(reading: r),
+            const SizedBox(height: 10),
+            FontPicker(reading: r),
             const Divider(height: 22),
             toggle(l.justifyText, Icons.format_align_justify_rounded, r.justify, r.setJustify),
             toggle(l.hideDiacritics, Icons.text_format_rounded, r.hideDiacritics, r.setHideDiacritics),
@@ -1240,6 +1277,34 @@ class PaperPicker extends StatelessWidget {
           ),
         ),
     ]);
+  }
+}
+
+/// Book face chips, each written in its own font.
+class FontPicker extends StatelessWidget {
+  const FontPicker({super.key, required this.reading});
+  final ReadingController reading;
+  @override
+  Widget build(BuildContext context) {
+    final a = context.aura;
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(children: [
+        for (final (id, family, name) in readerFonts(context.l))
+          Padding(
+            padding: const EdgeInsetsDirectional.only(end: 6),
+            child: ChoiceChip(
+              selected: reading.fontFamily == id,
+              showCheckmark: false,
+              onSelected: (_) => reading.setFontFamily(id),
+              label: Column(mainAxisSize: MainAxisSize.min, children: [
+                Text('بسم الله', style: TextStyle(fontFamily: family, fontSize: 16, height: 1.5, color: reading.fontFamily == id ? a.accent : a.text)),
+                Text(name, style: TextStyle(fontFamily: uiFont, fontSize: 10.5, color: a.muted)),
+              ]),
+            ),
+          ),
+      ]),
+    );
   }
 }
 

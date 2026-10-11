@@ -9,6 +9,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../models/library.dart';
+import 'html_text.dart';
 import '../pipeline/answer_pipeline.dart' show PassageSearch, SearchHits;
 import 'excerpt.dart';
 
@@ -22,8 +23,8 @@ class TurathException implements Exception {
   String toString() => 'TurathException($code): $message';
 }
 
-String _plainText(String value) =>
-    value.replaceAll(RegExp(r'<br\s*/?\s*>', caseSensitive: false), '\n').replaceAll(RegExp(r'</?[a-z][^>]*>', caseSensitive: false), '');
+String _plainText(String value) => decodeHtmlEntities(
+    value.replaceAll(RegExp(r'<br\s*/?\s*>', caseSensitive: false), '\n').replaceAll(RegExp(r'</?[a-z][^>]*>', caseSensitive: false), ''));
 
 String sourceUrl(String bookId, int? internalPage) =>
     internalPage == null ? 'https://app.turath.io/book/$bookId' : 'https://app.turath.io/book/$bookId?page=$internalPage';
@@ -180,6 +181,7 @@ class TurathClient implements PassageSearch {
       toc: toc,
       volumes: volumes,
       hasPdf: meta['pdf_links'] != null && meta['pdf_links'] != false && meta['pdf_links'] != '',
+      pdf: PdfLinks.parse(meta['pdf_links']),
       pageMap: pageMap,
       volumeBounds: bounds,
     );

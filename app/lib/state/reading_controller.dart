@@ -110,8 +110,8 @@ class ReadingController extends ChangeNotifier {
   /// 'scroll' (continuous pages, like Turath) or 'pages' (swipe page by page).
   String readingMode = 'scroll';
 
-  /// Arabic face of the book text: 'naskh' or 'vazir'.
-  String fontFamily = 'naskh';
+  /// Arabic face of the book text: 'amiri', 'naskh', 'scheherazade', 'plex' or 'vazir'.
+  String fontFamily = 'amiri';
 
   /// Justify lines (Arabic books are typeset justified).
   bool justify = true;
@@ -175,7 +175,7 @@ class ReadingController extends ChangeNotifier {
     lineHeight = prefs.getDouble('readerLineHeight') ?? 2.1;
     paper = prefs.getString('readerPaper') ?? 'paper';
     readingMode = prefs.getString('readerMode') ?? 'scroll';
-    fontFamily = prefs.getString('readerFont') ?? 'naskh';
+    fontFamily = prefs.getString('readerFont') ?? 'amiri';
     justify = prefs.getBool('readerJustify') ?? true;
     hideDiacritics = prefs.getBool('readerHideDiacritics') ?? false;
     showFootnotes = prefs.getBool('readerFootnotes') ?? true;
@@ -330,7 +330,7 @@ class ReadingController extends ChangeNotifier {
     lineHeight = 2.1;
     paper = 'paper';
     readingMode = 'scroll';
-    fontFamily = 'naskh';
+    fontFamily = 'amiri';
     justify = true;
     hideDiacritics = false;
     showFootnotes = true;

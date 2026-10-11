@@ -8,6 +8,7 @@
 //
 // Keep in sync with app/lib/core/pipeline/answer_pipeline.dart.
 import { partialJsonString } from "./partial.mjs";
+import { decodingTurath } from "./text.mjs";
 import {
   COMPOSE_SCHEMA,
   LANGUAGES,
@@ -374,7 +375,8 @@ const error = (code, message) => Object.assign(new Error(message), { code });
 /** Gemini output (or search) steps kept per request, so a retry resumes where it stopped. */
 export const createMemo = () => new Map();
 
-export const createPipeline = ({ gemini, turath, catalog }) => {
+export const createPipeline = ({ gemini, turath: client, catalog }) => {
+  const turath = decodingTurath(client);
   const ask = async (input, onEvent = () => {}, memo = createMemo()) => {
     const started = Date.now();
     const usage = { input: 0, output: 0, thoughts: 0, calls: 0, peak: 0 };

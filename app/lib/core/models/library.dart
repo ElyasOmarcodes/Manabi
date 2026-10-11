@@ -1,6 +1,8 @@
 /// Library records (Turath catalog and live Turath data).
 library;
 
+import '../turath/html_text.dart';
+
 class CatalogCategory {
   const CatalogCategory(this.id, this.title, this.bookCount);
   final String id;
@@ -30,6 +32,38 @@ class TocEntry {
   final int? page;
 }
 
+/// Turath's scanned edition: `files.turath.io/pdf/<root><file>`, per volume.
+class PdfLinks {
+  const PdfLinks(this.root, this.files);
+  final String root;
+
+  /// "01_54495.pdf", or with a part label: "01_54495p2.pdf|#3|المقدمة".
+  final List<String> files;
+
+  static PdfLinks? parse(Object? raw) {
+    if (raw is! Map || raw['files'] is! List) return null;
+    final files = [for (final f in raw['files'] as List) if (f is String && f.trim().isNotEmpty) f];
+    return files.isEmpty ? null : PdfLinks(raw['root'] is String ? raw['root'] as String : '', files);
+  }
+
+  Map<String, dynamic> toJson() => {'root': root, 'files': files};
+
+  /// The whole-volume file for [volume] (parts are only used as a fallback).
+  String url([String? volume]) {
+    String name(String f) => f.split('|').first;
+    final whole = files.where((f) => !f.contains('|')).toList();
+    String? pick;
+    final v = int.tryParse(volume ?? '');
+    if (v != null) {
+      final prefix = '${v.toString().padLeft(2, '0')}_';
+      pick = whole.where((f) => f.startsWith(prefix)).firstOrNull ?? files.where((f) => f.startsWith(prefix)).firstOrNull;
+    }
+    pick ??= (whole.length == 1 ? whole.first : null) ?? whole.where((f) => !f.startsWith('00_')).firstOrNull ?? files.first;
+    final path = '$root/${name(pick)}'.replaceAll(RegExp(r'/+'), '/');
+    return 'https://files.turath.io/pdf/${path.startsWith('/') ? path.substring(1) : path}';
+  }
+}
+
 class BookDetails {
   const BookDetails({
     required this.id,
@@ -42,6 +76,7 @@ class BookDetails {
     this.hasPdf = false,
     this.pageMap = const [],
     this.volumeBounds = const {},
+    this.pdf,
   });
   final String id;
   final String title;
@@ -57,6 +92,9 @@ class BookDetails {
 
   /// Volume → first and last internal page.
   final Map<String, (int, int)> volumeBounds;
+
+  /// The scanned edition, when Turath has one.
+  final PdfLinks? pdf;
 
   String get url => 'https://app.turath.io/book/$id';
 
@@ -136,6 +174,7 @@ class BookDetails {
         hasPdf: j['hasPdf'] == true,
         pageMap: (j['pageMap'] as List?)?.map((e) => '$e').toList() ?? const [],
         volumeBounds: parseBounds(j['volumeBounds']),
+        pdf: PdfLinks.parse(j['pdf']),
       );
 }
 
@@ -203,8 +242,8 @@ class PagePassage {
       printedPage: (location['printedPage'] as num?)?.toInt(),
       volume: location['volume']?.toString(),
       headings: (j['headings'] as List?)?.whereType<String>().toList() ?? const [],
-      text: j['text'] as String? ?? '',
-      snippet: j['snippet'] as String?,
+      text: decodeHtmlEntities(j['text'] as String? ?? ''),
+      snippet: j['snippet'] == null ? null : decodeHtmlEntities('${j['snippet']}'),
       url: j['url'] as String? ?? '',
       citation: j['citation'] as String?,
       shamelaUrl: (j['alternateUrls'] as Map?)?['shamela'] as String?,

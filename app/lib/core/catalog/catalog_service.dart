@@ -108,6 +108,8 @@ String normalizeForSearch(String value) => value
     .replaceAll(RegExp('[ىیۍې]'), 'ي')
     .replaceAll('ک', 'ك')
     .replaceAll('ة', 'ه')
+    // Punctuation and brackets («» ( ) … - ،) do not matter for titles.
+    .replaceAll(RegExp(r'[^\p{L}\p{N}\s]', unicode: true), ' ')
     .replaceAll(RegExp(r'\s+'), ' ')
     .trim()
     .toLowerCase();

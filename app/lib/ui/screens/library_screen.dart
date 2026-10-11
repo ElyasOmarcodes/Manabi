@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -187,7 +189,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
     final home = _q.trim().isEmpty;
     final books = _sorted(catalog.findBooks(_q, limit: catalog.books.length));
     final recent = home ? [for (final p in reading.recent.take(6)) if (catalog.book(p.bookId) != null) (catalog.book(p.bookId)!, p)] : const <(CatalogBook, ReadingPosition)>[];
-    if (books.isEmpty) return EmptyState(icon: Icons.search_off_rounded, text: l.noResults);
+    final online = home ? null : _TurathBooks(key: ValueKey(_q.trim()), query: _q.trim(), exclude: {for (final b in books.take(200)) b.id});
+    if (books.isEmpty && online == null) return EmptyState(icon: Icons.search_off_rounded, text: l.noResults);
     return CustomScrollView(slivers: [
       if (recent.isNotEmpty) ...[
         _header(context, l.recentlyRead),
@@ -198,7 +201,9 @@ class _LibraryScreenState extends State<LibraryScreen> {
         _header(context, l.allBooks),
       ] else if (!home)
         _header(context, l.matches(books.length)),
+      if (online != null && books.length < 12) SliverToBoxAdapter(child: _width(online)),
       SliverList.builder(itemCount: books.length, itemBuilder: (context, i) => _width(LibraryBookRow(book: books[i]))),
+      if (online != null && books.length >= 12) SliverToBoxAdapter(child: _width(online)),
       const SliverToBoxAdapter(child: SizedBox(height: 32)),
     ]);
   }
@@ -366,6 +371,90 @@ class _LibraryScreenState extends State<LibraryScreen> {
         ]),
       ),
     );
+  }
+}
+
+/// Books that are on Turath but not in the offline list (it is a snapshot):
+/// found through Turath's search, whose hits name their books. A number or
+/// a Turath link opens that book directly.
+class _TurathBooks extends StatefulWidget {
+  const _TurathBooks({super.key, required this.query, required this.exclude});
+  final String query;
+  final Set<String> exclude;
+  @override
+  State<_TurathBooks> createState() => _TurathBooksState();
+}
+
+class _TurathBooksState extends State<_TurathBooks> {
+  Timer? _debounce;
+  List<CatalogBook>? _books;
+  bool _failed = false;
+
+  String? get _directId => RegExp(r'^(?:https?://app\.turath\.io/book/)?(\d{1,7})(?:\D.*)?$').firstMatch(widget.query)?.group(1);
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.query.length >= 3 && _directId == null) _debounce = Timer(const Duration(milliseconds: 650), _search);
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _search() async {
+    final backend = context.read<SettingsController>().backend;
+    final catalog = context.read<CatalogService>();
+    final words = normalizeForSearch(widget.query).split(' ').where((w) => w.length > 1).toList();
+    try {
+      final pages = await Future.wait([
+        for (final page in [1, 2]) backend.search(widget.query, page: page).catchError((Object _) => const SearchResultPage(items: [], totalMatches: 0, page: 1)),
+      ]);
+      final found = <String, CatalogBook>{};
+      for (final p in pages.expand((r) => r.items)) {
+        if (widget.exclude.contains(p.bookId) || found.containsKey(p.bookId)) continue;
+        final title = normalizeForSearch(p.bookTitle);
+        if (words.isEmpty || !words.every(title.contains)) continue;
+        found[p.bookId] = catalog.book(p.bookId) ?? CatalogBook(p.bookId, p.bookTitle, p.authorId ?? '', p.categoryId ?? '');
+      }
+      if (mounted) setState(() => _books = found.values.toList());
+    } catch (_) {
+      if (mounted) setState(() => _failed = true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = context.l;
+    final a = context.aura;
+    final id = _directId;
+    if (id != null) {
+      return ListTile(
+        leading: Icon(Icons.open_in_browser_rounded, color: a.accent),
+        title: Text('${l.book} $id', style: TextStyle(fontFamily: uiFont, fontWeight: FontWeight.w700, color: a.text)),
+        subtitle: Text(l.onTurath, style: TextStyle(fontFamily: uiFont, fontSize: 12, color: a.muted)),
+        onTap: () => openReader(context, id, 1),
+      );
+    }
+    if (widget.query.length < 3 || _failed || (_books?.isEmpty ?? false)) return const SizedBox.shrink();
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Padding(
+        padding: const EdgeInsetsDirectional.fromSTEB(20, 14, 20, 2),
+        child: Row(children: [
+          Icon(Icons.travel_explore_rounded, size: 16, color: a.accent),
+          const SizedBox(width: 6),
+          Text(l.onTurath, style: TextStyle(fontFamily: uiFont, fontSize: 12.5, fontWeight: FontWeight.w700, color: a.accent)),
+          if (_books == null) ...[const SizedBox(width: 10), const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))],
+        ]),
+      ),
+      Padding(
+        padding: const EdgeInsetsDirectional.fromSTEB(20, 0, 20, 4),
+        child: Text(_books == null ? l.searchingTurath : l.onTurathInfo, style: TextStyle(fontFamily: uiFont, fontSize: 11.5, color: a.muted)),
+      ),
+      for (final b in _books ?? const <CatalogBook>[]) LibraryBookRow(book: b),
+    ]);
   }
 }
 

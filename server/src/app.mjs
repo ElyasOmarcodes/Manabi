@@ -1,6 +1,7 @@
 // HTTP API for the Manabi app. No framework: node:http, JSON and SSE.
 import { createServer } from "node:http";
 import { NususError } from "nusus";
+import { decodingTurath } from "./text.mjs";
 
 const VERSION = "1.0.0";
 const MAX_BODY = 32 * 1024;
@@ -67,6 +68,14 @@ export const createRateLimiter = ({ limit, windowMs, now = () => Date.now() }) =
   };
 };
 
+/** Turath's scanned PDFs: files.turath.io/pdf/<root><file>, one or more per volume. */
+const pdfLinks = (links) => {
+  if (!links || typeof links !== "object" || !Array.isArray(links.files)) return undefined;
+  const root = typeof links.root === "string" ? links.root : "";
+  const files = links.files.filter((f) => typeof f === "string" && f.trim());
+  return files.length ? { root, files } : undefined;
+};
+
 const stripRaw = (value) => {
   if (Array.isArray(value)) return value.map(stripRaw);
   if (value && typeof value === "object") {
@@ -79,7 +88,8 @@ const stripRaw = (value) => {
 
 const positive = (value) => (value && /^[1-9]\d*$/.test(value) ? value : undefined);
 
-export const createApp = ({ config, pipeline, turath, catalog, gemini, logger = console }) => {
+export const createApp = ({ config, pipeline, turath: client, catalog, gemini, logger = console }) => {
+  const turath = decodingTurath(client);
   const askLimiter = createRateLimiter({ limit: config.askLimit, windowMs: config.askWindowMs });
   const readLimiter = createRateLimiter({ limit: config.readLimit, windowMs: 60_000 });
 
@@ -135,6 +145,7 @@ export const createApp = ({ config, pipeline, turath, catalog, gemini, logger = 
         ...stripRaw(book),
         pageMap: Array.isArray(indexes.page_map) ? indexes.page_map : undefined,
         volumeBounds: indexes.volume_bounds && typeof indexes.volume_bounds === "object" ? indexes.volume_bounds : undefined,
+        pdf: pdfLinks(book.raw?.meta?.pdf_links),
       };
     }],
     ["GET", /^\/api\/authors\/([1-9]\d*)$/, async (m) => stripRaw(await turath.getAuthor(m[1]))],

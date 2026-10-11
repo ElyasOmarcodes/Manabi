@@ -56,6 +56,20 @@ flutter:
         - asset: assets/fonts/NotoNaskhArabic-Regular.ttf
         - asset: assets/fonts/NotoNaskhArabic-Bold.ttf
           weight: 700
+    # Book faces for the reader (SIL Open Font License).
+    - family: Amiri
+      fonts:
+        - asset: assets/fonts/Amiri-Regular.ttf
+        - asset: assets/fonts/Amiri-Bold.ttf
+          weight: 700
+    - family: ScheherazadeNew
+      fonts:
+        - asset: assets/fonts/ScheherazadeNew-Regular.ttf
+    - family: IBMPlexSansArabic
+      fonts:
+        - asset: assets/fonts/IBMPlexSansArabic-Regular.ttf
+        - asset: assets/fonts/IBMPlexSansArabic-Bold.ttf
+          weight: 700
 
 flutter_launcher_icons:
   image_path: assets/images/icon.png
