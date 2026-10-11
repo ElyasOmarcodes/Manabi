@@ -1152,4 +1152,7 @@ class AppLocalizationsPs extends AppLocalizations {
 
   @override
   String get fontVazir => 'وزیر متن';
+
+  @override
+  String get moreActions => 'نور';
 }

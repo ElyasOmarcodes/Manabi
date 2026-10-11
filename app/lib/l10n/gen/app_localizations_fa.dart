@@ -1154,4 +1154,7 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get fontVazir => 'وزیرمتن';
+
+  @override
+  String get moreActions => 'بیشتر';
 }

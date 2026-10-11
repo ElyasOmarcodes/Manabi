@@ -12,8 +12,11 @@ const turath = fixtureTurath();
 
 const keys = (prompt, prefix) => [...prompt.matchAll(new RegExp(`\\[(${prefix}\\d+)\\] Book: [^\\n]*Page: (\\d+)`, "g"))].map((m) => ({ key: m[1], page: Number(m[2]) }));
 
-const gemini = {
-  resolveModel: async () => "demo-model",
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Like the real client: token usage on every reply, and the answer streamed
+// in pieces when the pipeline asks for it (so the draft view can be seen).
+const scripted = {
   generateJson: async ({ prompt, schema }) => {
     if (schema.properties?.queries) {
       return { model: "demo-model", data: { standaloneQuestion: "حديث النية", detectedLanguage: "ps", questionType: "hadith", isIslamicStudies: true, queries: ["النيات", "الإسلام"], madhhabs: [], requestedBooks: [], referenceBooks: [] } };
@@ -46,6 +49,23 @@ const gemini = {
     };
   },
 };
+
+const gemini = {
+  resolveModel: async () => "demo-model",
+  generateJson: async (request) => {
+    await sleep(900);
+    const reply = await scripted.generateJson(request);
+    if (request.onText) {
+      const text = JSON.stringify(reply.data);
+      for (let n = 40; n < text.length; n += 40) {
+        request.onText(text.slice(0, n));
+        await sleep(120);
+      }
+    }
+    return { ...reply, usage: { input: Math.round(prompt(request).length / 3.6), output: Math.round(JSON.stringify(reply.data).length / 3.2), thoughts: request.onText ? 180 : 60 } };
+  },
+};
+const prompt = (r) => `${r.system}${r.prompt}`;
 
 const pipeline = createPipeline({ gemini, turath, catalog });
 const app = createApp({ config: { allowedOrigins: ["*"], askLimit: 1000, askWindowMs: 60_000, readLimit: 10_000, trustProxy: false }, pipeline, turath, catalog, gemini, logger: console });

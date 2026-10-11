@@ -2195,6 +2195,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Vazirmatn'**
   String get fontVazir;
+
+  /// No description provided for @moreActions.
+  ///
+  /// In en, this message translates to:
+  /// **'More'**
+  String get moreActions;
 }
 
 class _AppLocalizationsDelegate

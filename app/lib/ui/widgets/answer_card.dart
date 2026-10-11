@@ -205,7 +205,7 @@ class AnswerCard extends StatelessWidget {
                 onTap: () => showExportSheet(context, title: turn.question, turns: [turn], uiLanguage: context.read<SettingsController>().uiLanguage),
               ),
               if (onRetry != null) _Action(icon: Icons.refresh_rounded, tooltip: l.retry, onTap: onRetry!),
-              if (onMore != null) _Action(icon: Icons.more_horiz_rounded, tooltip: l.options, onTap: onMore!),
+              if (onMore != null) _Action(icon: Icons.more_horiz_rounded, tooltip: l.moreActions, onTap: onMore!),
               if (!r.usage.isEmpty)
                 Padding(
                   padding: const EdgeInsetsDirectional.only(start: 6),

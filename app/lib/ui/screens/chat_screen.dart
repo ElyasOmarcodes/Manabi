@@ -144,7 +144,7 @@ class _Welcome extends StatelessWidget {
       child: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          const Reveal(child: BrandLogo(height: 64)),
+          const AnimatedBrandLogo(height: 64),
           const SizedBox(height: 18),
           Reveal(
             delay: 80,

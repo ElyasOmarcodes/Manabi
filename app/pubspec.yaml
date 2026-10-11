@@ -28,6 +28,7 @@ dependencies:
   package_info_plus: ^10.0.0
   wakelock_plus: ^1.8.1
   flutter_foreground_task: ^11.0.3
+  lottie: ^3.6.1
 
 dev_dependencies:
   flutter_test:
@@ -91,11 +92,10 @@ flutter_launcher_icons:
     generate: true
     image_path: assets/images/icon.png
 
+# Plain background only: the Flutter splash then draws the logo in (Lottie).
 flutter_native_splash:
   color: "#FFFFFF"
-  image: assets/images/splash_logo.png
   color_dark: "#0F0F14"
-  image_dark: assets/images/splash_logo_dark.png
   android_12:
     color: "#FFFFFF"
     color_dark: "#0F0F14"

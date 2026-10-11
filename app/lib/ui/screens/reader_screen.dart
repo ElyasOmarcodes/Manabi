@@ -743,7 +743,7 @@ class _PageBlock extends StatelessWidget {
                 SizedBox(
                   width: 40,
                   child: PopupMenuButton<String>(
-                    tooltip: l.options,
+                    tooltip: l.moreActions,
                     icon: Icon(Icons.more_horiz_rounded, color: colors.muted, size: 20),
                     onSelected: onAction,
                     itemBuilder: (_) => [

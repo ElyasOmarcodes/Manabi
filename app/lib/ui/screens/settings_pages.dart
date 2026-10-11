@@ -648,7 +648,7 @@ class AboutPage extends StatelessWidget {
       _Card(
         padding: const EdgeInsets.fromLTRB(20, 28, 20, 22),
         child: Column(children: [
-          const BrandLogo(height: 74),
+          const AnimatedBrandLogo(height: 74),
           const SizedBox(height: 10),
           FutureBuilder<PackageInfo>(
             future: PackageInfo.fromPlatform(),

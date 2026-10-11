@@ -1156,4 +1156,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get fontVazir => 'Vazirmatn';
+
+  @override
+  String get moreActions => 'More';
 }

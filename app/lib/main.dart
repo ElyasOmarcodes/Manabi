@@ -28,7 +28,7 @@ class AppServices {
   final ChatController chats;
 
   static Future<AppServices> load() async {
-    final minSplash = Future<void>.delayed(const Duration(milliseconds: 1500));
+    final minSplash = Future<void>.delayed(const Duration(milliseconds: 3800));
     final catalog = await CatalogService.load();
     final settings = await SettingsController.load(catalog);
     final store = await ChatStore.open();

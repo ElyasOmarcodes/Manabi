@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lottie/lottie.dart';
 
 import '../theme.dart';
 import 'brand_paths.dart';
@@ -87,4 +88,58 @@ Path parseSvgPath(String d) {
     }
   }
   return path;
+}
+
+/// The المنابع logo drawing itself in (Lottie, built from the same paths by
+/// tool/brand/lottie.py): stroked in the brand violet, then filled in the
+/// theme's ink colour, with the Latin name rising in underneath.
+class AnimatedBrandLogo extends StatefulWidget {
+  const AnimatedBrandLogo({super.key, this.height = 112, this.delay = Duration.zero, this.onDone});
+  final double height;
+  final Duration delay;
+  final VoidCallback? onDone;
+  @override
+  State<AnimatedBrandLogo> createState() => _AnimatedBrandLogoState();
+}
+
+class _AnimatedBrandLogoState extends State<AnimatedBrandLogo> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(vsync: this)..addStatusListener((s) {
+      if (s == AnimationStatus.completed) widget.onDone?.call();
+    });
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final a = context.aura;
+    return SizedBox(
+      height: widget.height,
+      child: AspectRatio(
+        aspectRatio: brandViewBox.width / brandViewBox.height,
+        child: Lottie.asset(
+          'assets/brand/almanabea_lottie.json',
+          controller: _c,
+          fit: BoxFit.contain,
+          // Without the animation (tests, missing asset) the still logo shows.
+          errorBuilder: (context, error, stack) => BrandLogo(height: widget.height),
+          delegates: LottieDelegates(values: [
+            ValueDelegate.strokeColor(const ['ink', '**'], value: a.accent),
+            ValueDelegate.color(const ['ink', '**'], value: a.text),
+            ValueDelegate.strokeColor(const ['latin', '**'], value: a.muted),
+            ValueDelegate.color(const ['latin', '**'], value: a.muted),
+          ]),
+          onLoaded: (composition) {
+            _c.duration = composition.duration;
+            Future<void>.delayed(widget.delay, () {
+              if (mounted) _c.forward();
+            });
+          },
+        ),
+      ),
+    );
+  }
 }

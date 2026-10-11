@@ -1152,4 +1152,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get fontVazir => 'وزير متن';
+
+  @override
+  String get moreActions => 'المزيد';
 }
