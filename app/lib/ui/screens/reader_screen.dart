@@ -125,6 +125,15 @@ class _ReaderScreenState extends State<ReaderScreen> {
   Timer? _scrollTick;
 
   ManabiBackend get _backend => context.read<SettingsController>().backend;
+  late final ReadingController _reading = context.read<ReadingController>();
+
+  /// Bumped when the page or a loaded page changes: only the bars and the
+  /// panel rebuild, never the pages, so scrolling stays smooth.
+  final _bars = ValueNotifier<int>(0);
+  void _barsChanged() => _bars.value++;
+
+  /// Measured height of loaded pages, used for pages still loading.
+  double _avgHeight = 640;
 
   @override
   void initState() {
@@ -145,6 +154,10 @@ class _ReaderScreenState extends State<ReaderScreen> {
     _scrollTick?.cancel();
     _scroll.dispose();
     _pages.dispose();
+    _bars.dispose();
+    // Positions were saved quietly while reading; tell the library now.
+    final reading = _reading;
+    WidgetsBinding.instance.addPostFrameCallback((_) => reading.notifyPositions());
     if (_wake) WakelockPlus.disable().catchError((Object _) {});
     if (_immersive) SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
@@ -155,7 +168,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
   Future<PagePassage> _passage(int page) => _cache.putIfAbsent(page, () {
         final f = _backend.page(widget.bookId, page);
         f.then((p) {
-          if (mounted) setState(() => _loaded[page] = p);
+          _loaded[page] = p;
+          if (mounted) _barsChanged();
         }).catchError((Object _) {
           _cache.remove(page);
         });
@@ -170,11 +184,12 @@ class _ReaderScreenState extends State<ReaderScreen> {
     }
   }
 
-  void _remember() => context.read<ReadingController>().savePosition(widget.bookId, _title, _page);
+  void _remember() => _reading.savePosition(widget.bookId, _title, _page, notify: false);
 
   void _setPage(int page) {
     if (page == _page) return;
-    setState(() => _page = page);
+    _page = page;
+    _barsChanged();
     _remember();
     _prefetch(page);
   }
@@ -230,15 +245,20 @@ class _ReaderScreenState extends State<ReaderScreen> {
       final view = _viewKey.currentContext?.findRenderObject() as RenderBox?;
       if (view == null || !view.attached) return;
       final probe = view.localToGlobal(Offset(0, view.size.height * 0.3)).dy;
+      int? current;
+      var sum = 0.0, n = 0;
       for (final e in _pageKeys.entries) {
         final box = e.value.currentContext?.findRenderObject() as RenderBox?;
-        if (box == null || !box.attached) continue;
-        final top = box.localToGlobal(Offset.zero).dy;
-        if (top <= probe && top + box.size.height > probe) {
-          _setPage(e.key);
-          break;
+        if (box == null || !box.attached || !box.hasSize) continue;
+        if (_loaded.containsKey(e.key)) {
+          sum += box.size.height;
+          n++;
         }
+        final top = box.localToGlobal(Offset.zero).dy;
+        if (current == null && top <= probe && top + box.size.height > probe) current = e.key;
       }
+      if (n > 0) _avgHeight = (sum / n).clamp(240.0, 2400.0);
+      if (current != null) _setPage(current);
       _pageKeys.removeWhere((p, k) => (p - _page).abs() > 40 && k.currentContext == null);
     });
   }
@@ -374,23 +394,26 @@ class _ReaderScreenState extends State<ReaderScreen> {
     return LayoutBuilder(builder: (context, box) {
       final wide = box.maxWidth >= 980;
       final rtlApp = Directionality.of(context) == TextDirection.rtl;
-      final panel = _BookPanel(
-        bookId: widget.bookId,
-        title: _title,
-        book: _book,
-        current: _page,
-        digits: reading.digits,
-        onJump: (page, {mark}) {
-          if (!wide) Navigator.of(context).maybePop();
-          _jump(page, mark: mark);
-        },
+      final panel = ValueListenableBuilder<int>(
+        valueListenable: _bars,
+        builder: (context, _, _) => _BookPanel(
+          bookId: widget.bookId,
+          title: _title,
+          book: _book,
+          current: _page,
+          digits: reading.digits,
+          onJump: (page, {mark}) {
+            if (!wide) Navigator.of(context).maybePop();
+            _jump(page, mark: mark);
+          },
+        ),
       );
       final drawer = Drawer(width: box.maxWidth.clamp(0, 420) * 0.9, backgroundColor: context.aura.surface, child: SafeArea(child: panel));
       final reader = Column(children: [
         AnimatedSize(
           duration: const Duration(milliseconds: 220),
           curve: Curves.easeOutCubic,
-          child: _immersive ? const SizedBox(width: double.infinity) : _topBar(context, c, wide),
+          child: _immersive ? const SizedBox(width: double.infinity) : ValueListenableBuilder<int>(valueListenable: _bars, builder: (context, _, _) => _topBar(context, c, wide)),
         ),
         Expanded(child: Stack(children: [
           Positioned.fill(child: reading.readingMode == 'pages' ? _pagesView(c) : _scrollView(c)),
@@ -409,7 +432,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
         AnimatedSize(
           duration: const Duration(milliseconds: 220),
           curve: Curves.easeOutCubic,
-          child: _immersive ? const SizedBox(width: double.infinity) : _bottomBar(context, c, wide),
+          child: _immersive ? const SizedBox(width: double.infinity) : ValueListenableBuilder<int>(valueListenable: _bars, builder: (context, _, _) => _bottomBar(context, c, wide)),
         ),
       ]);
       return Focus(
@@ -547,7 +570,10 @@ class _ReaderScreenState extends State<ReaderScreen> {
                       min: 1,
                       max: count.toDouble(),
                       label: pageLabel(context, _book, _page, digits: reading.digits),
-                      onChanged: (v) => setState(() => _page = v.round()),
+                      onChanged: (v) {
+                        _page = v.round();
+                        _barsChanged();
+                      },
                       onChangeEnd: (v) => _jump(v.round()),
                     ),
                   )
@@ -578,6 +604,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
         key: _pageKeys.putIfAbsent(page, GlobalKey.new),
         page: page,
         future: _passage(page),
+        initial: _loaded[page],
+        estimate: _avgHeight,
         colors: c,
         continuous: continuous,
         mark: _markPage == page ? _mark : null,
@@ -604,7 +632,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
             key: _viewKey,
             controller: _scroll,
             center: center,
-            scrollCacheExtent: const ScrollCacheExtent.pixels(1400),
+            scrollCacheExtent: const ScrollCacheExtent.pixels(2600),
             slivers: [
               SliverList(
                 delegate: SliverChildBuilderDelegate((context, i) => _block(_anchor - 1 - i, c, continuous: true), childCount: _anchor - 1),
@@ -645,6 +673,8 @@ class _PageBlock extends StatelessWidget {
     super.key,
     required this.page,
     required this.future,
+    this.initial,
+    this.estimate = 640,
     required this.colors,
     required this.continuous,
     required this.mark,
@@ -656,6 +686,11 @@ class _PageBlock extends StatelessWidget {
   });
   final int page;
   final Future<PagePassage> future;
+
+  /// The page when already loaded: built at once, without a loading frame
+  /// (which made the view jump when pages came back into view).
+  final PagePassage? initial;
+  final double estimate;
   final ReaderColors colors;
   final bool continuous;
   final String? mark;
@@ -672,11 +707,12 @@ class _PageBlock extends StatelessWidget {
     final reading = context.watch<ReadingController>();
     return FutureBuilder<PagePassage>(
       future: future,
+      initialData: initial,
       builder: (context, snap) {
-        if (snap.connectionState != ConnectionState.done) {
-          return SizedBox(height: continuous ? 420 : MediaQuery.sizeOf(context).height * 0.6, child: const Center(child: TypingDots()));
+        if (!snap.hasData) {
+          if (snap.hasError) return SizedBox(height: 320, child: ErrorPanel(code: mapError(snap.error!).code, onRetry: onRetry));
+          return SizedBox(height: continuous ? estimate : MediaQuery.sizeOf(context).height * 0.6, child: const Center(child: TypingDots()));
         }
-        if (snap.hasError) return SizedBox(height: 320, child: ErrorPanel(code: mapError(snap.error!).code, onRetry: onRetry));
         final p = snap.data!;
         final split = RegExp(r'\n?_{5,}\n?').firstMatch(p.text);
         var body = (split == null ? p.text : p.text.substring(0, split.start)).trim();

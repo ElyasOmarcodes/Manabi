@@ -275,7 +275,9 @@ class ReadingController extends ChangeNotifier {
   /// Recently read books, newest first.
   List<ReadingPosition> get recent => _positions.values.toList()..sort((a, b) => b.at.compareTo(a.at));
 
-  Future<void> savePosition(String bookId, String title, int page) async {
+  /// With [notify] false (the reader, on every page) listeners are told
+  /// later through [notifyPositions], so pages do not rebuild while scrolling.
+  Future<void> savePosition(String bookId, String title, int page, {bool notify = true}) async {
     _positions[bookId] = ReadingPosition(bookId: bookId, bookTitle: title, page: page, at: DateTime.now());
     _visit(bookId, page);
     // Keep the most recent 40 books.
@@ -285,8 +287,10 @@ class ReadingController extends ChangeNotifier {
     await _prefs?.setString('visitedPages', jsonEncode(_visited));
     await _prefs?.setString(
         'readingPositions', jsonEncode({for (final p in _positions.values) p.bookId: {'title': p.bookTitle, 'page': p.page, 'at': p.at.toIso8601String()}}));
-    notifyListeners();
+    if (notify) notifyListeners();
   }
+
+  void notifyPositions() => notifyListeners();
 
   Future<void> setFontScale(double v) async {
     fontScale = v;

@@ -15,6 +15,7 @@ import 'state/settings_controller.dart';
 import 'ui/home_shell.dart';
 import 'ui/screens/splash_screen.dart';
 import 'ui/theme.dart';
+import 'ui/widgets/visual_arrow_keys.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -116,7 +117,7 @@ class _App extends StatelessWidget {
         final mq = MediaQuery.of(context);
         final base = mq.textScaler.scale(100) / 100;
         final phone = mq.size.shortestSide < 600;
-        return MediaQuery(data: mq.copyWith(textScaler: TextScaler.linear(base * (phone ? 0.9 : 1.0) * settings.textScale)), child: child!);
+        return MediaQuery(data: mq.copyWith(textScaler: TextScaler.linear(base * (phone ? 0.9 : 1.0) * settings.textScale)), child: VisualArrowKeys(child: child!));
       },
       home: const HomeShell(),
     );
