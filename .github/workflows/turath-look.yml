@@ -33,7 +33,7 @@ jobs:
           from PIL import Image
           for path in sorted(glob.glob("turath-shots/*.png")):
               im = Image.open(path).convert("RGB")
-              im.thumbnail((700, 1000))
+              im.thumbnail((720, 1500))
               buf = io.BytesIO()
               im.save(buf, "JPEG", quality=60, optimize=True)
               print("SHOT", os.path.basename(path), base64.b64encode(buf.getvalue()).decode())
