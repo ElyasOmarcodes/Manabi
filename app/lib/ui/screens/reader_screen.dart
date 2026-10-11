@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:flutter/gestures.dart' show GestureRecognizer, TapGestureRecognizer;
+import 'package:flutter/gestures.dart' show GestureRecognizer, PointerDeviceKind, TapGestureRecognizer;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollCacheExtent;
 import 'package:flutter/services.dart';
@@ -732,16 +732,20 @@ class _ReaderScreenState extends State<ReaderScreen> {
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           SizedBox(
             height: 48,
-            child: PageView(
-              controller: _barPager,
-              onPageChanged: (i) {
-                _barPage = i;
-                _barsChanged();
-              },
-              children: [
-                Row(children: [prev, Expanded(child: slider), next, label]),
-                Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [...tools, label]),
-              ],
+            child: ScrollConfiguration(
+              // A mouse or trackpad can slide it too (small desktop windows).
+              behavior: ScrollConfiguration.of(context).copyWith(dragDevices: PointerDeviceKind.values.toSet()),
+              child: PageView(
+                controller: _barPager,
+                onPageChanged: (i) {
+                  _barPage = i;
+                  _barsChanged();
+                },
+                children: [
+                  Row(children: [prev, Expanded(child: slider), next, label]),
+                  Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [...tools, label]),
+                ],
+              ),
             ),
           ),
           // Which row is shown; tap to switch.
