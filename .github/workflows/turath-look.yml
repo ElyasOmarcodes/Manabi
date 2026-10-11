@@ -4,6 +4,11 @@ name: Look at Turath (reference screenshots)
 # screenshots plus a dump of each page's controls into the log.
 on:
   workflow_dispatch:
+    inputs:
+      network_only:
+        description: Only list the data requests (no screenshots)
+        required: false
+        default: "false"
 
 permissions:
   contents: read
@@ -23,7 +28,9 @@ jobs:
           npx playwright install --with-deps chromium
       - name: Capture Turath pages
         working-directory: tool/turath-look
-        run: node look.mjs "$GITHUB_WORKSPACE/turath-shots"
+        run: |
+          node network.mjs
+          [ "${{ github.event.inputs.network_only }}" = "true" ] || node look.mjs "$GITHUB_WORKSPACE/turath-shots"
       - name: Print screenshots (small JPEG, base64)
         if: always()
         run: |
