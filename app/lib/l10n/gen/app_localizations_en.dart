@@ -1219,4 +1219,81 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get textFormattingSub => 'Verses, matn and commentary';
+
+  @override
+  String get libSearchHint => 'Search books and authors…';
+
+  @override
+  String get narrators => 'Narrators';
+
+  @override
+  String get tabDownloaded => 'Saved offline';
+
+  @override
+  String get noDownloads =>
+      'Save a book from its info sheet or the reader menu to read it without internet.';
+
+  @override
+  String get saveOffline => 'Save for offline';
+
+  @override
+  String savingOffline(int percent) {
+    return 'Saving… $percent%';
+  }
+
+  @override
+  String get savedOffline => 'Saved on this device';
+
+  @override
+  String get removeDownload => 'Remove from device';
+
+  @override
+  String get stopDownload => 'Stop';
+
+  @override
+  String downloadsSize(String size) {
+    return '$size on this device';
+  }
+
+  @override
+  String get deleteAllDownloads => 'Delete all saved books';
+
+  @override
+  String get deleteAllDownloadsConfirm =>
+      'Delete every book saved on this device?';
+
+  @override
+  String searchInTextsFor(String query) {
+    return 'Search the texts for «$query»';
+  }
+
+  @override
+  String seeAll(int count) {
+    return 'See all ($count)';
+  }
+
+  @override
+  String narratorsCount(String count) {
+    return '$count narrators';
+  }
+
+  @override
+  String get searchNarrators => 'Search narrators…';
+
+  @override
+  String get narratorRank => 'Grade';
+
+  @override
+  String get narratorDeath => 'Died';
+
+  @override
+  String get findInTexts => 'Find in the texts';
+
+  @override
+  String get librarySections => 'Sections';
+
+  @override
+  String pagesShort(int count) {
+    return '$count p.';
+  }
 }

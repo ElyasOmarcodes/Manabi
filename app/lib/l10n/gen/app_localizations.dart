@@ -2321,6 +2321,132 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Verses, matn and commentary'**
   String get textFormattingSub;
+
+  /// No description provided for @libSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search books and authors…'**
+  String get libSearchHint;
+
+  /// No description provided for @narrators.
+  ///
+  /// In en, this message translates to:
+  /// **'Narrators'**
+  String get narrators;
+
+  /// No description provided for @tabDownloaded.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved offline'**
+  String get tabDownloaded;
+
+  /// No description provided for @noDownloads.
+  ///
+  /// In en, this message translates to:
+  /// **'Save a book from its info sheet or the reader menu to read it without internet.'**
+  String get noDownloads;
+
+  /// No description provided for @saveOffline.
+  ///
+  /// In en, this message translates to:
+  /// **'Save for offline'**
+  String get saveOffline;
+
+  /// No description provided for @savingOffline.
+  ///
+  /// In en, this message translates to:
+  /// **'Saving… {percent}%'**
+  String savingOffline(int percent);
+
+  /// No description provided for @savedOffline.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved on this device'**
+  String get savedOffline;
+
+  /// No description provided for @removeDownload.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove from device'**
+  String get removeDownload;
+
+  /// No description provided for @stopDownload.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop'**
+  String get stopDownload;
+
+  /// No description provided for @downloadsSize.
+  ///
+  /// In en, this message translates to:
+  /// **'{size} on this device'**
+  String downloadsSize(String size);
+
+  /// No description provided for @deleteAllDownloads.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete all saved books'**
+  String get deleteAllDownloads;
+
+  /// No description provided for @deleteAllDownloadsConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete every book saved on this device?'**
+  String get deleteAllDownloadsConfirm;
+
+  /// No description provided for @searchInTextsFor.
+  ///
+  /// In en, this message translates to:
+  /// **'Search the texts for «{query}»'**
+  String searchInTextsFor(String query);
+
+  /// No description provided for @seeAll.
+  ///
+  /// In en, this message translates to:
+  /// **'See all ({count})'**
+  String seeAll(int count);
+
+  /// No description provided for @narratorsCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} narrators'**
+  String narratorsCount(String count);
+
+  /// No description provided for @searchNarrators.
+  ///
+  /// In en, this message translates to:
+  /// **'Search narrators…'**
+  String get searchNarrators;
+
+  /// No description provided for @narratorRank.
+  ///
+  /// In en, this message translates to:
+  /// **'Grade'**
+  String get narratorRank;
+
+  /// No description provided for @narratorDeath.
+  ///
+  /// In en, this message translates to:
+  /// **'Died'**
+  String get narratorDeath;
+
+  /// No description provided for @findInTexts.
+  ///
+  /// In en, this message translates to:
+  /// **'Find in the texts'**
+  String get findInTexts;
+
+  /// No description provided for @librarySections.
+  ///
+  /// In en, this message translates to:
+  /// **'Sections'**
+  String get librarySections;
+
+  /// No description provided for @pagesShort.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} p.'**
+  String pagesShort(int count);
 }
 
 class _AppLocalizationsDelegate

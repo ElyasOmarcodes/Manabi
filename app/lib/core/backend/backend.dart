@@ -68,6 +68,12 @@ abstract class ManabiBackend {
 
   /// Asks the model which delimiters hold the matn and the verses of a book.
   Future<LayersGuess> detectLayers(String title, List<String> pages);
+
+  /// A short run of pages (at most five), for saving a book offline.
+  Future<List<PagePassage>> pages(String bookId, int from, int to);
+
+  Future<NarratorPage> narrators(String query, {int page = 1});
+  Future<Narrator> narrator(String id);
 }
 
 List<String> _layerSamples(List<String> pages) => [for (final p in pages.where((p) => p.trim().isNotEmpty).take(4)) p.length > 1800 ? p.substring(0, 1800) : p];
@@ -183,6 +189,19 @@ class ServerBackend implements ManabiBackend {
   Future<PagePassage> page(String bookId, int page) async => PagePassage.fromJson(await _get('/api/pages/$bookId/$page'));
 
   @override
+  Future<List<PagePassage>> pages(String bookId, int from, int to) async {
+    final j = await _get('/api/pages/$bookId/$from-$to');
+    return [for (final p in j['items'] as List? ?? const []) if (p is Map) PagePassage.fromJson(p.cast<String, dynamic>())];
+  }
+
+  @override
+  Future<NarratorPage> narrators(String query, {int page = 1}) async =>
+      NarratorPage.fromJson(await _get('/api/narrators', {if (query.trim().isNotEmpty) 'q': query.trim(), 'page': '$page'}));
+
+  @override
+  Future<Narrator> narrator(String id) async => Narrator.fromJson(await _get('/api/narrators/$id'));
+
+  @override
   Future<LayersGuess> detectLayers(String title, List<String> pages) async {
     http.Response res;
     try {
@@ -249,6 +268,15 @@ class DirectBackend implements ManabiBackend {
   Future<String> check() => _wrap(_gemini.check);
 
   @override
+  Future<List<PagePassage>> pages(String bookId, int from, int to) => _wrap(() => _turath.getPages(bookId, from, to));
+
+  @override
+  Future<NarratorPage> narrators(String query, {int page = 1}) => _wrap(() => _turath.searchNarrators(query, page: page));
+
+  @override
+  Future<Narrator> narrator(String id) => _wrap(() => _turath.getNarrator(id));
+
+  @override
   Future<LayersGuess> detectLayers(String title, List<String> pages) => _wrap(() async => LayersGuess.fromJson((await _gemini.generateJson(
         system: layersSystem,
         prompt: layersPrompt(title: title, pages: _layerSamples(pages)),
@@ -278,4 +306,10 @@ class UnconfiguredBackend implements ManabiBackend {
   Future<String> check() async => _fail();
   @override
   Future<LayersGuess> detectLayers(String title, List<String> pages) async => _fail();
+  @override
+  Future<List<PagePassage>> pages(String bookId, int from, int to) async => _fail();
+  @override
+  Future<NarratorPage> narrators(String query, {int page = 1}) async => _fail();
+  @override
+  Future<Narrator> narrator(String id) async => _fail();
 }

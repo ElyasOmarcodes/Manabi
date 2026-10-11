@@ -2,6 +2,7 @@
 import { createServer } from "node:http";
 import { NususError } from "nusus";
 import { LAYERS_SCHEMA, LAYERS_SYSTEM, layersPrompt } from "./prompts.mjs";
+import { createNarrators } from "./narrators.mjs";
 import { decodingTurath } from "./text.mjs";
 
 const VERSION = "1.0.0";
@@ -89,7 +90,7 @@ const stripRaw = (value) => {
 
 const positive = (value) => (value && /^[1-9]\d*$/.test(value) ? value : undefined);
 
-export const createApp = ({ config, pipeline, turath: client, catalog, gemini, logger = console }) => {
+export const createApp = ({ config, pipeline, turath: client, catalog, gemini, narrators = createNarrators(), logger = console }) => {
   const turath = decodingTurath(client);
   const askLimiter = createRateLimiter({ limit: config.askLimit, windowMs: config.askWindowMs });
   const readLimiter = createRateLimiter({ limit: config.readLimit, windowMs: 60_000 });
@@ -151,6 +152,16 @@ export const createApp = ({ config, pipeline, turath: client, catalog, gemini, l
     }],
     ["GET", /^\/api\/authors\/([1-9]\d*)$/, async (m) => stripRaw(await turath.getAuthor(m[1]))],
     ["GET", /^\/api\/pages\/([1-9]\d*)\/([1-9]\d*)$/, async (m) => stripRaw(await turath.getPage(m[1], m[2]))],
+    // A short run of pages (for saving a book offline); missing pages are skipped.
+    ["GET", /^\/api\/pages\/([1-9]\d*)\/([1-9]\d*)-([1-9]\d*)$/, async (m) => {
+      const from = Number(m[2]);
+      const to = Math.min(Number(m[3]), from + 9);
+      if (to < from) throw Object.assign(new Error("invalid page range"), { code: "INVALID_ARGUMENT" });
+      const pages = await Promise.all(Array.from({ length: to - from + 1 }, (_, i) => turath.getPage(m[1], from + i).catch(() => undefined)));
+      return { items: stripRaw(pages.filter(Boolean)) };
+    }],
+    ["GET", /^\/api\/narrators$/, async (_m, url) => narrators.search(url.searchParams.get("q")?.trim() ?? "", Number(positive(url.searchParams.get("page") ?? undefined) ?? 1))],
+    ["GET", /^\/api\/narrators\/([1-9]\d*)$/, async (m) => narrators.get(m[1])],
     ["GET", /^\/api\/catalog\/categories$/, async () => catalog.listCategories()],
     ["GET", /^\/api\/catalog\/books$/, async (_m, url) => {
       const q = url.searchParams.get("q") ?? "";

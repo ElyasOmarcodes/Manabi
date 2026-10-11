@@ -4,6 +4,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/backend/backend.dart';
+import 'downloads.dart';
 import '../core/catalog/catalog_service.dart';
 
 enum ConnectionMode { server, direct }
@@ -70,7 +71,9 @@ class SettingsController extends ChangeNotifier {
 
   Locale get locale => Locale(uiLanguage);
 
-  ManabiBackend get backend => _backend ??= _createBackend();
+  /// The configured backend, reading saved books from the device first.
+  ManabiBackend get backend => _backend ??= OfflineFirstBackend(_raw = _createBackend());
+  ManabiBackend? _raw;
 
   ManabiBackend _createBackend() {
     if (mode == ConnectionMode.direct) {
@@ -82,7 +85,10 @@ class SettingsController extends ChangeNotifier {
     return ServerBackend(serverUrl.trim(), accessToken: accessToken.trim());
   }
 
-  bool get isConfigured => backend is! UnconfiguredBackend;
+  bool get isConfigured {
+    backend;
+    return _raw is! UnconfiguredBackend;
+  }
 
   void _changed({bool backendChanged = false}) {
     if (backendChanged) _backend = null;

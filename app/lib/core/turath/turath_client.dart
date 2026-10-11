@@ -23,6 +23,13 @@ class TurathException implements Exception {
   String toString() => 'TurathException($code): $message';
 }
 
+final _narratorLink = RegExp(r'<a href="inr://man-(\d+)"[^>]*>([^<]+)</a>');
+
+/// Narrators linked in a raw Turath page (hadith chains).
+List<({String id, String name})> narratorsIn(String raw) => [
+      for (final m in _narratorLink.allMatches(raw)) (id: m[1]!, name: decodeHtmlEntities(m[2]!).trim().replaceAll(RegExp(r'[،,]+$'), '').trim()),
+    ];
+
 String _plainText(String value) => decodeHtmlEntities(
     value.replaceAll(RegExp(r'<br\s*/?\s*>', caseSensitive: false), '\n').replaceAll(RegExp(r'</?[a-z][^>]*>', caseSensitive: false), ''));
 
@@ -129,6 +136,7 @@ class TurathClient implements PassageSearch {
       headings: (meta['headings'] as List?)?.whereType<String>().toList() ?? const [],
       text: _plainText(text),
       snippet: snippet == null ? null : _plainText(snippet),
+      narrators: narratorsIn(text),
       url: sourceUrl(bookId, internal),
       shamelaUrl: shamelaUrl(bookId, internal),
       citation: formatCitation(
@@ -151,6 +159,32 @@ class TurathClient implements PassageSearch {
         rethrow;
       }
     }();
+  }
+
+  /// Up to five pages in one request (Turath's own page window).
+  Future<List<PagePassage>> getPages(String bookId, int from, int to) async {
+    final end = to < from + 4 ? to : from + 4;
+    final raw = await _get('page', {'book_id': bookId, 'pg': from, 'end_pg': end, 'ver': 3});
+    final pages = raw is Map ? raw['pages'] : null;
+    if (pages is! List) return [for (var p = from; p <= end; p++) await getPage(bookId, p).catchError((Object _) => _missing)].where((p) => !identical(p, _missing)).toList();
+    return [
+      for (final p in pages)
+        if (p is Map && p['text'] is String) _passage(_meta(p['meta']), bookId, p['text'] as String),
+    ];
+  }
+
+  static const _missing = PagePassage(bookId: '', bookTitle: '', text: '', url: '');
+
+  Future<NarratorPage> searchNarrators(String query, {int page = 1}) async {
+    final raw = await _get('narrators', {'page': page, 'limit': 50, if (query.trim().isNotEmpty) 'q': query.trim()});
+    if (raw is! Map) throw const TurathException('INVALID_RESPONSE', 'invalid narrators');
+    return NarratorPage.fromJson(raw.cast<String, dynamic>());
+  }
+
+  Future<Narrator> getNarrator(String id) async {
+    final raw = await _get('narrator', {'id': id});
+    if (raw is! Map || raw['id'] == null) throw TurathException('NOT_FOUND', 'Narrator $id not found');
+    return Narrator.fromJson(raw.cast<String, dynamic>());
   }
 
   Future<BookDetails> getBook(String bookId) async {

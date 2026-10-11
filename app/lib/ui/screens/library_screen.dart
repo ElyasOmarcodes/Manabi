@@ -8,24 +8,28 @@ import '../../core/catalog/catalog_service.dart';
 import '../../core/models/library.dart';
 import '../../core/models/scope.dart';
 import '../../state/nav_controller.dart';
+import '../../state/downloads.dart';
 import '../../state/reading_controller.dart';
 import '../../state/settings_controller.dart';
 import '../theme.dart';
 import '../widgets/answer_card.dart' show QueryChip;
 import '../widgets/chat_list.dart' show confirmDialog;
 import '../widgets/common.dart';
+import '../widgets/save_offline.dart';
 import '../widgets/scope_picker.dart';
 import 'author_screen.dart';
 import 'book_screen.dart';
 import 'reader_screen.dart';
 
-enum _Tab { books, favorites, authors, categories, search }
+void _push(BuildContext context, Widget page) => Navigator.of(context).push(MaterialPageRoute(builder: (_) => page));
 
-_Tab _tabFrom(String name) => _Tab.values.firstWhere((t) => t.name == name, orElse: () => _Tab.books);
+String formatBytes(int bytes) {
+  if (bytes < 1024 * 1024) return '${(bytes / 1024).ceil()} KB';
+  return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+}
 
-/// Library home in the Turath layout: tabs for all books, favourites,
-/// authors, categories and full-text search, a search field with the
-/// result count, and compact book rows with info and favourite actions.
+/// Library home: one search for books and authors, the books being read,
+/// and one clear tile per section; each section opens its own page.
 class LibraryScreen extends StatefulWidget {
   const LibraryScreen({super.key});
   @override
@@ -33,16 +37,699 @@ class LibraryScreen extends StatefulWidget {
 }
 
 class _LibraryScreenState extends State<LibraryScreen> {
-  late _Tab _tab = _tabFrom(context.read<ReadingController>().libraryTab);
+  final _search = TextEditingController();
   String _q = '';
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = context.l;
+    final catalog = context.read<CatalogService>();
+    return AuraPage(
+      titleText: l.library,
+      body: Column(children: [
+        ReadingWidth(
+          maxWidth: 940,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 4, 14, 6),
+            child: _SearchBar(
+              controller: _search,
+              hint: l.libSearchHint,
+              count: _q.isEmpty ? '${catalog.books.length} ${l.books}' : '',
+              rtl: false,
+              onChanged: (v) => setState(() => _q = v),
+              onSubmitted: (_) {},
+              actions: [
+                if (_q.isNotEmpty)
+                  IconButton(
+                    tooltip: MaterialLocalizations.of(context).deleteButtonTooltip,
+                    icon: const Icon(Icons.close_rounded, size: 20),
+                    onPressed: () => setState(() {
+                      _q = '';
+                      _search.clear();
+                    }),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        Expanded(child: _q.trim().isEmpty ? const _LibraryHome() : _SearchResults(query: _q.trim())),
+      ]),
+    );
+  }
+}
+
+class _LibraryHome extends StatelessWidget {
+  const _LibraryHome();
+  @override
+  Widget build(BuildContext context) {
+    final l = context.l;
+    final a = context.aura;
+    final catalog = context.read<CatalogService>();
+    final reading = context.watch<ReadingController>();
+    final downloads = context.watch<DownloadController>();
+    final recent = [for (final p in reading.recent.take(10)) (catalog.book(p.bookId), p)];
+    final tiles = <(IconData, Color, String, String, Widget)>[
+      (Icons.menu_book_rounded, AuraHues.violet, l.allBooks, '${catalog.books.length}', const AllBooksPage()),
+      (Icons.category_rounded, AuraHues.teal, l.categories, '${catalog.categories.length}', const CategoriesPage()),
+      (Icons.person_rounded, AuraHues.amber, l.authors, '${catalog.authors.length}', const AuthorsPage()),
+      (Icons.groups_rounded, AuraHues.blue, l.narrators, '18,989', const NarratorsPage()),
+      (Icons.star_rounded, AuraHues.amber, l.tabFavorites, '${reading.favorites.length}', const FavoritesPage()),
+      (Icons.download_done_rounded, AuraHues.green, l.tabDownloaded, '${downloads.books.length}', const DownloadsPage()),
+      (Icons.manage_search_rounded, AuraHues.rose, l.fullTextSearch, '', const FullTextPage()),
+      (Icons.border_color_outlined, AuraHues.amber, l.highlights, '${reading.highlights.length}', const HighlightsScreen()),
+      (Icons.bookmarks_outlined, AuraHues.rose, l.bookmarks, '${reading.bookmarks.length}', const BookmarksScreen()),
+    ];
+    return ListView(padding: const EdgeInsets.only(bottom: 32), children: [
+      if (recent.isNotEmpty) ...[
+        ReadingWidth(maxWidth: 940, child: _Heading(l.continueReading)),
+        SizedBox(
+          height: 112,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            itemCount: recent.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 10),
+            itemBuilder: (context, i) {
+              final (book, pos) = recent[i];
+              return Pressable(
+                onTap: () => openReader(context, pos.bookId, pos.page, title: pos.bookTitle),
+                child: Container(
+                  width: 236,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(color: a.surface, borderRadius: BorderRadius.circular(18), border: Border.all(color: a.border)),
+                  child: Row(children: [
+                    BookCover(title: pos.bookTitle, color: AuraHues.category(book?.categoryId), width: 52, height: 76),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [
+                        Text(pos.bookTitle, maxLines: 2, overflow: TextOverflow.ellipsis, textDirection: TextDirection.rtl, style: arabicStyle(context, size: 14.5, weight: FontWeight.w700).copyWith(height: 1.5)),
+                        const SizedBox(height: 4),
+                        Row(children: [
+                          Icon(Icons.play_circle_fill_rounded, size: 15, color: a.accent),
+                          const SizedBox(width: 4),
+                          Text('${l.turathPage} ${pos.page}', style: TextStyle(fontFamily: uiFont, fontSize: 11.5, color: a.accent, fontWeight: FontWeight.w600)),
+                        ]),
+                      ]),
+                    ),
+                  ]),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+      ReadingWidth(maxWidth: 940, child: _Heading(l.librarySections)),
+      ReadingWidth(
+        maxWidth: 940,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          child: LayoutBuilder(builder: (context, box) {
+            final columns = box.maxWidth > 760 ? 3 : 2;
+            final width = (box.maxWidth - (columns - 1) * 10) / columns;
+            return Wrap(spacing: 10, runSpacing: 10, children: [
+              for (final (icon, color, title, count, page) in tiles)
+                SizedBox(
+                  width: width,
+                  child: Pressable(
+                    onTap: () => _push(context, page),
+                    child: Container(
+                      padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+                      decoration: BoxDecoration(color: a.surface, borderRadius: BorderRadius.circular(20), border: Border.all(color: a.border)),
+                      child: Row(children: [
+                        IconTile(icon: icon, color: color, size: 40),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontFamily: uiFont, fontSize: 14.5, fontWeight: FontWeight.w700, color: a.text)),
+                            if (count.isNotEmpty) Text(count, style: TextStyle(fontFamily: uiFont, fontSize: 12, color: a.muted)),
+                          ]),
+                        ),
+                      ]),
+                    ),
+                  ),
+                ),
+            ]);
+          }),
+        ),
+      ),
+    ]);
+  }
+}
+
+class _Heading extends StatelessWidget {
+  const _Heading(this.text, {this.trailing});
+  final String text;
+  final Widget? trailing;
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsetsDirectional.fromSTEB(20, 16, 14, 8),
+        child: Row(children: [
+          Expanded(child: Text(text, style: TextStyle(fontFamily: uiFont, fontSize: 13.5, fontWeight: FontWeight.w800, color: context.aura.muted))),
+          ?trailing,
+        ]),
+      );
+}
+
+/// Results while typing: books, authors, books found on Turath, and a way
+/// to search inside the texts.
+class _SearchResults extends StatelessWidget {
+  const _SearchResults({required this.query});
+  final String query;
+  @override
+  Widget build(BuildContext context) {
+    final l = context.l;
+    final a = context.aura;
+    final catalog = context.read<CatalogService>();
+    final books = catalog.findBooks(query, limit: catalog.books.length);
+    final authors = catalog.findAuthors(query, limit: 6);
+    Widget w(Widget child) => ReadingWidth(maxWidth: 940, child: child);
+    return ListView(padding: const EdgeInsets.only(bottom: 32), children: [
+      w(ListTile(
+        leading: IconTile(icon: Icons.manage_search_rounded, color: AuraHues.rose, size: 36),
+        title: Text(l.searchInTextsFor(query), maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontFamily: uiFont, fontSize: 14, fontWeight: FontWeight.w600, color: a.text)),
+        trailing: Icon(Directionality.of(context) == TextDirection.rtl ? Icons.chevron_left_rounded : Icons.chevron_right_rounded, color: a.faint),
+        onTap: () => _push(context, FullTextPage(initialQuery: query)),
+      )),
+      if (books.isNotEmpty)
+        w(_Heading('${l.books} · ${books.length}',
+            trailing: books.length > 12 ? TextButton(onPressed: () => _push(context, AllBooksPage(initialQuery: query)), child: Text(l.seeAll(books.length))) : null)),
+      for (final b in books.take(12)) w(LibraryBookRow(book: b)),
+      w(_TurathBooks(key: ValueKey(query), query: query, exclude: {for (final b in books.take(200)) b.id})),
+      if (authors.isNotEmpty) ...[
+        w(_Heading(l.authors)),
+        for (final x in authors) w(AuthorTile(author: x, onTap: () => openAuthor(context, x.id))),
+      ],
+      if (books.isEmpty && authors.isEmpty) Padding(padding: const EdgeInsets.all(28), child: Center(child: Text(l.noResults, style: TextStyle(fontFamily: uiFont, color: a.muted)))),
+    ]);
+  }
+}
+
+/// Scaffold of a library section: title, an optional search field, body.
+class _SectionPage extends StatelessWidget {
+  const _SectionPage({required this.title, required this.body, this.search, this.actions = const []});
+  final String title;
+  final Widget body;
+  final Widget? search;
+  final List<Widget> actions;
+  @override
+  Widget build(BuildContext context) => AuraPage(
+        titleText: title,
+        actions: actions,
+        body: Column(children: [
+          if (search != null) ReadingWidth(maxWidth: 940, child: Padding(padding: const EdgeInsets.fromLTRB(14, 4, 14, 6), child: search)),
+          Expanded(child: body),
+        ]),
+      );
+}
+
+class AllBooksPage extends StatefulWidget {
+  const AllBooksPage({super.key, this.initialQuery = ''});
+  final String initialQuery;
+  @override
+  State<AllBooksPage> createState() => _AllBooksPageState();
+}
+
+class _AllBooksPageState extends State<AllBooksPage> {
+  late final _search = TextEditingController(text: widget.initialQuery);
+  late String _q = widget.initialQuery;
+  String _sort = 'title';
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = context.l;
+    final a = context.aura;
+    final catalog = context.read<CatalogService>();
+    final books = catalog.findBooks(_q, limit: catalog.books.length);
+    if (_sort == 'title') books.sort((x, y) => x.title.compareTo(y.title));
+    if (_sort == 'author') books.sort((x, y) => (catalog.author(x.authorId)?.name ?? '').compareTo(catalog.author(y.authorId)?.name ?? ''));
+    return _SectionPage(
+      title: l.allBooks,
+      search: _SearchBar(
+        controller: _search,
+        hint: l.searchBooks,
+        count: '${books.length}',
+        rtl: false,
+        onChanged: (v) => setState(() => _q = v),
+        onSubmitted: (_) {},
+        actions: [
+          PopupMenuButton<String>(
+            tooltip: l.sortBy,
+            icon: Icon(Icons.swap_vert_rounded, color: a.muted),
+            onSelected: (v) => setState(() => _sort = v),
+            itemBuilder: (_) => [
+              for (final (v, label) in [('relevance', l.sortRelevance), ('title', l.sortTitle), ('author', l.sortAuthor)])
+                CheckedPopupMenuItem(value: v, checked: _sort == v, child: Text(label, style: const TextStyle(fontFamily: uiFont))),
+            ],
+          ),
+        ],
+      ),
+      body: books.isEmpty
+          ? EmptyState(icon: Icons.search_off_rounded, text: l.noResults)
+          : ListView.builder(
+              padding: const EdgeInsets.only(bottom: 32),
+              itemCount: books.length,
+              itemBuilder: (context, i) => ReadingWidth(maxWidth: 940, child: LibraryBookRow(book: books[i])),
+            ),
+    );
+  }
+}
+
+class FavoritesPage extends StatelessWidget {
+  const FavoritesPage({super.key});
+  @override
+  Widget build(BuildContext context) {
+    final l = context.l;
+    final catalog = context.read<CatalogService>();
+    final reading = context.watch<ReadingController>();
+    final books = [for (final f in reading.favorites) catalog.book(f.bookId) ?? CatalogBook(f.bookId, f.title, '', '')];
+    return _SectionPage(
+      title: l.tabFavorites,
+      body: books.isEmpty
+          ? EmptyState(icon: Icons.star_outline_rounded, text: l.noFavoriteBooks, color: AuraHues.amber)
+          : ListView.builder(
+              padding: const EdgeInsets.only(bottom: 32),
+              itemCount: books.length,
+              itemBuilder: (context, i) => ReadingWidth(maxWidth: 940, child: LibraryBookRow(book: books[i], position: reading.positionOf(books[i].id))),
+            ),
+    );
+  }
+}
+
+/// Books saved on the device, with their size; ones being saved show progress.
+class DownloadsPage extends StatelessWidget {
+  const DownloadsPage({super.key});
+  @override
+  Widget build(BuildContext context) {
+    final l = context.l;
+    final a = context.aura;
+    final catalog = context.read<CatalogService>();
+    final downloads = context.watch<DownloadController>();
+    final books = downloads.books;
+    return _SectionPage(
+      title: l.tabDownloaded,
+      actions: [
+        if (books.isNotEmpty)
+          RoundIconButton(
+            icon: Icons.delete_sweep_outlined,
+            tooltip: l.deleteAllDownloads,
+            onTap: () async {
+              if (await confirmDialog(context, l.deleteAllDownloadsConfirm)) await downloads.removeAll();
+            },
+          ),
+      ],
+      body: books.isEmpty
+          ? EmptyState(icon: Icons.download_for_offline_outlined, text: l.noDownloads, color: AuraHues.green)
+          : ListView(padding: const EdgeInsets.only(bottom: 32), children: [
+              ReadingWidth(
+                maxWidth: 940,
+                child: Padding(
+                  padding: const EdgeInsetsDirectional.fromSTEB(20, 6, 20, 6),
+                  child: Text(l.downloadsSize(formatBytes(downloads.totalBytes)), style: TextStyle(fontFamily: uiFont, fontSize: 12.5, color: a.muted)),
+                ),
+              ),
+              for (final b in books)
+                ReadingWidth(
+                  maxWidth: 940,
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                    LibraryBookRow(book: catalog.book(b.bookId) ?? CatalogBook(b.bookId, b.title, b.authorId ?? '', b.categoryId ?? '')),
+                    Padding(
+                      padding: const EdgeInsetsDirectional.fromSTEB(30, 0, 14, 8),
+                      child: Row(children: [
+                        Icon(b.complete ? Icons.offline_pin_rounded : Icons.downloading_rounded, size: 16, color: b.complete ? AuraHues.green : AuraHues.amber),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text('${l.pagesShort(b.pages)} · ${formatBytes(b.bytes)}', style: TextStyle(fontFamily: uiFont, fontSize: 12, color: a.muted)),
+                        ),
+                        TextButton.icon(
+                          onPressed: () => downloads.remove(b.bookId),
+                          icon: const Icon(Icons.delete_outline_rounded, size: 18),
+                          label: Text(l.removeDownload, style: const TextStyle(fontFamily: uiFont)),
+                        ),
+                      ]),
+                    ),
+                  ]),
+                ),
+            ]),
+    );
+  }
+}
+
+class AuthorsPage extends StatefulWidget {
+  const AuthorsPage({super.key});
+  @override
+  State<AuthorsPage> createState() => _AuthorsPageState();
+}
+
+class _AuthorsPageState extends State<AuthorsPage> {
+  final _search = TextEditingController();
+  String _q = '';
+  final _open = <String>{};
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = context.l;
+    final a = context.aura;
+    final catalog = context.read<CatalogService>();
+    final authors = catalog.findAuthors(_q, limit: catalog.authors.length);
+    return _SectionPage(
+      title: l.authors,
+      search: _SearchBar(controller: _search, hint: l.searchAuthors, count: '${authors.length}', rtl: false, onChanged: (v) => setState(() => _q = v), onSubmitted: (_) {}),
+      body: authors.isEmpty
+          ? EmptyState(icon: Icons.search_off_rounded, text: l.noResults)
+          : ListView.builder(
+              padding: const EdgeInsets.only(bottom: 32),
+              itemCount: authors.length,
+              itemBuilder: (context, i) {
+                final author = authors[i];
+                final open = _open.contains(author.id);
+                return ReadingWidth(
+                  maxWidth: 940,
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                    _GroupRow(
+                      title: author.name,
+                      count: author.bookCount,
+                      open: open,
+                      leading: _Initial(text: author.name, seed: int.tryParse(author.id) ?? 0),
+                      onTap: () => setState(() => open ? _open.remove(author.id) : _open.add(author.id)),
+                      trailing: IconButton(tooltip: l.author, icon: Icon(Icons.person_search_outlined, size: 20, color: a.muted), onPressed: () => openAuthor(context, author.id)),
+                    ),
+                    if (open)
+                      for (final b in catalog.booksByAuthor(author.id)) Padding(padding: const EdgeInsetsDirectional.only(start: 28), child: LibraryBookRow(book: b, showAuthor: false)),
+                  ]),
+                );
+              },
+            ),
+    );
+  }
+}
+
+class CategoriesPage extends StatefulWidget {
+  const CategoriesPage({super.key});
+  @override
+  State<CategoriesPage> createState() => _CategoriesPageState();
+}
+
+class _CategoriesPageState extends State<CategoriesPage> {
+  final _search = TextEditingController();
+  String _q = '';
+  final _open = <String>{};
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = context.l;
+    final catalog = context.read<CatalogService>();
+    final q = normalizeForSearch(_q);
+    final cats = catalog.categories.where((c) => q.isEmpty || normalizeForSearch(c.title).contains(q)).toList();
+    return _SectionPage(
+      title: l.categories,
+      search: _SearchBar(controller: _search, hint: l.categories, count: '${cats.length}', rtl: false, onChanged: (v) => setState(() => _q = v), onSubmitted: (_) {}),
+      body: ListView.builder(
+        padding: const EdgeInsets.only(bottom: 32),
+        itemCount: cats.length,
+        itemBuilder: (context, i) {
+          final cat = cats[i];
+          final open = _open.contains(cat.id);
+          final books = open ? catalog.findBooks('', categoryId: cat.id, limit: 25) : const <CatalogBook>[];
+          return ReadingWidth(
+            maxWidth: 940,
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              _GroupRow(
+                title: cat.title,
+                count: cat.bookCount,
+                open: open,
+                leading: IconTile(icon: categoryIcon(cat.id), color: AuraHues.category(cat.id), size: 34),
+                onTap: () => setState(() => open ? _open.remove(cat.id) : _open.add(cat.id)),
+              ),
+              if (open) ...[
+                for (final b in books) Padding(padding: const EdgeInsetsDirectional.only(start: 28), child: LibraryBookRow(book: b, showCategory: false)),
+                if (cat.bookCount > books.length)
+                  Padding(
+                    padding: const EdgeInsetsDirectional.fromSTEB(40, 4, 16, 12),
+                    child: Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: SoftButton(dense: true, icon: Icons.arrow_outward_rounded, label: l.seeAll(cat.bookCount), onTap: () => _push(context, CategoryBooksScreen(category: cat))),
+                    ),
+                  ),
+              ],
+            ]),
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// Turath's narrator index: search, grade and death year; a tap opens the
+/// biography.
+class NarratorsPage extends StatefulWidget {
+  const NarratorsPage({super.key});
+  @override
+  State<NarratorsPage> createState() => _NarratorsPageState();
+}
+
+class _NarratorsPageState extends State<NarratorsPage> {
+  final _search = TextEditingController();
+  final _items = <Narrator>[];
+  int _count = 0;
+  int _page = 0;
+  bool _loading = false;
+  String? _error;
+  String _q = '';
+  Timer? _debounce;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _search.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load({bool more = false}) async {
+    if (_loading) return;
+    final backend = context.read<SettingsController>().backend;
+    final q = _q;
+    setState(() {
+      _loading = true;
+      _error = null;
+      if (!more) {
+        _items.clear();
+        _page = 0;
+      }
+    });
+    try {
+      final r = await backend.narrators(q, page: _page + 1);
+      if (!mounted || q != _q) return;
+      setState(() {
+        _items.addAll(r.items);
+        _count = r.count;
+        _page = r.page;
+      });
+    } catch (e) {
+      if (mounted) setState(() => _error = mapError(e).code);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = context.l;
+    final a = context.aura;
+    return _SectionPage(
+      title: l.narrators,
+      search: _SearchBar(
+        controller: _search,
+        hint: l.searchNarrators,
+        count: _count == 0 ? '' : l.narratorsCount('$_count'),
+        rtl: true,
+        onChanged: (v) {
+          _q = v.trim();
+          _debounce?.cancel();
+          _debounce = Timer(const Duration(milliseconds: 450), _load);
+        },
+        onSubmitted: (_) => _load(),
+      ),
+      body: _error != null && _items.isEmpty
+          ? ErrorPanel(code: _error, onRetry: _load)
+          : _items.isEmpty
+              ? Center(child: _loading ? const TypingDots() : Text(l.noResults, style: TextStyle(fontFamily: uiFont, color: a.muted)))
+              : NotificationListener<ScrollNotification>(
+                  onNotification: (n) {
+                    if (n.metrics.extentAfter < 600 && _items.length < _count) _load(more: true);
+                    return false;
+                  },
+                  child: ListView.builder(
+                    padding: const EdgeInsets.only(bottom: 32),
+                    itemCount: _items.length + (_items.length < _count ? 1 : 0),
+                    itemBuilder: (context, i) {
+                      if (i == _items.length) return const Padding(padding: EdgeInsets.all(16), child: Center(child: TypingDots()));
+                      final n = _items[i];
+                      return ReadingWidth(maxWidth: 940, child: NarratorTile(narrator: n));
+                    },
+                  ),
+                ),
+    );
+  }
+}
+
+/// A narrator row: name, grade and death.
+class NarratorTile extends StatelessWidget {
+  const NarratorTile({super.key, required this.narrator});
+  final Narrator narrator;
+  @override
+  Widget build(BuildContext context) {
+    final a = context.aura;
+    final l = context.l;
+    final n = narrator;
+    return InkWell(
+      onTap: () => showNarrator(context, n.id, n.name),
+      child: Container(
+        decoration: BoxDecoration(border: Border(bottom: BorderSide(color: a.border.withValues(alpha: 0.7)))),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+        child: Directionality(
+          textDirection: TextDirection.rtl,
+          child: Row(children: [
+            _Initial(text: n.name.isEmpty ? '؟' : n.name, seed: int.tryParse(n.id) ?? 0),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(n.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: arabicStyle(context, size: 15.5, weight: FontWeight.w700).copyWith(height: 1.55)),
+                if (n.deathText.isNotEmpty)
+                  Text('${l.narratorDeath}: ${n.deathText}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontFamily: uiFont, fontSize: 12, color: a.muted)),
+              ]),
+            ),
+            if (n.rank.isNotEmpty)
+              Container(
+                constraints: const BoxConstraints(maxWidth: 150),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(color: a.accentTint, borderRadius: BorderRadius.circular(10)),
+                child: Text(n.rank, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontFamily: uiFont, fontSize: 11.5, fontWeight: FontWeight.w700, color: a.accent)),
+              ),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
+/// A narrator's biography (from Turath), with a way to find them in the texts.
+Future<void> showNarrator(BuildContext context, String id, String name) => showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => _NarratorSheet(id: id, name: name),
+    );
+
+class _NarratorSheet extends StatefulWidget {
+  const _NarratorSheet({required this.id, required this.name});
+  final String id;
+  final String name;
+  @override
+  State<_NarratorSheet> createState() => _NarratorSheetState();
+}
+
+class _NarratorSheetState extends State<_NarratorSheet> {
+  late final Future<Narrator> _future = context.read<SettingsController>().backend.narrator(widget.id);
+
+  @override
+  Widget build(BuildContext context) {
+    final l = context.l;
+    final a = context.aura;
+    return DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.6,
+      maxChildSize: 0.94,
+      builder: (context, scroll) => FutureBuilder<Narrator>(
+        future: _future,
+        builder: (context, snap) {
+          final n = snap.data;
+          return Directionality(
+            textDirection: TextDirection.rtl,
+            child: ListView(controller: scroll, padding: const EdgeInsets.fromLTRB(20, 0, 20, 28), children: [
+              Text(n?.name ?? widget.name, style: arabicStyle(context, size: 20, weight: FontWeight.w800).copyWith(height: 1.55)),
+              if (n != null && n.fullName.isNotEmpty && n.fullName != n.name) Text(n.fullName, style: arabicStyle(context, size: 14.5, color: a.muted).copyWith(height: 1.7)),
+              const SizedBox(height: 10),
+              if (snap.connectionState != ConnectionState.done)
+                const Padding(padding: EdgeInsets.all(24), child: Center(child: TypingDots()))
+              else if (snap.hasError)
+                SizedBox(height: 220, child: ErrorPanel(code: mapError(snap.error!).code))
+              else ...[
+                Wrap(spacing: 8, runSpacing: 8, children: [
+                  if (n!.rank.isNotEmpty) StatusBadge(icon: Icons.verified_outlined, color: AuraHues.violet, label: '${l.narratorRank}: ${n.rank}'),
+                  if (n.deathText.isNotEmpty) StatusBadge(icon: Icons.event_outlined, color: AuraHues.teal, label: '${l.narratorDeath}: ${n.deathText}'),
+                ]),
+                const SizedBox(height: 12),
+                for (final (k, v) in n.summary)
+                  Container(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    decoration: BoxDecoration(border: Border(bottom: BorderSide(color: a.border.withValues(alpha: 0.6)))),
+                    child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      SizedBox(width: 120, child: Text(k, style: TextStyle(fontFamily: uiFont, fontSize: 13, fontWeight: FontWeight.w700, color: a.muted, height: 1.6))),
+                      Expanded(child: SelectableText(v, style: arabicStyle(context, size: 15).copyWith(height: 1.8))),
+                    ]),
+                  ),
+              ],
+              const SizedBox(height: 14),
+              SoftButton(
+                icon: Icons.manage_search_rounded,
+                label: l.findInTexts,
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _push(context, FullTextPage(initialQuery: n?.name ?? widget.name));
+                },
+              ),
+            ]),
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// Full-text search across Turath with category, author and book filters.
+class FullTextPage extends StatefulWidget {
+  const FullTextPage({super.key, this.initialQuery = ''});
+  final String initialQuery;
+  @override
+  State<FullTextPage> createState() => _FullTextPageState();
+}
+
+class _FullTextPageState extends State<FullTextPage> {
+  late final _search = TextEditingController(text: widget.initialQuery);
+  late String _q = widget.initialQuery;
   CatalogCategory? _category;
   CatalogAuthor? _author;
   CatalogBook? _book;
-  String _sort = 'relevance';
-  final _openAuthors = <String>{};
-  final _openCategories = <String>{};
-  final _search = TextEditingController();
-  final _fullText = GlobalKey<_FullTextState>();
+  final _results = GlobalKey<_FullTextState>();
 
   SearchScope get _scope => SearchScope(
         bookId: _book?.id,
@@ -53,8 +740,10 @@ class _LibraryScreenState extends State<LibraryScreen> {
         categoryTitle: _category?.title,
       );
 
-  void _rerunFullText() {
-    if (_tab == _Tab.search && _q.trim().isNotEmpty) _fullText.currentState?.search(_q, scope: _scope);
+  @override
+  void initState() {
+    super.initState();
+    if (_q.isNotEmpty) WidgetsBinding.instance.addPostFrameCallback((_) => _run());
   }
 
   @override
@@ -63,258 +752,53 @@ class _LibraryScreenState extends State<LibraryScreen> {
     super.dispose();
   }
 
-  void _select(_Tab t) => setState(() {
-        _tab = t;
-        _q = '';
-        _search.clear();
-      });
+  void _run() {
+    if (_q.trim().isNotEmpty) _results.currentState?.search(_q, scope: _scope);
+  }
 
   @override
   Widget build(BuildContext context) {
     final l = context.l;
-    final a = context.aura;
-    final catalog = context.read<CatalogService>();
-    final reading = context.watch<ReadingController>();
-    final hint = switch (_tab) {
-      _Tab.books || _Tab.favorites => l.searchBooks,
-      _Tab.authors => l.searchAuthors,
-      _Tab.categories => l.categories,
-      _Tab.search => l.searchInText,
-    };
-    final total = switch (_tab) {
-      _Tab.books => '${catalog.books.length} ${l.books}',
-      _Tab.favorites => '${reading.favorites.length} ${l.books}',
-      _Tab.authors => '${catalog.authors.length} ${l.authors}',
-      _Tab.categories => '${catalog.categories.length} ${l.categories}',
-      _Tab.search => '',
-    };
-    return AuraPage(
-      titleText: l.library,
-      actions: [
-        RoundIconButton(
-          icon: Icons.border_color_outlined,
-          tooltip: l.highlights,
-          onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const HighlightsScreen())),
-        ),
-        const SizedBox(width: 6),
-        RoundIconButton(
-          icon: Icons.bookmarks_outlined,
-          tooltip: l.bookmarks,
-          onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const BookmarksScreen())),
-        ),
-      ],
-      body: Column(children: [
-        // Tabs: underlined, like Turath's library header.
-        ReadingWidth(
-          maxWidth: 940,
-          child: Container(
-            decoration: BoxDecoration(border: Border(bottom: BorderSide(color: a.border))),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              child: Row(children: [
-                for (final (t, label, icon) in [
-                  (_Tab.books, l.allBooks, Icons.menu_book_rounded),
-                  (_Tab.favorites, l.tabFavorites, Icons.star_rounded),
-                  (_Tab.authors, l.authors, Icons.person_rounded),
-                  (_Tab.categories, l.categories, Icons.category_rounded),
-                  (_Tab.search, l.fullTextSearch, Icons.manage_search_rounded),
-                ])
-                  _TabButton(label: label, icon: icon, selected: _tab == t, onTap: () => _select(t)),
-              ]),
-            ),
-          ),
-        ),
-        ReadingWidth(
-          maxWidth: 940,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(14, 10, 14, 4),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              _SearchBar(
-                controller: _search,
-                hint: hint,
-                count: total,
-                rtl: _tab == _Tab.search,
-                onChanged: (v) => setState(() => _q = v),
-                onSubmitted: (_) => _rerunFullText(),
-                actions: [
-                  if (_tab == _Tab.books || _tab == _Tab.favorites)
-                    PopupMenuButton<String>(
-                      tooltip: l.sortBy,
-                      icon: Icon(Icons.swap_vert_rounded, color: _sort == 'relevance' ? a.muted : a.accent),
-                      onSelected: (v) => setState(() => _sort = v),
-                      itemBuilder: (_) => [
-                        for (final (v, label) in [('relevance', l.sortRelevance), ('title', l.sortTitle), ('author', l.sortAuthor)])
-                          CheckedPopupMenuItem(value: v, checked: _sort == v, child: Text(label, style: const TextStyle(fontFamily: uiFont))),
-                      ],
-                    ),
-                  if (_tab == _Tab.books && reading.recent.isNotEmpty)
-                    IconButton(
-                      tooltip: l.clearReadingHistory,
-                      icon: Icon(Icons.history_toggle_off_rounded, color: a.muted),
-                      onPressed: () async {
-                        if (await confirmDialog(context, l.clearReadingHistoryConfirm) && context.mounted) await reading.clearHistory();
-                      },
-                    ),
-                ],
-              ),
-              if (_tab == _Tab.search) _filterBar(context),
-            ]),
-          ),
-        ),
-        Expanded(
-          child: switch (_tab) {
-            _Tab.books => _books(context),
-            _Tab.favorites => _favorites(context),
-            _Tab.authors => _authors(context),
-            _Tab.categories => _categories(context),
-            _Tab.search => ReadingWidth(maxWidth: 940, child: _FullText(key: _fullText, query: _q, scope: _scope)),
-          },
+    return _SectionPage(
+      title: l.fullTextSearch,
+      search: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        _SearchBar(controller: _search, hint: l.searchInText, count: '', rtl: true, onChanged: (v) => _q = v, onSubmitted: (_) => _run()),
+        _FilterChips(
+          category: _category,
+          author: _author,
+          book: _book,
+          onCategory: (c) => setState(() => _category = c),
+          onAuthor: (x) => setState(() => _author = x),
+          onBook: (b) => setState(() => _book = b),
+          onChanged: _run,
         ),
       ]),
+      body: ReadingWidth(maxWidth: 940, child: _FullText(key: _results, query: _q, scope: _scope)),
     );
   }
+}
 
-  List<CatalogBook> _sorted(List<CatalogBook> books) {
-    final catalog = context.read<CatalogService>();
-    if (_sort == 'title') books.sort((x, y) => x.title.compareTo(y.title));
-    if (_sort == 'author') books.sort((x, y) => (catalog.author(x.authorId)?.name ?? '').compareTo(catalog.author(y.authorId)?.name ?? ''));
-    return books;
-  }
-
-  Widget _books(BuildContext context) {
-    final catalog = context.read<CatalogService>();
-    final reading = context.watch<ReadingController>();
-    final l = context.l;
-    final home = _q.trim().isEmpty;
-    final books = _sorted(catalog.findBooks(_q, limit: catalog.books.length));
-    final recent = home ? [for (final p in reading.recent.take(6)) if (catalog.book(p.bookId) != null) (catalog.book(p.bookId)!, p)] : const <(CatalogBook, ReadingPosition)>[];
-    final online = home ? null : _TurathBooks(key: ValueKey(_q.trim()), query: _q.trim(), exclude: {for (final b in books.take(200)) b.id});
-    if (books.isEmpty && online == null) return EmptyState(icon: Icons.search_off_rounded, text: l.noResults);
-    return CustomScrollView(slivers: [
-      if (recent.isNotEmpty) ...[
-        _header(context, l.recentlyRead),
-        SliverList.builder(
-          itemCount: recent.length,
-          itemBuilder: (context, i) => _width(LibraryBookRow(book: recent[i].$1, position: recent[i].$2)),
-        ),
-        _header(context, l.allBooks),
-      ] else if (!home)
-        _header(context, l.matches(books.length)),
-      if (online != null && books.length < 12) SliverToBoxAdapter(child: _width(online)),
-      SliverList.builder(itemCount: books.length, itemBuilder: (context, i) => _width(LibraryBookRow(book: books[i]))),
-      if (online != null && books.length >= 12) SliverToBoxAdapter(child: _width(online)),
-      const SliverToBoxAdapter(child: SizedBox(height: 32)),
-    ]);
-  }
-
-  Widget _favorites(BuildContext context) {
-    final catalog = context.read<CatalogService>();
-    final reading = context.watch<ReadingController>();
-    final q = normalizeForSearch(_q);
-    final books = _sorted([
-      for (final f in reading.favorites)
-        if (catalog.book(f.bookId) case final b? when q.isEmpty || normalizeForSearch(b.title).contains(q)) b,
-    ]);
-    if (books.isEmpty) return EmptyState(icon: Icons.star_outline_rounded, text: context.l.noFavoriteBooks, color: AuraHues.amber);
-    return ListView.builder(
-      padding: const EdgeInsets.only(top: 4, bottom: 32),
-      itemCount: books.length,
-      itemBuilder: (context, i) => _width(LibraryBookRow(book: books[i], position: reading.positionOf(books[i].id))),
-    );
-  }
-
-  Widget _authors(BuildContext context) {
-    final catalog = context.read<CatalogService>();
+/// Category, author and book filters for the text search.
+class _FilterChips extends StatelessWidget {
+  const _FilterChips({required this.category, required this.author, required this.book, required this.onCategory, required this.onAuthor, required this.onBook, required this.onChanged});
+  final CatalogCategory? category;
+  final CatalogAuthor? author;
+  final CatalogBook? book;
+  final ValueChanged<CatalogCategory?> onCategory;
+  final ValueChanged<CatalogAuthor?> onAuthor;
+  final ValueChanged<CatalogBook?> onBook;
+  final VoidCallback onChanged;
+  @override
+  Widget build(BuildContext context) {
     final l = context.l;
     final a = context.aura;
-    final authors = catalog.findAuthors(_q, limit: catalog.authors.length);
-    if (authors.isEmpty) return EmptyState(icon: Icons.search_off_rounded, text: l.noResults);
-    return ListView.builder(
-      padding: const EdgeInsets.only(top: 4, bottom: 32),
-      itemCount: authors.length,
-      itemBuilder: (context, i) {
-        final author = authors[i];
-        final open = _openAuthors.contains(author.id);
-        return _width(Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          _GroupRow(
-            title: author.name,
-            count: author.bookCount,
-            open: open,
-            leading: _Initial(text: author.name, seed: int.tryParse(author.id) ?? 0),
-            onTap: () => setState(() => open ? _openAuthors.remove(author.id) : _openAuthors.add(author.id)),
-            trailing: IconButton(
-              tooltip: l.author,
-              icon: Icon(Icons.person_search_outlined, size: 20, color: a.muted),
-              onPressed: () => openAuthor(context, author.id),
-            ),
-          ),
-          if (open)
-            for (final b in catalog.booksByAuthor(author.id)) Padding(padding: const EdgeInsetsDirectional.only(start: 28), child: LibraryBookRow(book: b, showAuthor: false)),
-        ]));
-      },
-    );
-  }
-
-  Widget _categories(BuildContext context) {
-    final catalog = context.read<CatalogService>();
-    final l = context.l;
-    final q = normalizeForSearch(_q);
-    final cats = catalog.categories.where((c) => q.isEmpty || normalizeForSearch(c.title).contains(q)).toList();
-    if (cats.isEmpty) return EmptyState(icon: Icons.search_off_rounded, text: l.noResults);
-    return ListView.builder(
-      padding: const EdgeInsets.only(top: 4, bottom: 32),
-      itemCount: cats.length,
-      itemBuilder: (context, i) {
-        final cat = cats[i];
-        final open = _openCategories.contains(cat.id);
-        final books = open ? catalog.findBooks('', categoryId: cat.id, limit: 25) : const <CatalogBook>[];
-        return _width(Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          _GroupRow(
-            title: cat.title,
-            count: cat.bookCount,
-            open: open,
-            leading: IconTile(icon: categoryIcon(cat.id), color: AuraHues.category(cat.id), size: 34),
-            onTap: () => setState(() => open ? _openCategories.remove(cat.id) : _openCategories.add(cat.id)),
-          ),
-          if (open) ...[
-            for (final b in books) Padding(padding: const EdgeInsetsDirectional.only(start: 28), child: LibraryBookRow(book: b, showCategory: false)),
-            if (cat.bookCount > books.length)
-              Padding(
-                padding: const EdgeInsetsDirectional.fromSTEB(40, 4, 16, 12),
-                child: Align(
-                  alignment: AlignmentDirectional.centerStart,
-                  child: SoftButton(
-                    dense: true,
-                    icon: Icons.arrow_outward_rounded,
-                    label: '${l.allBooks} (${cat.bookCount})',
-                    onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => CategoryBooksScreen(category: cat))),
-                  ),
-                ),
-              ),
-          ],
-        ]));
-      },
-    );
-  }
-
-  Widget _width(Widget child) => ReadingWidth(maxWidth: 940, child: child);
-
-  Widget _header(BuildContext context, String text) => SliverToBoxAdapter(
-        child: _width(Padding(
-          padding: const EdgeInsetsDirectional.fromSTEB(20, 14, 20, 4),
-          child: Text(text, style: TextStyle(fontFamily: uiFont, fontSize: 12.5, fontWeight: FontWeight.w700, color: context.aura.muted)),
-        )),
-      );
-
-  /// Full-text filters: category, author and book.
-  Widget _filterBar(BuildContext context) {
-    final l = context.l;
-    final a = context.aura;
-    Widget chip(String label, IconData icon, bool active, VoidCallback onTap, VoidCallback onClear) => Padding(
+    Widget chip(String label, IconData icon, bool active, Future<void> Function() pick, VoidCallback clear) => Padding(
           padding: const EdgeInsetsDirectional.only(end: 6),
           child: Pressable(
-            onTap: onTap,
+            onTap: () async {
+              await pick();
+              onChanged();
+            },
             child: Container(
               padding: const EdgeInsetsDirectional.fromSTEB(10, 6, 8, 6),
               decoration: BoxDecoration(
@@ -331,7 +815,13 @@ class _LibraryScreenState extends State<LibraryScreen> {
                 ),
                 const SizedBox(width: 2),
                 if (active)
-                  GestureDetector(onTap: onClear, child: Icon(Icons.close_rounded, size: 15, color: a.accent))
+                  GestureDetector(
+                    onTap: () {
+                      clear();
+                      onChanged();
+                    },
+                    child: Icon(Icons.close_rounded, size: 15, color: a.accent),
+                  )
                 else
                   Icon(Icons.expand_more_rounded, size: 16, color: a.muted),
               ]),
@@ -344,30 +834,18 @@ class _LibraryScreenState extends State<LibraryScreen> {
         scrollDirection: Axis.horizontal,
         child: Row(children: [
           Padding(padding: const EdgeInsetsDirectional.only(end: 6), child: Icon(Icons.tune_rounded, size: 18, color: a.muted)),
-          chip(_category?.title ?? l.anyCategory, Icons.category_outlined, _category != null, () async {
+          chip(category?.title ?? l.anyCategory, Icons.category_outlined, category != null, () async {
             final c = await pickFromCatalog<CatalogCategory>(context, PickKind.category);
-            if (c != null) setState(() => _category = c);
-            _rerunFullText();
-          }, () {
-            setState(() => _category = null);
-            _rerunFullText();
-          }),
-          chip(_author?.name ?? l.anyAuthor, Icons.person_outline_rounded, _author != null, () async {
+            if (c != null) onCategory(c);
+          }, () => onCategory(null)),
+          chip(author?.name ?? l.anyAuthor, Icons.person_outline_rounded, author != null, () async {
             final x = await pickFromCatalog<CatalogAuthor>(context, PickKind.author);
-            if (x != null) setState(() => _author = x);
-            _rerunFullText();
-          }, () {
-            setState(() => _author = null);
-            _rerunFullText();
-          }),
-          chip(_book?.title ?? l.anyBook, Icons.menu_book_outlined, _book != null, () async {
-            final b = await pickFromCatalog<CatalogBook>(context, PickKind.book, authorId: _author?.id, categoryId: _category?.id);
-            if (b != null) setState(() => _book = b);
-            _rerunFullText();
-          }, () {
-            setState(() => _book = null);
-            _rerunFullText();
-          }),
+            if (x != null) onAuthor(x);
+          }, () => onAuthor(null)),
+          chip(book?.title ?? l.anyBook, Icons.menu_book_outlined, book != null, () async {
+            final b = await pickFromCatalog<CatalogBook>(context, PickKind.book, authorId: author?.id, categoryId: category?.id);
+            if (b != null) onBook(b);
+          }, () => onBook(null)),
         ]),
       ),
     );
@@ -455,32 +933,6 @@ class _TurathBooksState extends State<_TurathBooks> {
       ),
       for (final b in _books ?? const <CatalogBook>[]) LibraryBookRow(book: b),
     ]);
-  }
-}
-
-class _TabButton extends StatelessWidget {
-  const _TabButton({required this.label, required this.icon, required this.selected, required this.onTap});
-  final String label;
-  final IconData icon;
-  final bool selected;
-  final VoidCallback onTap;
-  @override
-  Widget build(BuildContext context) {
-    final a = context.aura;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.fromLTRB(12, 10, 12, 9),
-        decoration: BoxDecoration(border: Border(bottom: BorderSide(color: selected ? a.accent : Colors.transparent, width: 2.4))),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(icon, size: 17, color: selected ? a.accent : a.muted),
-          const SizedBox(width: 6),
-          Text(label, style: TextStyle(fontFamily: uiFont, fontSize: 13.5, fontWeight: selected ? FontWeight.w800 : FontWeight.w500, color: selected ? a.accent : a.text)),
-        ]),
-      ),
-    );
   }
 }
 
@@ -770,6 +1222,8 @@ class _BookInfoSheetState extends State<_BookInfoSheet> {
                 ),
               ),
             ]),
+            const SizedBox(height: 8),
+            SaveOfflineButton(bookId: widget.bookId, title: title),
             const SizedBox(height: 8),
             SoftButton(icon: Icons.open_in_new_rounded, color: AuraHues.blue, label: l.openLink, onTap: () => openUrl('https://app.turath.io/book/${widget.bookId}')),
             if (snap.connectionState != ConnectionState.done)

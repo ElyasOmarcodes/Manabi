@@ -1217,4 +1217,81 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get textFormattingSub => 'آیات، متن و شرح';
+
+  @override
+  String get libSearchHint => 'جستجوی کتاب‌ها و مؤلفان…';
+
+  @override
+  String get narrators => 'راویان';
+
+  @override
+  String get tabDownloaded => 'ذخیره‌شده';
+
+  @override
+  String get noDownloads =>
+      'کتاب را از برگهٔ اطلاعات یا منوی خواننده ذخیره کنید تا بدون اینترنت بخوانید.';
+
+  @override
+  String get saveOffline => 'ذخیره برای آفلاین';
+
+  @override
+  String savingOffline(int percent) {
+    return 'در حال ذخیره… $percent%';
+  }
+
+  @override
+  String get savedOffline => 'روی این دستگاه ذخیره شده';
+
+  @override
+  String get removeDownload => 'حذف از دستگاه';
+
+  @override
+  String get stopDownload => 'توقف';
+
+  @override
+  String downloadsSize(String size) {
+    return '$size روی این دستگاه';
+  }
+
+  @override
+  String get deleteAllDownloads => 'حذف همهٔ کتاب‌های ذخیره‌شده';
+
+  @override
+  String get deleteAllDownloadsConfirm =>
+      'همهٔ کتاب‌های ذخیره‌شده روی این دستگاه حذف شوند؟';
+
+  @override
+  String searchInTextsFor(String query) {
+    return 'جستجوی «$query» در متن‌ها';
+  }
+
+  @override
+  String seeAll(int count) {
+    return 'دیدن همه ($count)';
+  }
+
+  @override
+  String narratorsCount(String count) {
+    return '$count راوی';
+  }
+
+  @override
+  String get searchNarrators => 'جستجوی راویان…';
+
+  @override
+  String get narratorRank => 'رتبه';
+
+  @override
+  String get narratorDeath => 'وفات';
+
+  @override
+  String get findInTexts => 'یافتن در متن‌ها';
+
+  @override
+  String get librarySections => 'بخش‌ها';
+
+  @override
+  String pagesShort(int count) {
+    return '$count ص';
+  }
 }

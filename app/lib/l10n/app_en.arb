@@ -550,5 +550,68 @@
   "matnColorLabel": "Matn colour",
   "matnBoldLabel": "Matn in bold",
   "textFormatting": "Text formatting",
-  "textFormattingSub": "Verses, matn and commentary"
+  "textFormattingSub": "Verses, matn and commentary",
+  "libSearchHint": "Search books and authors…",
+  "narrators": "Narrators",
+  "tabDownloaded": "Saved offline",
+  "noDownloads": "Save a book from its info sheet or the reader menu to read it without internet.",
+  "saveOffline": "Save for offline",
+  "savingOffline": "Saving… {percent}%",
+  "@savingOffline": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "savedOffline": "Saved on this device",
+  "removeDownload": "Remove from device",
+  "stopDownload": "Stop",
+  "downloadsSize": "{size} on this device",
+  "@downloadsSize": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "deleteAllDownloads": "Delete all saved books",
+  "deleteAllDownloadsConfirm": "Delete every book saved on this device?",
+  "searchInTextsFor": "Search the texts for «{query}»",
+  "@searchInTextsFor": {
+    "placeholders": {
+      "query": {
+        "type": "String"
+      }
+    }
+  },
+  "seeAll": "See all ({count})",
+  "@seeAll": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "narratorsCount": "{count} narrators",
+  "@narratorsCount": {
+    "placeholders": {
+      "count": {
+        "type": "String"
+      }
+    }
+  },
+  "searchNarrators": "Search narrators…",
+  "narratorRank": "Grade",
+  "narratorDeath": "Died",
+  "findInTexts": "Find in the texts",
+  "librarySections": "Sections",
+  "pagesShort": "{count} p.",
+  "@pagesShort": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
 }

@@ -157,6 +157,21 @@ class BookDetails {
     return out;
   }
 
+  /// The shape [BookDetails.fromJson] reads (kept with offline books).
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'title': title,
+        'author': {'id': ?authorId},
+        'category': {'id': ?categoryId},
+        'description': ?description,
+        'toc': [for (final e in toc) {'title': e.title, 'level': e.level, 'page': ?e.page}],
+        'volumes': volumes,
+        'hasPdf': hasPdf,
+        'pageMap': pageMap,
+        'volumeBounds': {for (final e in volumeBounds.entries) e.key: [e.value.$1, e.value.$2]},
+        'pdf': ?pdf?.toJson(),
+      };
+
   /// Accepts both the Nusus-normalized shape (server) and is produced by the
   /// direct client in the same shape.
   factory BookDetails.fromJson(Map<String, dynamic> j) => BookDetails(
@@ -210,10 +225,15 @@ class PagePassage {
     this.snippet,
     this.citation,
     this.shamelaUrl,
+    this.narrators = const [],
   });
 
   final String bookId;
   final String bookTitle;
+
+  /// Narrators linked in the page (hadith chains), in order: id and name as
+  /// written on the page.
+  final List<({String id, String name})> narrators;
   final String? authorId;
   final String? authorName;
   final String? categoryId;
@@ -247,8 +267,27 @@ class PagePassage {
       url: j['url'] as String? ?? '',
       citation: j['citation'] as String?,
       shamelaUrl: (j['alternateUrls'] as Map?)?['shamela'] as String?,
+      narrators: [
+        for (final n in j['narrators'] as List? ?? const [])
+          if (n is Map && n['id'] != null) (id: '${n['id']}', name: '${n['name'] ?? ''}'),
+      ],
     );
   }
+
+  /// The same shape [PagePassage.fromJson] reads (used to keep pages offline).
+  Map<String, dynamic> toJson() => {
+        'book': {'id': bookId, 'title': bookTitle},
+        'author': {'id': ?authorId, 'name': ?authorName},
+        'category': {'id': ?categoryId},
+        'location': {'internalPage': ?internalPage, 'printedPage': ?printedPage, 'volume': ?volume},
+        'headings': headings,
+        'text': text,
+        'snippet': ?snippet,
+        'url': url,
+        'citation': ?citation,
+        'alternateUrls': {'shamela': ?shamelaUrl},
+        if (narrators.isNotEmpty) 'narrators': [for (final n in narrators) {'id': n.id, 'name': n.name}],
+      };
 
   PagePassage copyWith({String? text, String? authorName, String? authorId, String? categoryId}) => PagePassage(
         bookId: bookId,
@@ -265,6 +304,7 @@ class PagePassage {
         snippet: snippet,
         citation: citation,
         shamelaUrl: shamelaUrl,
+        narrators: narrators,
       );
 }
 
@@ -299,5 +339,47 @@ class LayersGuess {
         quran: [for (final m in j['quranMarkers'] as List? ?? const []) '$m'],
         confidence: (j['confidence'] as num?)?.toDouble() ?? 0,
         note: j['note'] as String? ?? '',
+      );
+}
+
+/// One of Turath's 18,000+ narrators (رواة).
+class Narrator {
+  const Narrator({required this.id, required this.name, this.fullName = '', this.death, this.deathText = '', this.rank = '', this.summary = const []});
+  final String id;
+  final String name;
+  final String fullName;
+  final int? death;
+  final String deathText;
+
+  /// The critics' grading (e.g. ثقة، صحابي).
+  final String rank;
+
+  /// Biography facts as label/value pairs (only when fetched one by one).
+  final List<(String, String)> summary;
+
+  factory Narrator.fromJson(Map<String, dynamic> j) => Narrator(
+        id: '${j['id']}',
+        name: '${j['name'] ?? ''}'.trim(),
+        fullName: '${j['full_name'] ?? ''}'.trim(),
+        death: (j['death'] as num?)?.toInt(),
+        deathText: '${j['death_text'] ?? ''}'.trim(),
+        rank: '${j['rank'] ?? ''}'.trim(),
+        summary: [
+          for (final row in j['summary'] as List? ?? const [])
+            if (row is List && row.length >= 2 && '${row[1]}'.trim().isNotEmpty) ('${row[0]}', '${row[1]}'),
+        ],
+      );
+}
+
+class NarratorPage {
+  const NarratorPage({required this.items, required this.count, required this.page});
+  final List<Narrator> items;
+  final int count;
+  final int page;
+
+  factory NarratorPage.fromJson(Map<String, dynamic> j) => NarratorPage(
+        items: [for (final n in j['data'] as List? ?? const []) if (n is Map) Narrator.fromJson(n.cast<String, dynamic>())],
+        count: (j['count'] as num?)?.toInt() ?? 0,
+        page: (j['page'] as num?)?.toInt() ?? 1,
       );
 }

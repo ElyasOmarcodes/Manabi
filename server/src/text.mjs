@@ -14,9 +14,17 @@ export const decodeEntities = (value) =>
         return NAMED[code.toLowerCase()] ?? whole;
       });
 
+/** Narrators linked in a raw hadith page: <a href="inr://man-ID">name</a>. */
+export const narratorsIn = (raw) =>
+  typeof raw !== "string"
+    ? []
+    : [...raw.matchAll(/<a href="inr:\/\/man-(\d+)"[^>]*>([^<]+)<\/a>/g)].map((m) => ({ id: m[1], name: decodeEntities(m[2]).trim().replace(/[،,]+$/, "").trim() }));
+
 const decodePassage = (p) => {
   if (!p || typeof p !== "object") return p;
   const out = { ...p, text: decodeEntities(p.text), snippet: decodeEntities(p.snippet) };
+  const narrators = narratorsIn(p.raw?.text);
+  if (narrators.length) out.narrators = narrators;
   if (p.raw && typeof p.raw === "object") out.raw = { ...p.raw, snip: decodeEntities(p.raw.snip) };
   return out;
 };

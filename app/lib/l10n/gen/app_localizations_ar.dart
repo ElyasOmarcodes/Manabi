@@ -1215,4 +1215,81 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get textFormattingSub => 'الآيات والمتن والشرح';
+
+  @override
+  String get libSearchHint => 'ابحث في الكتب والمؤلفين…';
+
+  @override
+  String get narrators => 'الرواة';
+
+  @override
+  String get tabDownloaded => 'المحمّلة';
+
+  @override
+  String get noDownloads =>
+      'احفظ كتابًا من بطاقته أو من قائمة القارئ لتقرأه دون إنترنت.';
+
+  @override
+  String get saveOffline => 'حفظ للقراءة دون اتصال';
+
+  @override
+  String savingOffline(int percent) {
+    return 'جارٍ الحفظ… $percent%';
+  }
+
+  @override
+  String get savedOffline => 'محفوظ على هذا الجهاز';
+
+  @override
+  String get removeDownload => 'إزالة من الجهاز';
+
+  @override
+  String get stopDownload => 'إيقاف';
+
+  @override
+  String downloadsSize(String size) {
+    return '$size على هذا الجهاز';
+  }
+
+  @override
+  String get deleteAllDownloads => 'حذف كل الكتب المحفوظة';
+
+  @override
+  String get deleteAllDownloadsConfirm =>
+      'حذف كل الكتب المحفوظة على هذا الجهاز؟';
+
+  @override
+  String searchInTextsFor(String query) {
+    return 'ابحث في النصوص عن «$query»';
+  }
+
+  @override
+  String seeAll(int count) {
+    return 'عرض الكل ($count)';
+  }
+
+  @override
+  String narratorsCount(String count) {
+    return '$count راوٍ';
+  }
+
+  @override
+  String get searchNarrators => 'ابحث في الرواة…';
+
+  @override
+  String get narratorRank => 'الرتبة';
+
+  @override
+  String get narratorDeath => 'الوفاة';
+
+  @override
+  String get findInTexts => 'البحث عنه في النصوص';
+
+  @override
+  String get librarySections => 'الأقسام';
+
+  @override
+  String pagesShort(int count) {
+    return '$count ص';
+  }
 }

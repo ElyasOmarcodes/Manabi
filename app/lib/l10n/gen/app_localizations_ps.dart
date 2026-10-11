@@ -1215,4 +1215,81 @@ class AppLocalizationsPs extends AppLocalizations {
 
   @override
   String get textFormattingSub => 'آیتونه، متن او شرح';
+
+  @override
+  String get libSearchHint => 'کتابونه او مؤلفین ولټوئ…';
+
+  @override
+  String get narrators => 'راویان';
+
+  @override
+  String get tabDownloaded => 'ښکته شوي';
+
+  @override
+  String get noDownloads =>
+      'کتاب د هغه د معلوماتو پاڼې یا د لوستونکي له منو څخه ښکته کړئ چې پرته له انټرنیټه یې ولولئ.';
+
+  @override
+  String get saveOffline => 'د آفلاین لپاره ښکته کړه';
+
+  @override
+  String savingOffline(int percent) {
+    return 'ښکته کیږي… $percent%';
+  }
+
+  @override
+  String get savedOffline => 'په دې وسیله کې ساتل شوی';
+
+  @override
+  String get removeDownload => 'له وسیلې لرې کړه';
+
+  @override
+  String get stopDownload => 'ودروه';
+
+  @override
+  String downloadsSize(String size) {
+    return '$size په دې وسیله کې';
+  }
+
+  @override
+  String get deleteAllDownloads => 'ټول ښکته شوي کتابونه ړنګ کړه';
+
+  @override
+  String get deleteAllDownloadsConfirm =>
+      'په دې وسیله کې ټول ساتل شوي کتابونه ړنګ شي؟';
+
+  @override
+  String searchInTextsFor(String query) {
+    return 'په متنونو کې «$query» ولټوئ';
+  }
+
+  @override
+  String seeAll(int count) {
+    return 'ټول وګورئ ($count)';
+  }
+
+  @override
+  String narratorsCount(String count) {
+    return '$count راویان';
+  }
+
+  @override
+  String get searchNarrators => 'راویان ولټوئ…';
+
+  @override
+  String get narratorRank => 'درجه';
+
+  @override
+  String get narratorDeath => 'وفات';
+
+  @override
+  String get findInTexts => 'په متنونو کې یې ومومئ';
+
+  @override
+  String get librarySections => 'برخې';
+
+  @override
+  String pagesShort(int count) {
+    return '$count مخ';
+  }
 }

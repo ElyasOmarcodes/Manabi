@@ -9,6 +9,7 @@ import 'core/storage/chat_store.dart';
 import 'l10n/fallback_localizations.dart';
 import 'l10n/gen/app_localizations.dart';
 import 'state/chat_controller.dart';
+import 'state/downloads.dart';
 import 'state/nav_controller.dart';
 import 'state/reading_controller.dart';
 import 'state/settings_controller.dart';
@@ -33,6 +34,7 @@ class AppServices {
     final catalog = await CatalogService.load();
     final settings = await SettingsController.load(catalog);
     final store = await ChatStore.open();
+    await DownloadController.open();
     final chats = ChatController(store, () => settings.backend);
     await minSplash;
     return AppServices(catalog, settings, chats);
@@ -81,6 +83,7 @@ class _ManabiAppState extends State<ManabiApp> {
               ChangeNotifierProvider.value(value: services.chats),
               ChangeNotifierProvider(create: (_) => NavController()),
               ChangeNotifierProvider(create: (_) => ReadingController()..load()),
+              ChangeNotifierProvider.value(value: DownloadController.instance ?? DownloadController.empty()),
             ],
             child: const _App(),
           );

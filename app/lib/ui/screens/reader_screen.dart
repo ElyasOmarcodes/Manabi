@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/gestures.dart' show GestureRecognizer, TapGestureRecognizer;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollCacheExtent;
 import 'package:flutter/services.dart';
@@ -15,11 +16,14 @@ import '../../core/models/scope.dart';
 import '../../core/turath/arabic_match.dart';
 import '../../core/turath/text_layers.dart';
 import '../../l10n/gen/app_localizations.dart';
+import '../../state/downloads.dart';
 import '../../state/nav_controller.dart';
 import '../../state/reading_controller.dart';
 import '../../state/settings_controller.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
+import '../widgets/save_offline.dart';
+import 'library_screen.dart' show showNarrator;
 import 'settings_pages.dart' show ReadingSettingsPage;
 
 /// Opens a book at an internal page. [highlight] marks a quote or search
@@ -356,6 +360,15 @@ class _ReaderScreenState extends State<ReaderScreen> {
         await openUrl(p?.url ?? 'https://app.turath.io/book/${widget.bookId}?page=$page');
       case 'shamela' when p?.shamelaUrl != null:
         await openUrl(p!.shamelaUrl!);
+      case 'offline':
+        final downloads = context.read<DownloadController>();
+        if (downloads.progressOf(widget.bookId) != null) {
+          downloads.cancel(widget.bookId);
+        } else if (downloads.isSaved(widget.bookId)) {
+          await downloads.remove(widget.bookId);
+        } else {
+          await saveBookOffline(context, widget.bookId, _title);
+        }
       case 'settings':
         await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ReadingSettingsPage()));
       default:
@@ -530,11 +543,21 @@ class _ReaderScreenState extends State<ReaderScreen> {
             menuItem('ask', Icons.auto_awesome_rounded, l.askInThisBook),
             menuItem('turath', Icons.open_in_new_rounded, l.openLink),
             if (current?.shamelaUrl != null) menuItem('shamela', Icons.public_rounded, l.openShamela),
+            _offlineItem(context),
             menuItem('settings', Icons.settings_outlined, l.moreReadingSettings),
           ],
         ),
       ]),
     );
+  }
+
+  PopupMenuItem<String> _offlineItem(BuildContext context) {
+    final l = context.l;
+    final downloads = context.read<DownloadController>();
+    final progress = downloads.progressOf(widget.bookId);
+    if (progress != null) return menuItem('offline', Icons.stop_circle_outlined, '${l.savingOffline((progress * 100).round())} · ${l.stopDownload}');
+    if (downloads.isSaved(widget.bookId)) return menuItem('offline', Icons.delete_outline_rounded, l.removeDownload);
+    return menuItem('offline', Icons.download_for_offline_outlined, l.saveOffline);
   }
 
   Widget _bottomBar(BuildContext context, ReaderColors c, bool wide) {
@@ -763,7 +786,7 @@ class _PageBlock extends StatelessWidget {
                       padding: const EdgeInsets.only(bottom: 8),
                       child: Text(title, textDirection: TextDirection.rtl, style: bookTextStyle(context, reading, size: 17, weight: FontWeight.w700, color: a.accent).copyWith(height: 1.7)),
                     ),
-                  Text.rich(_marked(context, body, mark, marks, style), textDirection: TextDirection.rtl, textAlign: align),
+                  Text.rich(_marked(context, body, mark, marks, style, narrators: p.narrators), textDirection: TextDirection.rtl, textAlign: align),
                   if (notes.isNotEmpty && reading.showFootnotes) ...[
                     const SizedBox(height: 14),
                     Align(alignment: AlignmentDirectional.centerStart, child: SizedBox(width: 90, child: Divider(color: colors.muted.withValues(alpha: 0.5)))),
@@ -830,19 +853,36 @@ class _PageBlock extends StatelessWidget {
     return AdaptiveTextSelectionToolbar.buttonItems(anchors: state.contextMenuAnchors, buttonItems: items);
   }
 
-  TextSpan _marked(BuildContext context, String text, String? query, List<Highlight> highlights, TextStyle style) {
+  TextSpan _marked(BuildContext context, String text, String? query, List<Highlight> highlights, TextStyle style, {List<({String id, String name})> narrators = const []}) {
     final dark = context.aura.dark;
     final reading = context.read<ReadingController>();
+    // Narrator names (linked by Turath) open their record when tapped.
+    final taps = <(int, int, GestureRecognizer)>[];
+    var from = 0;
+    for (final n in narrators) {
+      final name = reading.hideDiacritics ? stripDiacritics(n.name) : n.name;
+      if (name.trim().isEmpty) continue;
+      final at = text.indexOf(name, from);
+      if (at < 0) continue;
+      taps.add((at, at + name.length, TapGestureRecognizer()..onTap = () => showNarrator(context, n.id, n.name)));
+      from = at + name.length;
+    }
+    final linkStyle = TextStyle(
+      decoration: TextDecoration.underline,
+      decorationStyle: TextDecorationStyle.dotted,
+      decorationColor: context.aura.accent.withValues(alpha: dark ? 0.55 : 0.45),
+    );
     final ranges = <(int, int, TextStyle)>[
       // Lowest first: verses and matn, then highlights, then search matches.
       ...textLayerRanges(reading, reading.layersOf(book?.id ?? ''), text, dark: dark),
+      for (final (s, e, _) in taps) (s, e, linkStyle),
       for (final h in highlights)
         for (final (s, e) in arabicMatches(text, h.text))
           (s, e, TextStyle(backgroundColor: highlightColors[h.color.clamp(0, highlightColors.length - 1)].withValues(alpha: dark ? 0.38 : 0.45))),
       for (final (s, e) in arabicMatches(text, query))
         (s, e, TextStyle(color: dark ? const Color(0xFFFF8A80) : const Color(0xFFC62828), backgroundColor: AuraHues.rose.withValues(alpha: dark ? 0.12 : 0.08))),
     ];
-    return layeredSpan(text, style, ranges);
+    return layeredSpan(text, style, ranges, taps: taps);
   }
 }
 
@@ -873,10 +913,12 @@ List<(int, int, TextStyle)> textLayerRanges(ReadingController r, BookLayers laye
 
 /// A text span where each range adds its style on top of [base]; ranges may
 /// overlap and later ones win.
-TextSpan layeredSpan(String text, TextStyle base, List<(int, int, TextStyle)> ranges) {
+///
+/// [taps] make their ranges tappable (they should not overlap each other).
+TextSpan layeredSpan(String text, TextStyle base, List<(int, int, TextStyle)> ranges, {List<(int, int, GestureRecognizer)> taps = const []}) {
   final valid = [for (final r in ranges) if (r.$1 < r.$2 && r.$1 >= 0 && r.$2 <= text.length) r];
-  if (valid.isEmpty) return TextSpan(text: text, style: base);
-  final cuts = <int>{0, text.length, for (final r in valid) ...[r.$1, r.$2]}.toList()..sort();
+  if (valid.isEmpty && taps.isEmpty) return TextSpan(text: text, style: base);
+  final cuts = <int>{0, text.length, for (final r in valid) ...[r.$1, r.$2], for (final t in taps) ...[t.$1, t.$2]}.toList()..sort();
   final spans = <TextSpan>[];
   for (var i = 0; i + 1 < cuts.length; i++) {
     final a = cuts[i], b = cuts[i + 1];
@@ -884,7 +926,11 @@ TextSpan layeredSpan(String text, TextStyle base, List<(int, int, TextStyle)> ra
     for (final (s, e, st) in valid) {
       if (s <= a && e >= b) style = style == null ? st : style.merge(st);
     }
-    spans.add(TextSpan(text: text.substring(a, b), style: style));
+    GestureRecognizer? tap;
+    for (final (s, e, r) in taps) {
+      if (s <= a && e >= b) tap = r;
+    }
+    spans.add(TextSpan(text: text.substring(a, b), style: style, recognizer: tap));
   }
   return TextSpan(style: base, children: spans);
 }

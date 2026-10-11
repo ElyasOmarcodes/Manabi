@@ -162,3 +162,24 @@ test("layers: the model names the matn delimiters of sample pages", async () => 
     server.close();
   }
 });
+
+test("narrators and page ranges", async () => {
+  const fakeNarrators = {
+    search: async (q, page) => ({ count: 1, page, data: [{ id: 4210, name: "عبيد الله بن موسى", rank: "ثقة", death: 212, q }] }),
+    get: async (id) => ({ id: Number(id), name: "عبيد الله بن موسى", summary: [["الكنية", "أبو محمد"]] }),
+  };
+  const app = createApp({ config, pipeline: {}, turath: fixtureTurath(), catalog, gemini, narrators: fakeNarrators, logger: { info() {}, error() {} } });
+  const server = await app.listen(0, "127.0.0.1");
+  try {
+    const base = `http://127.0.0.1:${server.address().port}`;
+    const list = await (await fetch(`${base}/api/narrators?q=${encodeURIComponent("عبيد")}&page=2`)).json();
+    assert.equal(list.data[0].q, "عبيد");
+    assert.equal(list.page, 2);
+    const one = await (await fetch(`${base}/api/narrators/4210`)).json();
+    assert.equal(one.summary[0][1], "أبو محمد");
+    const range = await (await fetch(`${base}/api/pages/147927/4-7`)).json();
+    assert.deepEqual(range.items.map((p) => p.location.internalPage), [4, 5, 6, 7]);
+  } finally {
+    server.close();
+  }
+});
