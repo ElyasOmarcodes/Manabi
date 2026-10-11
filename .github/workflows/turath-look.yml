@@ -1,0 +1,46 @@
+name: Look at Turath (reference screenshots)
+
+# Manual only: opens app.turath.io in a headless browser and prints small JPEG
+# screenshots plus a dump of each page's controls into the log.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  look:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install Playwright
+        working-directory: tool/turath-look
+        run: |
+          npm install
+          npx playwright install --with-deps chromium
+      - name: Capture Turath pages
+        working-directory: tool/turath-look
+        run: node look.mjs "$GITHUB_WORKSPACE/turath-shots"
+      - name: Print screenshots (small JPEG, base64)
+        if: always()
+        run: |
+          pip install --quiet pillow
+          python3 - <<'PY'
+          import base64, glob, io, os
+          from PIL import Image
+          for path in sorted(glob.glob("turath-shots/*.png")):
+              im = Image.open(path).convert("RGB")
+              im.thumbnail((700, 1000))
+              buf = io.BytesIO()
+              im.save(buf, "JPEG", quality=60, optimize=True)
+              print("SHOT", os.path.basename(path), base64.b64encode(buf.getvalue()).decode())
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: turath-shots
+          path: turath-shots/
+          retention-days: 7
