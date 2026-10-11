@@ -1324,4 +1324,47 @@ class AppLocalizationsPs extends AppLocalizations {
   String pdfLoadingBytes(String size) {
     return 'PDF پورته کېږي… $size';
   }
+
+  @override
+  String get matnBlockRule => 'د هر مخ په سر کې له کرښې پورته متن، متن دی';
+
+  @override
+  String get matnBlockShort => 'د مخ په سر کې چاپ شوی متن';
+
+  @override
+  String get markerAlwaysShort => 'تل متن';
+
+  @override
+  String get markerVerifiedShort => 'متن، کله چې له متن څخه نقل شوی وي';
+
+  @override
+  String get markersHint =>
+      'په نښه ټک وکړئ: بند ← تل متن ← یوازې کله چې یې کلمې په متن کې وي.';
+
+  @override
+  String get aiPagesLabel => 'دقیق: AI هر مخ په نښه کوي';
+
+  @override
+  String get aiPagesSub =>
+      'تر ټولو دقیق. د هر خلاص شوي مخ لپاره یو ځل AI کاروي؛ پایله په دې وسیله کې ساتل کېږي.';
+
+  @override
+  String layersAgreement(int percent) {
+    return 'د نمونې مخونو په $percent٪ کې له AI سره برابر دی';
+  }
+
+  @override
+  String get layersAutoNote => 'د کتاب له جوړښت څخه په خپله وټاکل شو';
+
+  @override
+  String get fineTune => 'دقیق تنظیم';
+
+  @override
+  String get matnRulesTitle => 'دا کتاب څنګه لوستل کېږي';
+
+  @override
+  String get noMatnRules => 'لا قاعده نشته — «پېژندل» ووهئ.';
+
+  @override
+  String get moreSuggestions => 'نورې پوښتنې';
 }

@@ -12,6 +12,8 @@ const open = async ({ width, height, lang = "ps", theme = "light", prefs = {} })
   await ctx.addInitScript(([lang, theme, prefs]) => {
     localStorage.setItem("flutter.uiLanguage", JSON.stringify(lang));
     localStorage.setItem("flutter.themeMode", JSON.stringify(theme));
+    // The starter questions rotate; screenshots use the classic first ones.
+    localStorage.setItem("flutter.fixedSuggestions", "true");
     for (const [k, v] of Object.entries(prefs)) localStorage.setItem(`flutter.${k}`, JSON.stringify(v));
   }, [lang, theme, prefs]);
   const page = await ctx.newPage();

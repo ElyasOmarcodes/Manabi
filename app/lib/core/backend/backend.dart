@@ -74,9 +74,13 @@ abstract class ManabiBackend {
 
   Future<NarratorPage> narrators(String query, {int page = 1});
   Future<Narrator> narrator(String id);
+
+  /// Books outside the bundled catalog that the server has met on Turath,
+  /// as rows [id, title, authorId, categoryId, authorName].
+  Future<List<dynamic>> discoveredBooks();
 }
 
-List<String> _layerSamples(List<String> pages) => [for (final p in pages.where((p) => p.trim().isNotEmpty).take(4)) p.length > 1800 ? p.substring(0, 1800) : p];
+List<String> _layerSamples(List<String> pages) => [for (final p in pages.where((p) => p.trim().isNotEmpty).take(4)) p.length > 5000 ? p.substring(0, 5000) : p];
 
 class ServerBackend implements ManabiBackend {
   ServerBackend(String baseUrl, {this.accessToken, http.Client? client})
@@ -200,6 +204,8 @@ class ServerBackend implements ManabiBackend {
 
   @override
   Future<Narrator> narrator(String id) async => Narrator.fromJson(await _get('/api/narrators/$id'));
+  @override
+  Future<List<dynamic>> discoveredBooks() async => (await _get('/api/catalog/discovered'))['books'] as List? ?? const [];
 
   @override
   Future<LayersGuess> detectLayers(String title, List<String> pages) async {
@@ -275,6 +281,8 @@ class DirectBackend implements ManabiBackend {
 
   @override
   Future<Narrator> narrator(String id) => _wrap(() => _turath.getNarrator(id));
+  @override
+  Future<List<dynamic>> discoveredBooks() async => const [];
 
   @override
   Future<LayersGuess> detectLayers(String title, List<String> pages) => _wrap(() async => LayersGuess.fromJson((await _gemini.generateJson(
@@ -312,4 +320,6 @@ class UnconfiguredBackend implements ManabiBackend {
   Future<NarratorPage> narrators(String query, {int page = 1}) async => _fail();
   @override
   Future<Narrator> narrator(String id) async => _fail();
+  @override
+  Future<List<dynamic>> discoveredBooks() async => const [];
 }

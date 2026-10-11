@@ -13,6 +13,7 @@ import '../../state/settings_controller.dart';
 import '../export/export_actions.dart';
 import '../home_shell.dart';
 import '../theme.dart';
+import '../widgets/suggestion_pool.dart';
 import '../widgets/answer_card.dart';
 import '../widgets/brand_logo.dart';
 import '../widgets/common.dart';
@@ -172,41 +173,95 @@ class _Welcome extends StatelessWidget {
   }
 }
 
-/// Starter questions as a horizontal row of small cards above the composer.
-class _Suggestions extends StatelessWidget {
+/// Starter questions as a horizontal row of small filled cards above the
+/// composer: a different mix each time, with a button for another mix.
+class _Suggestions extends StatefulWidget {
   const _Suggestions();
   @override
+  State<_Suggestions> createState() => _SuggestionsState();
+}
+
+class _SuggestionsState extends State<_Suggestions> {
+  List<(String, SuggestionKind)>? _items;
+  String? _language;
+  int _round = 0;
+
+  static (IconData, Color) _look(SuggestionKind k) => switch (k) {
+        SuggestionKind.hadith => (Icons.format_quote_rounded, AuraHues.amber),
+        SuggestionKind.fiqh => (Icons.balance_rounded, AuraHues.green),
+        SuggestionKind.aqidah => (Icons.auto_awesome_rounded, AuraHues.violet),
+        SuggestionKind.tafsir => (Icons.menu_book_rounded, AuraHues.blue),
+        SuggestionKind.history => (Icons.history_edu_rounded, AuraHues.rose),
+        SuggestionKind.ethics => (Icons.school_rounded, AuraHues.teal),
+      };
+
+  void _pick(SettingsController settings) {
+    _language = settings.uiLanguage;
+    _items = pickSuggestions(settings.uiLanguage, fixed: settings.fixedSuggestions);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final l = context.l;
     final a = context.aura;
+    final l = context.l;
     final nav = context.read<NavController>();
-    final items = [
-      (l.suggestion1, Icons.format_quote_rounded, AuraHues.amber),
-      (l.suggestion2, Icons.balance_rounded, AuraHues.green),
-      (l.suggestion3, Icons.auto_awesome_rounded, AuraHues.violet),
-      (l.suggestion4, Icons.school_rounded, AuraHues.teal),
-    ];
+    final settings = context.watch<SettingsController>();
+    if (_items == null || _language != settings.uiLanguage) _pick(settings);
+    final items = _items!;
     return ReadingWidth(
       maxWidth: 788,
       child: SizedBox(
-        height: 76,
+        height: 80,
         child: ListView.separated(
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.symmetric(horizontal: 14),
-          itemCount: items.length,
+          itemCount: items.length + 1,
           separatorBuilder: (_, _) => const SizedBox(width: 8),
           itemBuilder: (context, i) {
-            final (text, icon, color) = items[i];
+            if (i == items.length) {
+              return Center(
+                child: Tooltip(
+                  message: l.moreSuggestions,
+                  child: Pressable(
+                    onTap: () => setState(() {
+                      _round++;
+                      _items = pickSuggestions(settings.uiLanguage);
+                    }),
+                    child: Container(
+                      width: 46,
+                      height: 46,
+                      decoration: BoxDecoration(color: a.surfaceAlt, shape: BoxShape.circle),
+                      child: Icon(Icons.refresh_rounded, size: 20, color: a.muted),
+                    ),
+                  ),
+                ),
+              );
+            }
+            final (text, kind) = items[i];
+            final (icon, color) = _look(kind);
             return Reveal(
+              key: ValueKey('$_round-$i'),
               delay: 60 + i * 40,
               child: Pressable(
                 onTap: () => nav.prefill(text),
                 child: Container(
-                  width: 228,
+                  width: 232,
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  decoration: BoxDecoration(color: a.surface, border: Border.all(color: a.border), borderRadius: BorderRadius.circular(18)),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: AlignmentDirectional.topStart,
+                      end: AlignmentDirectional.bottomEnd,
+                      colors: [color.withValues(alpha: a.dark ? 0.20 : 0.13), color.withValues(alpha: a.dark ? 0.08 : 0.05)],
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
                   child: Row(children: [
-                    Icon(icon, size: 18, color: color),
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(color: color.withValues(alpha: a.dark ? 0.28 : 0.18), shape: BoxShape.circle),
+                      child: Icon(icon, size: 17, color: color),
+                    ),
                     const SizedBox(width: 10),
                     Expanded(child: Text(text, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontFamily: uiFont, fontSize: 13, height: 1.5, color: a.text))),
                   ]),

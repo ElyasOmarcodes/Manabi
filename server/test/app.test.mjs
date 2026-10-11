@@ -136,26 +136,26 @@ test("rate limiter window resets", () => {
   assert.equal(limit("a").ok, true);
 });
 
-test("layers: the model names the matn delimiters of sample pages", async () => {
+test("layers: the model marks the matn stretches of sample pages", async () => {
   const calls = [];
   const gemini = {
     resolveModel: async () => "m",
     generateJson: async (r) => {
       calls.push(r);
-      return { data: { isCommentary: true, matnMarkers: ["()"], quranMarkers: ["﴿﴾"], confidence: 0.9, note: "x" }, model: "m", usage: { input: 10, output: 5, thoughts: 0 } };
+      return { data: { isCommentary: true, pages: [{ matn: [{ start: "قال", end: "قال" }] }, { matn: [] }], quranMarkers: ["﴿﴾"], note: "x" }, model: "m", usage: { input: 10, output: 5, thoughts: 0 } };
     },
   };
   const app = createApp({ config: { allowedOrigins: ["*"], askLimit: 10, askWindowMs: 60_000, readLimit: 100, trustProxy: false }, pipeline: {}, turath: fixtureTurath(), catalog, gemini, logger: { info() {}, error() {} } });
   const server = await app.listen(0, "127.0.0.1");
   try {
     const url = `http://127.0.0.1:${server.address().port}/api/layers`;
-    const res = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ title: "مرقاة المفاتيح", pages: ["(قال) أي ...", "x".repeat(5000)] }) });
+    const res = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ title: "مرقاة المفاتيح", pages: ["(قال) أي ...", "x".repeat(9000)] }) });
     const body = await res.json();
     assert.equal(res.status, 200);
-    assert.deepEqual(body.matnMarkers, ["()"]);
+    assert.deepEqual(body.pages[0].matn, [{ start: "قال", end: "قال" }]);
     assert.equal(calls[0].tier, "fast");
     assert.ok(calls[0].prompt.includes("مرقاة المفاتيح"));
-    assert.ok(calls[0].prompt.length < 4500, "pages are trimmed");
+    assert.ok(calls[0].prompt.length < 6000, "pages are trimmed");
     const bad = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ pages: [] }) });
     assert.equal(bad.status, 400);
   } finally {
@@ -179,6 +179,28 @@ test("narrators and page ranges", async () => {
     assert.equal(one.summary[0][1], "أبو محمد");
     const range = await (await fetch(`${base}/api/pages/147927/4-7`)).json();
     assert.deepEqual(range.items.map((p) => p.location.internalPage), [4, 5, 6, 7]);
+  } finally {
+    server.close();
+  }
+});
+
+test("books outside the catalog snapshot are collected from Turath responses", async () => {
+  const { createDiscovered } = await import("../src/discovered.mjs");
+  const discovered = createDiscovered({ catalog });
+  const client = discovered.watch({
+    search: async () => ({ items: [{ book: { id: "999999", title: "كتاب جديد" }, author: { id: "77", name: "مؤلف" }, category: { id: "3" } }, { book: { id: "8176", title: "مرقاة المفاتيح" } }] }),
+    getBook: async () => ({ id: "999998", title: "كتاب آخر", author: { id: "78" }, category: { id: "4" } }),
+  });
+  await client.search("x");
+  await client.getBook("999998");
+  const { count, books } = discovered.list();
+  assert.equal(count, 2, "books already in the snapshot are skipped");
+  assert.deepEqual(books[0], ["999999", "كتاب جديد", "77", "3", "مؤلف"]);
+  const app = createApp({ config, pipeline: {}, turath: fixtureTurath(), catalog, gemini, discovered, logger: { info() {}, error() {} } });
+  const server = await app.listen(0, "127.0.0.1");
+  try {
+    const body = await (await fetch(`http://127.0.0.1:${server.address().port}/api/catalog/discovered`)).json();
+    assert.equal(body.count, 2);
   } finally {
     server.close();
   }

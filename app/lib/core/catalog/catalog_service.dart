@@ -50,6 +50,31 @@ class CatalogService {
     );
   }
 
+  /// Books added after the snapshot (found on Turath while using the app).
+  int discovered = 0;
+
+  /// Adds books the snapshot lacks (with their authors when named). Returns
+  /// how many were new.
+  int addBooks(Iterable<({CatalogBook book, String? authorName})> found) {
+    var added = 0;
+    for (final (:book, :authorName) in found) {
+      if (book.id.isEmpty || book.title.trim().isEmpty || _bookById.containsKey(book.id)) continue;
+      books.add(book);
+      _bookById[book.id] = book;
+      _bookKeys.add(normalizeForSearch(book.title));
+      final name = authorName?.trim() ?? '';
+      if (book.authorId.isNotEmpty && name.isNotEmpty && !_authorById.containsKey(book.authorId)) {
+        final a = CatalogAuthor(book.authorId, name, 1);
+        authors.add(a);
+        _authorById[a.id] = a;
+        _authorKeys.add(normalizeForSearch(name));
+      }
+      added++;
+    }
+    discovered += added;
+    return added;
+  }
+
   CatalogAuthor? author(String? id) => id == null ? null : _authorById[id];
   CatalogBook? book(String? id) => id == null ? null : _bookById[id];
   CatalogCategory? category(String? id) => id == null ? null : _categoryById[id];

@@ -24,6 +24,9 @@ class SettingsController extends ChangeNotifier {
 
   ThemeMode themeMode = ThemeMode.system;
   String uiLanguage = 'ps';
+
+  /// Always show the first starter questions (for screenshots and tests).
+  bool fixedSuggestions = false;
   String answerLanguage = 'auto';
   ConnectionMode mode = ConnectionMode.server;
   String serverUrl = defaultServerUrl;
@@ -51,6 +54,7 @@ class SettingsController extends ChangeNotifier {
     final systemLang = WidgetsBinding.instance.platformDispatcher.locale.languageCode;
     c.uiLanguage = prefs.getString('uiLanguage') ?? (supportedUiLanguages.contains(systemLang) ? systemLang : 'ps');
     c.answerLanguage = prefs.getString('answerLanguage') ?? 'auto';
+    c.fixedSuggestions = prefs.getBool('fixedSuggestions') ?? false;
     c.serverUrl = prefs.getString('serverUrl') ?? defaultServerUrl;
     final savedMode = ConnectionMode.values.asNameMap()[prefs.getString('mode')];
     c.mode = savedMode ?? (c.serverUrl.isEmpty && c.directAvailable ? ConnectionMode.direct : ConnectionMode.server);

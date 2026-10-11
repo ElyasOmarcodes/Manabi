@@ -1326,4 +1326,47 @@ class AppLocalizationsFa extends AppLocalizations {
   String pdfLoadingBytes(String size) {
     return 'در حال بارگذاری PDF… $size';
   }
+
+  @override
+  String get matnBlockRule => 'متنِ بالای خط در سر هر صفحه، متن است';
+
+  @override
+  String get matnBlockShort => 'متن چاپ‌شده در بالای صفحه';
+
+  @override
+  String get markerAlwaysShort => 'همیشه متن';
+
+  @override
+  String get markerVerifiedShort => 'متن، اگر از متن نقل شده باشد';
+
+  @override
+  String get markersHint =>
+      'روی نشانه بزنید: خاموش ← همیشه متن ← فقط وقتی کلماتش در متن باشد.';
+
+  @override
+  String get aiPagesLabel => 'دقیق: هوش مصنوعی هر صفحه را علامت می‌زند';
+
+  @override
+  String get aiPagesSub =>
+      'دقیق‌ترین حالت. برای هر صفحه‌ای که باز می‌کنید یک بار از هوش مصنوعی استفاده می‌کند؛ نتیجه روی همین دستگاه می‌ماند.';
+
+  @override
+  String layersAgreement(int percent) {
+    return 'در $percent٪ صفحات نمونه با هوش مصنوعی یکی است';
+  }
+
+  @override
+  String get layersAutoNote => 'به‌طور خودکار از ساختار کتاب تنظیم شد';
+
+  @override
+  String get fineTune => 'تنظیم دقیق';
+
+  @override
+  String get matnRulesTitle => 'این کتاب چگونه خوانده می‌شود';
+
+  @override
+  String get noMatnRules => 'هنوز قاعده‌ای نیست — «تشخیص» را بزنید.';
+
+  @override
+  String get moreSuggestions => 'پرسش‌های دیگر';
 }

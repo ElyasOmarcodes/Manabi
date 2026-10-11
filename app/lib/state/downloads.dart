@@ -9,6 +9,7 @@ import '../core/models/answer.dart';
 import '../core/models/library.dart';
 import '../core/models/scope.dart';
 import '../core/pipeline/answer_pipeline.dart' show AskRequest;
+import 'discovered_books.dart';
 
 /// A book kept on the device for offline reading.
 class SavedBook {
@@ -226,13 +227,17 @@ class OfflineFirstBackend implements ManabiBackend {
       final kept = await _d?.page(bookId, page);
       if (kept != null) return kept;
     } catch (_) {}
-    return inner.page(bookId, page);
+    final p = await inner.page(bookId, page);
+    DiscoveredBooks.notePassages([p]);
+    return p;
   }
 
   @override
   Future<BookDetails> book(String id) async {
     try {
-      return await inner.book(id);
+      final d = await inner.book(id);
+      DiscoveredBooks.noteBook(d);
+      return d;
     } catch (e) {
       // Offline: the saved copy of the book's index.
       final kept = await _d?.details(id).catchError((Object _) => null);
@@ -241,10 +246,18 @@ class OfflineFirstBackend implements ManabiBackend {
     }
   }
 
+  // Books seen in results join the library (see DiscoveredBooks).
   @override
-  Stream<AskEvent> ask(AskRequest request) => inner.ask(request);
+  Stream<AskEvent> ask(AskRequest request) => inner.ask(request).map((e) {
+        if (e is AskResultEvent) DiscoveredBooks.noteSources(e.result.sources);
+        return e;
+      });
   @override
-  Future<SearchResultPage> search(String query, {int page = 1, SearchScope scope = SearchScope.all}) => inner.search(query, page: page, scope: scope);
+  Future<SearchResultPage> search(String query, {int page = 1, SearchScope scope = SearchScope.all}) async {
+    final r = await inner.search(query, page: page, scope: scope);
+    DiscoveredBooks.notePassages(r.items);
+    return r;
+  }
   @override
   Future<AuthorDetails> author(String id) => inner.author(id);
   @override
@@ -257,4 +270,6 @@ class OfflineFirstBackend implements ManabiBackend {
   Future<NarratorPage> narrators(String query, {int page = 1}) => inner.narrators(query, page: page);
   @override
   Future<Narrator> narrator(String id) => inner.narrator(id);
+  @override
+  Future<List<dynamic>> discoveredBooks() => inner.discoveredBooks();
 }

@@ -7,9 +7,11 @@
 //   ASK_WINDOW_MIN   window in minutes (default 10)
 //   TRUST_PROXY      1 to trust X-Forwarded-For (behind a reverse proxy)
 //   ACCESS_TOKEN     optional bearer token required for /api/* (except health)
+//   MANABI_DATA_DIR  optional folder to keep the books found outside the catalog snapshot
 import { createTurathClient } from "nusus/turath";
 import { createApp } from "./app.mjs";
 import { catalog } from "./catalog.mjs";
+import { createDiscovered } from "./discovered.mjs";
 import { createGemini } from "./gemini.mjs";
 import { createPipeline } from "./pipeline.mjs";
 
@@ -27,14 +29,19 @@ const config = {
   accessToken: env.ACCESS_TOKEN || undefined,
 };
 
-const turath = createTurathClient({ timeout: 15_000 });
+const discovered = createDiscovered({ catalog, dataDir: env.MANABI_DATA_DIR || undefined });
+await discovered.load();
+const turath = discovered.watch(createTurathClient({ timeout: 15_000 }));
 const gemini = apiKey ? createGemini({ apiKey, model: env.GEMINI_MODEL }) : undefined;
 const pipeline = createPipeline({ gemini, turath, catalog });
-const app = createApp({ config, pipeline, turath, catalog, gemini });
+const app = createApp({ config, pipeline, turath, catalog, gemini, discovered });
 
 const server = await app.listen(config.port, config.host);
 console.log(`manabi-server listening on http://${config.host}:${config.port} (gemini: ${gemini ? "configured" : "MISSING GEMINI_API_KYA"})`);
 
-const shutdown = () => server.close(() => process.exit(0));
+const shutdown = () => {
+  discovered.save();
+  server.close(() => process.exit(0));
+};
 process.on("SIGTERM", shutdown);
 process.on("SIGINT", shutdown);

@@ -244,6 +244,7 @@ ThemeData buildTheme(Brightness brightness) {
 /// Classical Arabic source text.
 TextStyle arabicStyle(BuildContext context, {double size = 19, double scale = 1, FontWeight weight = FontWeight.w400, Color? color}) => TextStyle(
       fontFamily: arabicFont,
+      fontFamilyFallback: const ['NotoNaskhArabic', 'ScheherazadeNew'],
       fontSize: size * scale,
       height: 2.0,
       fontWeight: weight,

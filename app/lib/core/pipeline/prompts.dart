@@ -159,11 +159,25 @@ const layersSchema = {
   'type': 'OBJECT',
   'properties': {
     'isCommentary': {'type': 'BOOLEAN'},
-    'matnMarkers': {
+    'pages': {
       'type': 'ARRAY',
       'items': {
-        'type': 'STRING',
-        'enum': ['()', '«»', '""', '“”', '[]', '{}']
+        'type': 'OBJECT',
+        'properties': {
+          'matn': {
+            'type': 'ARRAY',
+            'items': {
+              'type': 'OBJECT',
+              'properties': {
+                'start': {'type': 'STRING'},
+                'end': {'type': 'STRING'},
+              },
+              'required': ['start', 'end'],
+              'propertyOrdering': ['start', 'end'],
+            }
+          },
+        },
+        'required': ['matn'],
       }
     },
     'quranMarkers': {
@@ -173,14 +187,13 @@ const layersSchema = {
         'enum': ['﴿﴾', '{}', '()', '«»']
       }
     },
-    'confidence': {'type': 'NUMBER'},
     'note': {'type': 'STRING'},
   },
-  'required': ['isCommentary', 'matnMarkers', 'quranMarkers', 'confidence'],
-  'propertyOrdering': ['isCommentary', 'matnMarkers', 'quranMarkers', 'confidence', 'note'],
+  'required': ['isCommentary', 'pages', 'quranMarkers'],
+  'propertyOrdering': ['isCommentary', 'pages', 'quranMarkers', 'note'],
 };
 
 /// Mirrors layersPrompt in server/src/prompts.mjs.
 String layersPrompt({required String title, required List<String> pages}) =>
     'BOOK: ${title.isEmpty ? '(unknown)' : title}\n\n${[for (var i = 0; i < pages.length; i++) 'PAGE ${i + 1}\n<<<\n${pages[i]}\n>>>'].join('\n\n')}\n\n'
-    'Which delimiters enclose the matn, and which enclose Quran verses? Give "note" as one short sentence.';
+    'Mark the matn stretches of each page (one entry in "pages" per page, in order). Give "note" as one short sentence on how this book sets its matn apart.';

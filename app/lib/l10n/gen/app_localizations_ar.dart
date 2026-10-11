@@ -1324,4 +1324,47 @@ class AppLocalizationsAr extends AppLocalizations {
   String pdfLoadingBytes(String size) {
     return 'جارٍ تحميل PDF… $size';
   }
+
+  @override
+  String get matnBlockRule => 'النص المطبوع أعلى كل صفحة فوق الخط هو المتن';
+
+  @override
+  String get matnBlockShort => 'متن مطبوع أعلى الصفحة';
+
+  @override
+  String get markerAlwaysShort => 'متن دائمًا';
+
+  @override
+  String get markerVerifiedShort => 'متن إذا نُقل من المتن';
+
+  @override
+  String get markersHint =>
+      'اضغط على العلامة للتبديل: معطّلة ← متن دائمًا ← متن إذا كانت كلماته في المتن.';
+
+  @override
+  String get aiPagesLabel => 'دقيق: الذكاء الاصطناعي يعلّم كل صفحة';
+
+  @override
+  String get aiPagesSub =>
+      'الأدق. يستعمل الذكاء الاصطناعي مرة لكل صفحة تفتحها، وتُحفظ النتيجة على هذا الجهاز.';
+
+  @override
+  String layersAgreement(int percent) {
+    return 'يطابق الذكاء الاصطناعي في $percent٪ من صفحات العينة';
+  }
+
+  @override
+  String get layersAutoNote => 'ضُبط تلقائيًا من تنسيق الكتاب';
+
+  @override
+  String get fineTune => 'ضبط دقيق';
+
+  @override
+  String get matnRulesTitle => 'كيف يُقرأ هذا الكتاب';
+
+  @override
+  String get noMatnRules => 'لا قواعد بعد — اضغط «اكتشاف».';
+
+  @override
+  String get moreSuggestions => 'أسئلة أخرى';
 }

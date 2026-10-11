@@ -73,3 +73,19 @@ liveTest("live: Hanafi ruling with several sources, then a follow-up naming two 
   const books = second.sources.map((s) => s.bookId);
   assert.ok(books.includes("384") || books.includes("38056"), `requested books should be consulted, got ${second.sources.map((s) => s.bookTitle).join(" | ")}`);
 });
+
+// The AI's matn marking on real commentary pages (printed for review; the app
+// learns the book's rules from this marking).
+liveTest("layers: Gemini marks the matn of مرقاة المفاتيح and مراقي الفلاح", 180_000, async () => {
+  const { LAYERS_SYSTEM, LAYERS_SCHEMA, layersPrompt } = await import("../src/prompts.mjs");
+  const gemini = createGemini({ apiKey: key, model: process.env.GEMINI_MODEL });
+  for (const [bookId, title, pages] of [[8176, "مرقاة المفاتيح شرح مشكاة المصابيح", [3721, 3722, 3723]], [412, "مراقي الفلاح شرح نور الإيضاح", [114, 115]]]) {
+    const texts = [];
+    for (const pg of pages) texts.push((await turath.getPage(bookId, pg)).text.slice(0, 5000));
+    const result = await gemini.generateJson({ system: LAYERS_SYSTEM, prompt: layersPrompt({ title, pages: texts }), schema: LAYERS_SCHEMA, temperature: 0, tier: "fast" });
+    console.log("LAYERS", bookId, JSON.stringify({ texts, result: result.data, usage: result.usage }));
+    assert.equal(result.data.isCommentary, true);
+    assert.equal(result.data.pages.length, pages.length);
+    assert.ok(result.data.pages.some((p) => p.matn.length > 0));
+  }
+});

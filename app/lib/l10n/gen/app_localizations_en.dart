@@ -1328,4 +1328,48 @@ class AppLocalizationsEn extends AppLocalizations {
   String pdfLoadingBytes(String size) {
     return 'Loading the PDF… $size';
   }
+
+  @override
+  String get matnBlockRule =>
+      'The text above the line on top of each page is matn';
+
+  @override
+  String get matnBlockShort => 'Matn printed on top of the page';
+
+  @override
+  String get markerAlwaysShort => 'always matn';
+
+  @override
+  String get markerVerifiedShort => 'matn when quoted from the matn';
+
+  @override
+  String get markersHint =>
+      'Tap a sign to switch: off → always matn → only when its words are in the matn.';
+
+  @override
+  String get aiPagesLabel => 'Precise: the AI marks every page';
+
+  @override
+  String get aiPagesSub =>
+      'Most accurate. Uses the AI once for each page you open; the result is kept on this device.';
+
+  @override
+  String layersAgreement(int percent) {
+    return 'Matches the AI on $percent% of the sample pages';
+  }
+
+  @override
+  String get layersAutoNote => 'Set automatically from the book\'s layout';
+
+  @override
+  String get fineTune => 'Fine-tune';
+
+  @override
+  String get matnRulesTitle => 'How this book is read';
+
+  @override
+  String get noMatnRules => 'No matn rules yet — tap Detect.';
+
+  @override
+  String get moreSuggestions => 'Other questions';
 }

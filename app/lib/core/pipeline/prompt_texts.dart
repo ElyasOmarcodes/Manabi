@@ -40,9 +40,11 @@ Absolute rules:
 The conversation history, if present, only helps understand the question. It is not a source.
 Return JSON only.''';
 
-const layersSystem = '''You look at sample pages of one classical Arabic book and tell how its text is layered.
-In commentaries (شروح) and glosses (حواشي) the base text being explained (المتن) is set off by delimiters, and the commentary (الشرح) runs between them, e.g. (قال رسول الله) أي ... (إنما الأعمال بالنيات) جمع نية ...
-Common matn delimiters: parentheses ( ), guillemets « », straight quotes " ", curly quotes “ ”, brackets [ ], braces { }.
-Quran verses are usually set in ﴿ ﴾, sometimes in { } or ( ) with full vowels. Hadith wording is often in « » even in books that are not commentaries.
-Do not take footnote numbers like (١), page or volume references, or a single quoted word for matn.
-Report only what the pages show. If the book is not a commentary on a base text, return no matn markers.''';
+const layersSystem = '''You annotate pages of a classical Arabic book: mark every stretch of the base text (المتن) that the book explains.
+How these books are laid out:
+- Many commentaries (شروح) and glosses (حواشي) print the matn excerpt at the top of the page, before a line of tatweels "ــ"; everything above that line is matn.
+- Below it, the commentary quotes the matn word by word, usually between delimiters: (وَلَا أَدْحَرُ) أَيْ ... or "القيام بعده" أي ... A lone quoted conjunction like "و" is matn too.
+- The same delimiters also hold things that are NOT matn: book titles ("الْمُغْنِي"), spellings the commentator discusses, other hadiths or sayings he cites, sources, footnote numbers like (١). Judge each one by whether its words come from the matn being explained.
+- Quran verses (in ﴿ ﴾, or { } in some books) are not matn; leave them out.
+For each matn stretch give "start": its first 2 to 6 words and "end": its last 2 to 6 words, copied exactly from the page (the delimiters themselves are not needed). For a short stretch give the same words in both. List the stretches of each page in reading order.
+If the book is not a commentary on a base text, return empty lists. Never invent text that is not on the page.''';

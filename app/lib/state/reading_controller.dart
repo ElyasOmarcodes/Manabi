@@ -4,6 +4,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart' show Color;
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../core/turath/text_layers.dart' show MatnRules;
+
 /// A saved page in a book.
 class Bookmark {
   const Bookmark({required this.bookId, required this.bookTitle, required this.page, this.volume, this.printed, this.heading, required this.savedAt});
@@ -74,28 +76,86 @@ class Highlight {
 /// commentary) is set apart, by which delimiters, and whether braces hold
 /// verses in it.
 class BookLayers {
-  const BookLayers({this.enabled = false, this.matn = const [], this.bracesAreVerses = false, this.source = 'manual'});
+  const BookLayers({
+    this.enabled = false,
+    this.matn = const [],
+    this.verified = const [],
+    this.block = false,
+    this.bracesAreVerses = false,
+    this.source = 'manual',
+    this.aiPages = false,
+    this.agreement,
+    this.note = '',
+  });
   final bool enabled;
+
+  /// Delimiters whose content is always matn.
   final List<String> matn;
+
+  /// Delimiters whose content is matn when its words are in the matn.
+  final List<String> verified;
+
+  /// The text above the ــ line on top of a page is matn.
+  final bool block;
   final bool bracesAreVerses;
 
   /// 'manual', 'auto' (detected from the pages) or 'ai'.
   final String source;
 
-  BookLayers copyWith({bool? enabled, List<String>? matn, bool? bracesAreVerses, String? source}) => BookLayers(
+  /// The AI marks the matn of every page read (most precise).
+  final bool aiPages;
+
+  /// How closely the rules matched the AI's marking of sample pages (0…1).
+  final double? agreement;
+  final String note;
+
+  MatnRules get rules => MatnRules(block: block, always: matn, verified: verified);
+
+  BookLayers copyWith({
+    bool? enabled,
+    List<String>? matn,
+    List<String>? verified,
+    bool? block,
+    bool? bracesAreVerses,
+    String? source,
+    bool? aiPages,
+    double? agreement,
+    String? note,
+  }) =>
+      BookLayers(
         enabled: enabled ?? this.enabled,
         matn: matn ?? this.matn,
+        verified: verified ?? this.verified,
+        block: block ?? this.block,
         bracesAreVerses: bracesAreVerses ?? this.bracesAreVerses,
         source: source ?? this.source,
+        aiPages: aiPages ?? this.aiPages,
+        agreement: agreement ?? this.agreement,
+        note: note ?? this.note,
       );
 
-  Map<String, dynamic> toJson() => {'enabled': enabled, 'matn': matn, 'braces': bracesAreVerses, 'source': source};
+  Map<String, dynamic> toJson() => {
+        'enabled': enabled,
+        'matn': matn,
+        'verified': verified,
+        'block': block,
+        'braces': bracesAreVerses,
+        'source': source,
+        'aiPages': aiPages,
+        'agreement': ?agreement,
+        if (note.isNotEmpty) 'note': note,
+      };
 
   factory BookLayers.fromJson(Map<String, dynamic> j) => BookLayers(
         enabled: j['enabled'] == true,
         matn: [for (final m in j['matn'] as List? ?? const []) '$m'],
+        verified: [for (final m in j['verified'] as List? ?? const []) '$m'],
+        block: j['block'] == true,
         bracesAreVerses: j['braces'] == true,
         source: j['source'] as String? ?? 'manual',
+        aiPages: j['aiPages'] == true,
+        agreement: (j['agreement'] as num?)?.toDouble(),
+        note: j['note'] as String? ?? '',
       );
 }
 
@@ -135,18 +195,18 @@ class ReadingController extends ChangeNotifier {
   final Map<String, List<int>> _visited = {};
 
   /// Reader text size (multiplies the Arabic text size) and line spacing.
-  double fontScale = 1.0;
+  double fontScale = 0.95;
   double lineHeight = 2.1;
 
   /// 'paper' (warm page), 'sepia' (yellow page), 'plain' (follows the app
   /// theme) or 'night'.
-  String paper = 'paper';
+  String paper = 'plain';
 
   /// 'scroll' (continuous pages, like Turath) or 'pages' (swipe page by page).
   String readingMode = 'scroll';
 
   /// Arabic face of the book text: 'amiri', 'naskh', 'scheherazade', 'plex' or 'vazir'.
-  String fontFamily = 'amiri';
+  String fontFamily = 'plex';
 
   /// Justify lines (Arabic books are typeset justified).
   bool justify = true;
@@ -225,11 +285,11 @@ class ReadingController extends ChangeNotifier {
     } catch (_) {
       // Corrupt data is ignored rather than blocking the reader.
     }
-    fontScale = prefs.getDouble('readerFontScale') ?? 1.0;
+    fontScale = prefs.getDouble('readerFontScale') ?? 0.95;
     lineHeight = prefs.getDouble('readerLineHeight') ?? 2.1;
-    paper = prefs.getString('readerPaper') ?? 'paper';
+    paper = prefs.getString('readerPaper') ?? 'plain';
     readingMode = prefs.getString('readerMode') ?? 'scroll';
-    fontFamily = prefs.getString('readerFont') ?? 'amiri';
+    fontFamily = prefs.getString('readerFont') ?? 'plex';
     justify = prefs.getBool('readerJustify') ?? true;
     hideDiacritics = prefs.getBool('readerHideDiacritics') ?? false;
     showFootnotes = prefs.getBool('readerFootnotes') ?? true;
@@ -248,6 +308,9 @@ class ReadingController extends ChangeNotifier {
   // ── Text layers ────────────────────────────────────────────────────
 
   BookLayers layersOf(String bookId) => _layers[bookId] ?? const BookLayers();
+
+  /// Has the book's layering been set, by the reader or by detection?
+  bool hasLayers(String bookId) => _layers.containsKey(bookId);
 
   Future<void> setLayers(String bookId, BookLayers value) async {
     _layers[bookId] = value;
@@ -430,11 +493,11 @@ class ReadingController extends ChangeNotifier {
     ]) {
       await _prefs?.remove(k);
     }
-    fontScale = 1.0;
+    fontScale = 0.95;
     lineHeight = 2.1;
-    paper = 'paper';
+    paper = 'plain';
     readingMode = 'scroll';
-    fontFamily = 'amiri';
+    fontFamily = 'plex';
     justify = true;
     hideDiacritics = false;
     showFootnotes = true;

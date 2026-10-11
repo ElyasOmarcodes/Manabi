@@ -454,5 +454,18 @@
   "pdfAlignHint": "که د PDF پاڼه له متن سره سمه نه وي، دلته یې وښوروه؛ د دې کتاب لپاره ساتل کېږي.",
   "pdfPage": "د PDF پاڼه {page}",
   "pdfOpenOutside": "په براوزر کې پرانیستل",
-  "pdfLoadingBytes": "PDF پورته کېږي… {size}"
+  "pdfLoadingBytes": "PDF پورته کېږي… {size}",
+  "matnBlockRule": "د هر مخ په سر کې له کرښې پورته متن، متن دی",
+  "matnBlockShort": "د مخ په سر کې چاپ شوی متن",
+  "markerAlwaysShort": "تل متن",
+  "markerVerifiedShort": "متن، کله چې له متن څخه نقل شوی وي",
+  "markersHint": "په نښه ټک وکړئ: بند ← تل متن ← یوازې کله چې یې کلمې په متن کې وي.",
+  "aiPagesLabel": "دقیق: AI هر مخ په نښه کوي",
+  "aiPagesSub": "تر ټولو دقیق. د هر خلاص شوي مخ لپاره یو ځل AI کاروي؛ پایله په دې وسیله کې ساتل کېږي.",
+  "layersAgreement": "د نمونې مخونو په {percent}٪ کې له AI سره برابر دی",
+  "layersAutoNote": "د کتاب له جوړښت څخه په خپله وټاکل شو",
+  "fineTune": "دقیق تنظیم",
+  "matnRulesTitle": "دا کتاب څنګه لوستل کېږي",
+  "noMatnRules": "لا قاعده نشته — «پېژندل» ووهئ.",
+  "moreSuggestions": "نورې پوښتنې"
 }

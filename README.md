@@ -65,7 +65,7 @@ Each answer takes 3–4 Gemini calls: planning goes to the light model (Flash-Li
 
 The composer's gauge button (and *Settings → AI style*) chooses **quick**, **standard** or **deep** research: how many queries and books are searched, how many pages are read (up to 6 / 14 / 18 sources) and how many follow-up rounds run. If a phone app goes to the background mid-answer and loses its connection, it resumes when it comes back; the server keeps each answer for 20 minutes under the app's request id, so the retry gets the finished answer without spending Gemini quota again.
 
-Optional env: `GEMINI_MODEL` (pins one model and turns off the fallback; default: the newest available Flash / Flash-Lite), `ALLOWED_ORIGINS`, `ASK_LIMIT`/`ASK_WINDOW_MIN` (rate limit), `TRUST_PROXY=1`, `ACCESS_TOKEN`. Any Docker/Node host works (Cloud Run, Fly.io, Render, a VPS). Then set `MANABI_SERVER_URL` in *Settings → Secrets and variables → Actions → Variables*.
+Optional env: `GEMINI_MODEL` (pins one model and turns off the fallback; default: the newest available Flash / Flash-Lite), `ALLOWED_ORIGINS`, `ASK_LIMIT`/`ASK_WINDOW_MIN` (rate limit), `TRUST_PROXY=1`, `ACCESS_TOKEN`, `MANABI_DATA_DIR` (a folder where the server keeps the Turath books it finds beyond the bundled 8,124-book catalog, shared with every app through `/api/catalog/discovered`). Any Docker/Node host works (Cloud Run, Fly.io, Render, a VPS). Then set `MANABI_SERVER_URL` in *Settings → Secrets and variables → Actions → Variables*.
 
 API: `POST /api/ask` (JSON or SSE stream), `GET /api/search`, `/api/books/:id`, `/api/authors/:id`, `/api/pages/:bookId/:pageId`, `/api/catalog/{books,authors,categories}`, `/api/health`.
 

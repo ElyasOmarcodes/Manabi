@@ -10,6 +10,8 @@ import 'l10n/fallback_localizations.dart';
 import 'l10n/gen/app_localizations.dart';
 import 'state/chat_controller.dart';
 import 'state/downloads.dart';
+import 'state/discovered_books.dart';
+import 'state/layer_ai.dart';
 import 'state/nav_controller.dart';
 import 'state/reading_controller.dart';
 import 'state/settings_controller.dart';
@@ -35,6 +37,10 @@ class AppServices {
     final settings = await SettingsController.load(catalog);
     final store = await ChatStore.open();
     await DownloadController.open();
+    await PageMatnAi.open();
+    await DiscoveredBooks.open(catalog);
+    // The server's shared list of books found beyond the snapshot.
+    unawaited(settings.backend.discoveredBooks().then(DiscoveredBooks.noteRows).catchError((Object _) {}));
     final chats = ChatController(store, () => settings.backend);
     await minSplash;
     return AppServices(catalog, settings, chats);

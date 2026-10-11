@@ -17,6 +17,7 @@ import '../../core/turath/arabic_match.dart';
 import '../../core/turath/text_layers.dart';
 import '../../l10n/gen/app_localizations.dart';
 import '../../state/downloads.dart';
+import '../../state/layer_ai.dart';
 import '../../state/nav_controller.dart';
 import '../../state/reading_controller.dart';
 import '../../state/settings_controller.dart';
@@ -69,10 +70,15 @@ String readerFontFamily(String id) => switch (id) {
     };
 
 /// The book text style for the reader settings.
+/// Faces tried for characters the chosen face lacks.
+const bookFontFallback = ['NotoNaskhArabic', 'ScheherazadeNew'];
+
 TextStyle bookTextStyle(BuildContext context, ReadingController r, {double size = 20, required Color color, FontWeight weight = FontWeight.w400}) {
   final scale = context.read<SettingsController>().arabicScale * r.fontScale * (r.fontFamily == 'amiri' || r.fontFamily == 'scheherazade' ? 1.08 : 1.0);
   return TextStyle(
     fontFamily: readerFontFamily(r.fontFamily),
+    // Honorific ligatures (﵀ ﵁ ﵂ …) are missing from several faces.
+    fontFamilyFallback: bookFontFallback,
     fontSize: size * scale,
     height: r.lineHeight,
     fontWeight: weight,
@@ -166,6 +172,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
     _scrollTick?.cancel();
     _scroll.dispose();
     _pages.dispose();
+    _barPager.dispose();
     _bars.dispose();
     // Positions were saved quietly while reading; tell the library now.
     final reading = _reading;
@@ -181,7 +188,10 @@ class _ReaderScreenState extends State<ReaderScreen> {
         final f = _backend.page(widget.bookId, page);
         f.then((p) {
           _loaded[page] = p;
-          if (mounted) _barsChanged();
+          if (mounted) {
+            _barsChanged();
+            _maybeDetectLayers();
+          }
         }).catchError((Object _) {
           _cache.remove(page);
         });
@@ -191,7 +201,9 @@ class _ReaderScreenState extends State<ReaderScreen> {
   bool _exists(int p) => p >= 1 && (_book?.pageCount == null || p <= _book!.pageCount!);
 
   void _prefetch(int page) {
-    for (final p in [page + 1, page + 2, page - 1]) {
+    // Two pages back too in commentaries, for the matn printed before.
+    final layered = _reading.layersOf(widget.bookId).enabled;
+    for (final p in [page + 1, page + 2, page - 1, if (layered) page - 2]) {
       if (_exists(p)) _passage(p);
     }
   }
@@ -317,8 +329,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
   /// Page texts around the current page, for detecting the book's layers.
   List<String> _layerSamples() {
-    final pages = _loaded.keys.toList()..sort((a, b) => (a - _page).abs().compareTo((b - _page).abs()));
-    return [for (final p in pages.take(6)) _loaded[p]!.text];
+    final near = (_loaded.keys.toList()..sort((a, b) => (a - _page).abs().compareTo((b - _page).abs()))).take(6).toList()..sort();
+    return [for (final p in near) _loaded[p]!.text];
   }
 
   /// Points the PDF at the printed page of the current text page (as Turath
@@ -634,6 +646,10 @@ class _ReaderScreenState extends State<ReaderScreen> {
     return menuItem('offline', Icons.download_for_offline_outlined, l.saveOffline);
   }
 
+  /// Which half of the phone bottom bar is shown: 0 the page slider, 1 the tools.
+  static int _barPage = 0;
+  late final PageController _barPager = PageController(initialPage: _barPage);
+
   Widget _bottomBar(BuildContext context, ReaderColors c, bool wide) {
     final l = context.l;
     final reading = context.read<ReadingController>();
@@ -644,64 +660,108 @@ class _ReaderScreenState extends State<ReaderScreen> {
             onTap: onTap,
             scale: 0.9,
             child: Container(
-              width: 38,
-              height: 38,
+              width: 40,
+              height: 40,
               decoration: BoxDecoration(color: active ? context.aura.accent.withValues(alpha: 0.14) : Colors.transparent, borderRadius: BorderRadius.circular(12)),
               child: Icon(icon, size: 21, color: active ? context.aura.accent : c.text),
             ),
           ),
         );
-    final pagesMode = reading.readingMode == 'pages';
+    final tools = [
+      tool(Icons.toc_rounded, l.tableOfContents, () => _openPanel(wide), active: wide && _panel),
+      tool(Icons.manage_search_rounded, l.searchInBook, _openSearch),
+      tool(Icons.tune_rounded, l.readerTools, _openTools),
+      tool(Icons.fullscreen_rounded, l.fullScreen, _toggleImmersive),
+      if (_book?.pdf != null) tool(_pdf ? Icons.picture_as_pdf_rounded : Icons.picture_as_pdf_outlined, _pdf ? l.showText : l.showPdf, _togglePdf, active: _pdf),
+    ];
+    final slider = count != null && count > 1
+        ? SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              trackHeight: 3,
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
+              overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
+              inactiveTrackColor: c.muted.withValues(alpha: 0.25),
+            ),
+            child: Slider(
+              value: _page.clamp(1, count).toDouble(),
+              min: 1,
+              max: count.toDouble(),
+              label: pageLabel(context, _book, _page, digits: reading.digits),
+              onChanged: (v) {
+                _page = v.round();
+                _barsChanged();
+              },
+              onChangeEnd: (v) => _jump(v.round()),
+            ),
+          )
+        : const SizedBox();
+    final label = Pressable(
+      onTap: _openGoTo,
+      child: Container(
+        constraints: const BoxConstraints(minWidth: 64),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Text(pageLabel(context, _book, _page, passage: _loaded[_page], digits: reading.digits),
+              style: TextStyle(fontFamily: uiFont, fontSize: 12.5, fontWeight: FontWeight.w700, color: c.text)),
+          if (count != null)
+            Text('${readerDigits(((_page / count) * 100).round(), reading.digits)}٪', style: TextStyle(fontFamily: uiFont, fontSize: 10.5, color: c.muted)),
+        ]),
+      ),
+    );
+    final prev = tool(Icons.chevron_right_rounded, l.previousPage, () => _page > 1 ? _jump(_page - 1) : null);
+    final next = tool(Icons.chevron_left_rounded, l.nextPage, () => _exists(_page + 1) ? _jump(_page + 1) : null);
+    final bottom = MediaQuery.paddingOf(context).bottom;
+
+    if (wide) {
+      return Container(
+        color: c.bar,
+        padding: EdgeInsets.fromLTRB(6, 2, 6, bottom + 4),
+        child: Directionality(
+          textDirection: TextDirection.rtl,
+          child: Row(children: [...tools, Expanded(child: slider), prev, label, next]),
+        ),
+      );
+    }
+    // Phones: two rows that slide sideways, so the page slider keeps its
+    // full width however many tools the book has.
     return Container(
       color: c.bar,
-      padding: EdgeInsets.fromLTRB(6, 2, 6, MediaQuery.paddingOf(context).bottom + 4),
+      padding: EdgeInsets.fromLTRB(4, 0, 4, bottom + 2),
       child: Directionality(
         textDirection: TextDirection.rtl,
-        child: Row(children: [
-          tool(Icons.toc_rounded, l.tableOfContents, () => _openPanel(wide), active: wide && _panel),
-          tool(Icons.manage_search_rounded, l.searchInBook, _openSearch),
-          tool(Icons.tune_rounded, l.readerTools, _openTools),
-          tool(Icons.fullscreen_rounded, l.fullScreen, _toggleImmersive),
-          if (_book?.pdf != null) tool(_pdf ? Icons.picture_as_pdf_rounded : Icons.picture_as_pdf_outlined, _pdf ? l.showText : l.showPdf, _togglePdf, active: _pdf),
-          Expanded(
-            child: count != null && count > 1
-                ? SliderTheme(
-                    data: SliderTheme.of(context).copyWith(
-                      trackHeight: 3,
-                      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
-                      overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
-                      inactiveTrackColor: c.muted.withValues(alpha: 0.25),
-                    ),
-                    child: Slider(
-                      value: _page.clamp(1, count).toDouble(),
-                      min: 1,
-                      max: count.toDouble(),
-                      label: pageLabel(context, _book, _page, digits: reading.digits),
-                      onChanged: (v) {
-                        _page = v.round();
-                        _barsChanged();
-                      },
-                      onChangeEnd: (v) => _jump(v.round()),
-                    ),
-                  )
-                : const SizedBox(),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          SizedBox(
+            height: 48,
+            child: PageView(
+              controller: _barPager,
+              onPageChanged: (i) {
+                _barPage = i;
+                _barsChanged();
+              },
+              children: [
+                Row(children: [prev, Expanded(child: slider), next, label]),
+                Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [...tools, label]),
+              ],
+            ),
           ),
-          if (pagesMode) tool(Icons.chevron_left_rounded, l.previousPage, () => _page > 1 ? _jump(_page - 1) : null),
-          Pressable(
-            onTap: _openGoTo,
-            child: Container(
-              constraints: const BoxConstraints(minWidth: 64),
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              child: Column(mainAxisSize: MainAxisSize.min, children: [
-                Text(pageLabel(context, _book, _page, passage: _loaded[_page], digits: reading.digits),
-                    style: TextStyle(fontFamily: uiFont, fontSize: 12.5, fontWeight: FontWeight.w700, color: c.text)),
-                if (count != null)
-                  Text('${readerDigits(((_page / count) * 100).round(), reading.digits)}٪',
-                      style: TextStyle(fontFamily: uiFont, fontSize: 10.5, color: c.muted)),
+          // Which row is shown; tap to switch.
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => _barPager.animateToPage(_barPage == 0 ? 1 : 0, duration: const Duration(milliseconds: 260), curve: Curves.easeOutCubic),
+            child: Padding(
+              padding: const EdgeInsets.only(top: 1, bottom: 3),
+              child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                for (var i = 0; i < 2; i++)
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    margin: const EdgeInsets.symmetric(horizontal: 3),
+                    width: _barPage == i ? 16 : 6,
+                    height: 4,
+                    decoration: BoxDecoration(color: _barPage == i ? context.aura.accent : c.muted.withValues(alpha: 0.35), borderRadius: BorderRadius.circular(2)),
+                  ),
               ]),
             ),
           ),
-          if (pagesMode) tool(Icons.chevron_right_rounded, l.nextPage, () => _exists(_page + 1) ? _jump(_page + 1) : null),
         ]),
       ),
     );
@@ -721,7 +781,38 @@ class _ReaderScreenState extends State<ReaderScreen> {
         onAction: (a) => _pageAction(a, page),
         onHighlight: (t) => _highlight(page, t),
         onCopyQuote: (t) => _copyQuote(page, t),
+        matnContext: () => _matnContext(page),
       );
+
+  /// Matn blocks printed on the pages before [page] (nearest first): the
+  /// commentary on a page often explains matn printed a few pages back.
+  List<String> _matnContext(int page) {
+    final out = <String>[];
+    for (var q = page - 1; q >= 1 && q >= page - 12 && out.length < 3; q--) {
+      final text = _loaded[q]?.text;
+      if (text == null) continue;
+      final b = matnBlock(text);
+      if (b != null) out.add(text.substring(0, b.blockEnd));
+    }
+    return out;
+  }
+
+  /// A book whose pages print their matn on top (the ــ layout) gets its
+  /// matn set apart at once, unless the reader already chose for it.
+  bool _layersTried = false;
+  void _maybeDetectLayers() {
+    if (_layersTried || _loaded.length < 3) return;
+    _layersTried = true;
+    if (_reading.hasLayers(widget.bookId)) return;
+    final samples = _layerSamples();
+    final braces = bracesAreVerses(samples);
+    final rules = detectMatnRules(samples, quranMarkers: braces ? const ['{}'] : const []);
+    if (!rules.block) return;
+    _reading.setLayers(
+      widget.bookId,
+      BookLayers(enabled: true, block: true, matn: rules.always, verified: rules.verified, bracesAreVerses: braces, source: 'auto'),
+    );
+  }
 
   Widget _scrollView(ReaderColors c) {
     final count = _book?.pageCount;
@@ -790,9 +881,14 @@ class _PageBlock extends StatelessWidget {
     required this.onAction,
     required this.onHighlight,
     required this.onCopyQuote,
+    this.matnContext,
   });
   final int page;
   final Future<PagePassage> future;
+
+  /// Matn blocks of the pages before this one (most recent first), to tell
+  /// quoted matn from other quotes.
+  final List<String> Function()? matnContext;
 
   /// The page when already loaded: built at once, without a loading frame
   /// (which made the view jump when pages came back into view).
@@ -860,7 +956,7 @@ class _PageBlock extends StatelessWidget {
                       padding: const EdgeInsets.only(bottom: 8),
                       child: Text(title, textDirection: TextDirection.rtl, style: bookTextStyle(context, reading, size: 17, weight: FontWeight.w700, color: a.accent).copyWith(height: 1.7)),
                     ),
-                  Text.rich(_marked(context, body, mark, marks, style, narrators: p.narrators), textDirection: TextDirection.rtl, textAlign: align),
+                  ..._bodyParts(context, p, body, marks, style, align),
                   if (notes.isNotEmpty && reading.showFootnotes) ...[
                     const SizedBox(height: 14),
                     Align(alignment: AlignmentDirectional.centerStart, child: SizedBox(width: 90, child: Divider(color: colors.muted.withValues(alpha: 0.5)))),
@@ -908,6 +1004,48 @@ class _PageBlock extends StatelessWidget {
     );
   }
 
+  /// The page text: the matn printed on top (before the ــ line), a short
+  /// rule, then the commentary.
+  List<Widget> _bodyParts(BuildContext context, PagePassage p, String body, List<Highlight> marks, TextStyle style, TextAlign align) {
+    final reading = context.read<ReadingController>();
+    final layers = reading.layersOf(p.bookId);
+    List<(String, String)>? ai;
+    if (layers.enabled && layers.aiPages) {
+      ai = PageMatnAi.cached(p.bookId, page);
+      if (ai == null) {
+        final backend = context.read<SettingsController>().backend;
+        return [
+          FutureBuilder<List<(String, String)>?>(
+            future: PageMatnAi.fetch(backend, p.bookId, page, p.bookTitle, p.text),
+            builder: (context, snap) => Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: _parts(context, p, body, marks, style, align, layers, snap.data),
+            ),
+          ),
+        ];
+      }
+    }
+    return _parts(context, p, body, marks, style, align, layers, ai);
+  }
+
+  List<Widget> _parts(BuildContext context, PagePassage p, String body, List<Highlight> marks, TextStyle style, TextAlign align, BookLayers layers, List<(String, String)>? ai) {
+    final block = matnBlock(body);
+    final earlier = matnContext?.call() ?? const <String>[];
+    if (block == null) {
+      return [Text.rich(_marked(context, body, mark, marks, style, narrators: p.narrators, earlier: earlier, ai: ai), textDirection: TextDirection.rtl, textAlign: align)];
+    }
+    final top = body.substring(0, block.blockEnd);
+    final sharh = body.substring(block.sharhStart);
+    return [
+      Text.rich(_marked(context, top, mark, marks, style, narrators: p.narrators, top: true, ai: ai), textDirection: TextDirection.rtl, textAlign: align),
+      Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Center(child: Container(width: 72, height: 1.5, decoration: BoxDecoration(color: colors.muted.withValues(alpha: 0.45), borderRadius: BorderRadius.circular(2)))),
+      ),
+      Text.rich(_marked(context, sharh, mark, marks, style, narrators: p.narrators, earlier: [top, ...earlier], ai: ai), textDirection: TextDirection.rtl, textAlign: align),
+    ];
+  }
+
   /// Text selection menu: highlight and copy with citation come first.
   Widget _menu(BuildContext context, SelectableRegionState state, String selected) {
     final l = context.l;
@@ -927,7 +1065,8 @@ class _PageBlock extends StatelessWidget {
     return AdaptiveTextSelectionToolbar.buttonItems(anchors: state.contextMenuAnchors, buttonItems: items);
   }
 
-  TextSpan _marked(BuildContext context, String text, String? query, List<Highlight> highlights, TextStyle style, {List<({String id, String name})> narrators = const []}) {
+  TextSpan _marked(BuildContext context, String text, String? query, List<Highlight> highlights, TextStyle style,
+      {List<({String id, String name})> narrators = const [], bool top = false, List<String> earlier = const [], List<(String, String)>? ai}) {
     final dark = context.aura.dark;
     final reading = context.read<ReadingController>();
     // Narrator names (linked by Turath) open their record when tapped.
@@ -948,7 +1087,7 @@ class _PageBlock extends StatelessWidget {
     );
     final ranges = <(int, int, TextStyle)>[
       // Lowest first: verses and matn, then highlights, then search matches.
-      ...textLayerRanges(reading, reading.layersOf(book?.id ?? ''), text, dark: dark),
+      ...textLayerRanges(reading, reading.layersOf(book?.id ?? ''), text, dark: dark, top: top, context: earlier, ai: ai),
       for (final (s, e, _) in taps) (s, e, linkStyle),
       for (final h in highlights)
         for (final (s, e) in arabicMatches(text, h.text))
@@ -961,25 +1100,43 @@ class _PageBlock extends StatelessWidget {
 }
 
 /// Verse and matn styles for a page text, from the reading settings and the
-/// book's layers.
-List<(int, int, TextStyle)> textLayerRanges(ReadingController r, BookLayers layers, String text, {required bool dark}) {
+/// book's layers. [top] is the matn block printed above the ــ line;
+/// [context] holds matn printed earlier (to verify quotes); [ai] the AI's
+/// marking of this page, when the book is read in the precise mode.
+List<(int, int, TextStyle)> textLayerRanges(ReadingController r, BookLayers layers, String text,
+    {required bool dark, bool top = false, List<String> context = const [], List<(String, String)>? ai}) {
   final out = <(int, int, TextStyle)>[];
   final verses = r.styleQuran ? quranRanges(text, extra: layers.bracesAreVerses ? const ['{}'] : const []) : const <(int, int)>[];
+  if (layers.enabled) {
+    final c = matnColors[r.matnColor.clamp(0, matnColors.length - 1)];
+    final style = TextStyle(color: dark ? c.$2 : c.$1, fontWeight: r.matnBold ? FontWeight.w700 : null);
+    final List<(int, int)> matn;
+    if (top && (layers.block || (ai != null && ai.isNotEmpty))) {
+      matn = [(0, text.length)];
+    } else if (ai != null) {
+      matn = locateSpans(text, ai);
+    } else {
+      final rules = layers.rules;
+      matn = matnRanges(
+        text,
+        MatnRules(
+          always: [for (final m in rules.always) if (!(m == '{}' && layers.bracesAreVerses)) m],
+          verified: [for (final m in rules.verified) if (!(m == '{}' && layers.bracesAreVerses)) m],
+        ),
+        context: context,
+        verses: verses,
+      );
+    }
+    for (final (s, e) in matn) {
+      out.add((s, e, style));
+    }
+  }
   if (verses.isNotEmpty) {
+    // Verses are set last: a verse inside the matn keeps its own style.
     final c = quranColors[r.quranColor.clamp(0, quranColors.length - 1)];
     final style = TextStyle(color: dark ? c.$2 : c.$1, fontFamily: r.quranFont == 'quran' ? 'AmiriQuran' : null);
     for (final (s, e) in verses) {
       out.add((s, e, style));
-    }
-  }
-  if (layers.enabled && layers.matn.isNotEmpty) {
-    final c = matnColors[r.matnColor.clamp(0, matnColors.length - 1)];
-    final style = TextStyle(color: dark ? c.$2 : c.$1, fontWeight: r.matnBold ? FontWeight.w700 : null);
-    for (final m in layers.matn) {
-      if (m == '{}' && layers.bracesAreVerses) continue;
-      for (final (s, e) in markerRanges(text, m, exclude: verses)) {
-        out.add((s, e, style));
-      }
     }
   }
   return out;
@@ -1441,25 +1598,55 @@ class _LayersPanelState extends State<LayersPanel> {
     return '$open … $close';
   }
 
+  List<String> get _samples => [for (final p in widget.samples.take(4)) p.length > 5000 ? p.substring(0, 5000) : p];
+
   Future<void> _detect() async {
     final r = context.read<ReadingController>();
     final braces = bracesAreVerses(widget.samples);
-    final found = detectMatnMarkers(widget.samples, quranMarkers: braces ? const ['{}'] : const []);
+    final rules = detectMatnRules(widget.samples, quranMarkers: braces ? const ['{}'] : const []);
     final l = context.l;
-    await r.setLayers(widget.bookId, r.layersOf(widget.bookId).copyWith(enabled: found.isNotEmpty, matn: found, bracesAreVerses: braces, source: 'auto'));
-    setState(() => _note = found.isEmpty ? l.detectedNone : '${l.layersSourceAuto}: ${found.map(glyph).join('  ')}');
+    final old = r.layersOf(widget.bookId);
+    await r.setLayers(
+      widget.bookId,
+      BookLayers(enabled: !rules.isEmpty, block: rules.block, matn: rules.always, verified: rules.verified, bracesAreVerses: braces, source: 'auto', aiPages: old.aiPages),
+    );
+    setState(() => _note = rules.isEmpty ? l.detectedNone : null);
   }
 
+  /// The AI marks the matn on sample pages; the rules that reproduce its
+  /// marking best are kept for the whole book.
   Future<void> _detectAi() async {
     final r = context.read<ReadingController>();
     final backend = context.read<SettingsController>().backend;
     final l = context.l;
     setState(() => _busy = true);
     try {
-      final g = await backend.detectLayers(widget.title, widget.samples);
-      final matn = [for (final m in g.matn) if (layerMarkers.containsKey(m)) m];
-      await r.setLayers(widget.bookId, BookLayers(enabled: matn.isNotEmpty, matn: matn, bracesAreVerses: g.quran.contains('{}'), source: 'ai'));
-      if (mounted) setState(() => _note = matn.isEmpty ? (g.note.isEmpty ? l.detectedNone : g.note) : '${l.layersSourceAi}: ${matn.map(glyph).join('  ')}${g.note.isEmpty ? '' : ' — ${g.note}'}');
+      final samples = _samples;
+      final g = await backend.detectLayers(widget.title, samples);
+      final truth = [for (var i = 0; i < samples.length; i++) i < g.pages.length ? locateSpans(samples[i], g.pages[i]) : const <(int, int)>[]];
+      final old = r.layersOf(widget.bookId);
+      final braces = g.quran.contains('{}');
+      if (truth.every((t) => t.isEmpty)) {
+        await r.setLayers(widget.bookId, BookLayers(enabled: false, bracesAreVerses: braces, source: 'ai', note: g.note));
+        if (mounted) setState(() => _note = g.note.isEmpty ? l.detectedNone : g.note);
+        return;
+      }
+      final (rules, agreement) = learnMatnRules(samples, truth);
+      await r.setLayers(
+        widget.bookId,
+        BookLayers(
+          enabled: true,
+          block: rules.block,
+          matn: rules.always,
+          verified: rules.verified,
+          bracesAreVerses: braces,
+          source: 'ai',
+          agreement: agreement,
+          note: g.note,
+          aiPages: old.aiPages,
+        ),
+      );
+      if (mounted) setState(() => _note = null);
     } catch (e) {
       if (mounted) setState(() => _note = errorText(l, mapError(e).code));
     } finally {
@@ -1473,7 +1660,22 @@ class _LayersPanelState extends State<LayersPanel> {
     final l = context.l;
     final a = context.aura;
     final layers = r.layersOf(widget.bookId);
+    final hasAi = context.read<SettingsController>().isConfigured;
     void update(BookLayers v) => r.setLayers(widget.bookId, v.copyWith(source: 'manual'));
+    Widget rule(IconData icon, String text) => Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Icon(icon, size: 16, color: a.accent),
+            const SizedBox(width: 8),
+            Expanded(child: Text(text, style: TextStyle(fontFamily: uiFont, fontSize: 13, color: a.text, height: 1.45))),
+          ]),
+        );
+    final rules = [
+      if (layers.block) rule(Icons.vertical_align_top_rounded, l.matnBlockShort),
+      for (final m in layers.matn) rule(Icons.check_rounded, '${glyph(m)}   ${l.markerAlwaysShort}'),
+      for (final m in layers.verified) rule(Icons.fact_check_outlined, '${glyph(m)}   ${l.markerVerifiedShort}'),
+      if (layers.aiPages) rule(Icons.auto_awesome_rounded, l.aiPagesLabel),
+    ];
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Text(l.matnSection, style: TextStyle(fontFamily: uiFont, fontSize: 14, fontWeight: FontWeight.w800, color: a.text)),
       SwitchListTile.adaptive(
@@ -1482,30 +1684,27 @@ class _LayersPanelState extends State<LayersPanel> {
         secondary: Icon(Icons.format_quote_rounded, size: 20, color: a.muted),
         title: Text(l.matnSeparate, style: TextStyle(fontFamily: uiFont, fontSize: 14.5, color: a.text)),
         value: layers.enabled,
-        onChanged: (v) => update(layers.copyWith(enabled: v, matn: v && layers.matn.isEmpty ? const ['()'] : layers.matn)),
+        onChanged: (v) => update(layers.copyWith(enabled: v, matn: v && layers.matn.isEmpty && layers.verified.isEmpty && !layers.block ? const ['()'] : layers.matn)),
       ),
-      if (layers.enabled) ...[
-        Padding(
-          padding: const EdgeInsetsDirectional.only(start: 4, bottom: 6),
-          child: Text(l.matnMarkersLabel, style: TextStyle(fontFamily: uiFont, fontSize: 12.5, color: a.muted)),
+      if (layers.enabled)
+        Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+          decoration: BoxDecoration(color: a.accent.withValues(alpha: a.dark ? 0.12 : 0.06), borderRadius: BorderRadius.circular(14)),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(l.matnRulesTitle, style: TextStyle(fontFamily: uiFont, fontSize: 12.5, fontWeight: FontWeight.w700, color: a.muted)),
+            if (rules.isEmpty) rule(Icons.info_outline_rounded, l.noMatnRules) else ...rules,
+            if (layers.source == 'ai' && layers.agreement != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text('${l.layersSourceAi} · ${l.layersAgreement((layers.agreement! * 100).round())}', style: TextStyle(fontFamily: uiFont, fontSize: 11.5, color: a.muted)),
+              )
+            else if (layers.source == 'auto')
+              Padding(padding: const EdgeInsets.only(top: 6), child: Text(l.layersAutoNote, style: TextStyle(fontFamily: uiFont, fontSize: 11.5, color: a.muted))),
+            if (layers.note.isNotEmpty)
+              Padding(padding: const EdgeInsets.only(top: 2), child: Text(layers.note, style: TextStyle(fontFamily: uiFont, fontSize: 11.5, color: a.muted, height: 1.4))),
+          ]),
         ),
-        Wrap(spacing: 6, runSpacing: 6, children: [
-          for (final m in matnMarkerIds)
-            FilterChip(
-              label: Text(glyph(m), textDirection: TextDirection.rtl, style: const TextStyle(fontFamily: arabicFont, fontSize: 15)),
-              selected: layers.matn.contains(m),
-              onSelected: (on) => update(layers.copyWith(matn: on ? [...layers.matn, m] : [for (final x in layers.matn) if (x != m) x])),
-            ),
-        ]),
-        SwitchListTile.adaptive(
-          dense: true,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-          title: Text('${l.bracesVerses}  { }', style: TextStyle(fontFamily: uiFont, fontSize: 13.5, color: a.text)),
-          value: layers.bracesAreVerses,
-          onChanged: (v) => update(layers.copyWith(bracesAreVerses: v)),
-        ),
-      ],
-      const SizedBox(height: 6),
       Row(children: [
         Expanded(child: SoftButton(icon: Icons.manage_search_rounded, label: l.detectAuto, onTap: widget.samples.isEmpty || _busy ? null : _detect)),
         const SizedBox(width: 8),
@@ -1514,19 +1713,101 @@ class _LayersPanelState extends State<LayersPanel> {
             icon: Icons.auto_awesome_rounded,
             color: AuraHues.violet,
             label: _busy ? l.detecting : l.detectAi,
-            onTap: widget.samples.isEmpty || _busy ? null : _detectAi,
+            onTap: widget.samples.isEmpty || _busy || !hasAi ? null : _detectAi,
           ),
         ),
       ]),
-      if (_note != null || layers.source != 'manual')
+      if (_note != null)
         Padding(
           padding: const EdgeInsets.only(top: 8),
-          child: Text(
-            _note ?? (layers.source == 'ai' ? l.layersSourceAi : l.layersSourceAuto),
-            style: TextStyle(fontFamily: uiFont, fontSize: 12, color: a.muted, height: 1.5),
+          child: Text(_note!, style: TextStyle(fontFamily: uiFont, fontSize: 12, color: a.muted, height: 1.5)),
+        ),
+      if (layers.enabled) ...[
+        SwitchListTile.adaptive(
+          dense: true,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+          secondary: const Icon(Icons.auto_awesome_rounded, size: 20, color: AuraHues.violet),
+          title: Text(l.aiPagesLabel, style: TextStyle(fontFamily: uiFont, fontSize: 14, color: a.text)),
+          subtitle: Text(l.aiPagesSub, style: TextStyle(fontFamily: uiFont, fontSize: 11.5, color: a.muted, height: 1.4)),
+          value: layers.aiPages,
+          onChanged: hasAi ? (v) => r.setLayers(widget.bookId, layers.copyWith(aiPages: v)) : null,
+        ),
+        Theme(
+          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+          child: ExpansionTile(
+            tilePadding: const EdgeInsets.symmetric(horizontal: 4),
+            childrenPadding: const EdgeInsets.only(bottom: 4),
+            title: Text(l.fineTune, style: TextStyle(fontFamily: uiFont, fontSize: 14, color: a.text)),
+            leading: Icon(Icons.tune_rounded, size: 20, color: a.muted),
+            children: [
+              SwitchListTile.adaptive(
+                dense: true,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+                title: Text(l.matnBlockRule, style: TextStyle(fontFamily: uiFont, fontSize: 13.5, color: a.text)),
+                value: layers.block,
+                onChanged: (v) => update(layers.copyWith(block: v)),
+              ),
+              Padding(
+                padding: const EdgeInsetsDirectional.only(start: 4, bottom: 6),
+                child: Text(l.markersHint, style: TextStyle(fontFamily: uiFont, fontSize: 12, color: a.muted, height: 1.45)),
+              ),
+              Wrap(spacing: 6, runSpacing: 6, children: [
+                for (final m in matnMarkerIds)
+                  _MarkerChip(
+                    label: glyph(m),
+                    state: layers.matn.contains(m) ? 1 : (layers.verified.contains(m) ? 2 : 0),
+                    onTap: () {
+                      final now = layers.matn.contains(m) ? 1 : (layers.verified.contains(m) ? 2 : 0);
+                      final next = (now + 1) % 3;
+                      update(layers.copyWith(
+                        matn: [for (final x in layers.matn) if (x != m) x, if (next == 1) m],
+                        verified: [for (final x in layers.verified) if (x != m) x, if (next == 2) m],
+                      ));
+                    },
+                  ),
+              ]),
+              SwitchListTile.adaptive(
+                dense: true,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+                title: Text('${l.bracesVerses}  { }', style: TextStyle(fontFamily: uiFont, fontSize: 13.5, color: a.text)),
+                value: layers.bracesAreVerses,
+                onChanged: (v) => update(layers.copyWith(bracesAreVerses: v)),
+              ),
+            ],
           ),
         ),
+      ],
     ]);
+  }
+}
+
+/// A delimiter chip with three states: off, always matn, matn when quoted
+/// from the matn.
+class _MarkerChip extends StatelessWidget {
+  const _MarkerChip({required this.label, required this.state, required this.onTap});
+  final String label;
+  final int state;
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) {
+    final a = context.aura;
+    final on = state != 0;
+    final color = state == 2 ? AuraHues.teal : a.accent;
+    return Pressable(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: on ? color.withValues(alpha: a.dark ? 0.22 : 0.12) : a.surfaceAlt,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          if (on) ...[Icon(state == 1 ? Icons.check_rounded : Icons.fact_check_outlined, size: 16, color: color), const SizedBox(width: 6)],
+          Text(label, textDirection: TextDirection.rtl, style: TextStyle(fontFamily: arabicFont, fontSize: 15, color: on ? color : a.text)),
+        ]),
+      ),
+    );
   }
 }
 

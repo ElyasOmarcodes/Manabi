@@ -90,7 +90,7 @@ const stripRaw = (value) => {
 
 const positive = (value) => (value && /^[1-9]\d*$/.test(value) ? value : undefined);
 
-export const createApp = ({ config, pipeline, turath: client, catalog, gemini, narrators = createNarrators(), logger = console }) => {
+export const createApp = ({ config, pipeline, turath: client, catalog, gemini, narrators = createNarrators(), discovered, logger = console }) => {
   const turath = decodingTurath(client);
   const askLimiter = createRateLimiter({ limit: config.askLimit, windowMs: config.askWindowMs });
   const readLimiter = createRateLimiter({ limit: config.readLimit, windowMs: 60_000 });
@@ -163,6 +163,8 @@ export const createApp = ({ config, pipeline, turath: client, catalog, gemini, n
     ["GET", /^\/api\/narrators$/, async (_m, url) => narrators.search(url.searchParams.get("q")?.trim() ?? "", Number(positive(url.searchParams.get("page") ?? undefined) ?? 1))],
     ["GET", /^\/api\/narrators\/([1-9]\d*)$/, async (m) => narrators.get(m[1])],
     ["GET", /^\/api\/catalog\/categories$/, async () => catalog.listCategories()],
+    // Books outside the bundled snapshot that the server has met on Turath.
+    ["GET", /^\/api\/catalog\/discovered$/, async () => discovered?.list() ?? { count: 0, books: [] }],
     ["GET", /^\/api\/catalog\/books$/, async (_m, url) => {
       const q = url.searchParams.get("q") ?? "";
       const authorId = positive(url.searchParams.get("authorId") ?? undefined);
@@ -265,7 +267,7 @@ export const createApp = ({ config, pipeline, turath: client, catalog, gemini, n
     const limited = askLimiter(clientKey(req));
     if (!limited.ok) return json(res, 429, { error: { code: "RATE_LIMITED", message: "Too many requests, please wait" } }, { ...cors, "retry-after": String(limited.retryAfter) });
     const body = await readJson(req);
-    const pages = (Array.isArray(body?.pages) ? body.pages : []).filter((p) => typeof p === "string" && p.trim()).slice(0, 4).map((p) => p.slice(0, 1800));
+    const pages = (Array.isArray(body?.pages) ? body.pages : []).filter((p) => typeof p === "string" && p.trim()).slice(0, 4).map((p) => p.slice(0, 5000));
     if (!pages.length) throw Object.assign(new Error("pages are required"), { code: "INVALID_ARGUMENT" });
     const result = await gemini.generateJson({
       system: LAYERS_SYSTEM,

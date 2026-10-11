@@ -2501,6 +2501,84 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Loading the PDF… {size}'**
   String pdfLoadingBytes(String size);
+
+  /// No description provided for @matnBlockRule.
+  ///
+  /// In en, this message translates to:
+  /// **'The text above the line on top of each page is matn'**
+  String get matnBlockRule;
+
+  /// No description provided for @matnBlockShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Matn printed on top of the page'**
+  String get matnBlockShort;
+
+  /// No description provided for @markerAlwaysShort.
+  ///
+  /// In en, this message translates to:
+  /// **'always matn'**
+  String get markerAlwaysShort;
+
+  /// No description provided for @markerVerifiedShort.
+  ///
+  /// In en, this message translates to:
+  /// **'matn when quoted from the matn'**
+  String get markerVerifiedShort;
+
+  /// No description provided for @markersHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap a sign to switch: off → always matn → only when its words are in the matn.'**
+  String get markersHint;
+
+  /// No description provided for @aiPagesLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Precise: the AI marks every page'**
+  String get aiPagesLabel;
+
+  /// No description provided for @aiPagesSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Most accurate. Uses the AI once for each page you open; the result is kept on this device.'**
+  String get aiPagesSub;
+
+  /// No description provided for @layersAgreement.
+  ///
+  /// In en, this message translates to:
+  /// **'Matches the AI on {percent}% of the sample pages'**
+  String layersAgreement(int percent);
+
+  /// No description provided for @layersAutoNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Set automatically from the book\'s layout'**
+  String get layersAutoNote;
+
+  /// No description provided for @fineTune.
+  ///
+  /// In en, this message translates to:
+  /// **'Fine-tune'**
+  String get fineTune;
+
+  /// No description provided for @matnRulesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'How this book is read'**
+  String get matnRulesTitle;
+
+  /// No description provided for @noMatnRules.
+  ///
+  /// In en, this message translates to:
+  /// **'No matn rules yet — tap Detect.'**
+  String get noMatnRules;
+
+  /// No description provided for @moreSuggestions.
+  ///
+  /// In en, this message translates to:
+  /// **'Other questions'**
+  String get moreSuggestions;
 }
 
 class _AppLocalizationsDelegate

@@ -329,18 +329,25 @@ class SearchResultPage {
 /// The model's reading of a book's layers: which delimiters hold the matn
 /// (base text of a commentary) and which hold Quran verses.
 class LayersGuess {
-  const LayersGuess({this.isCommentary = false, this.matn = const [], this.quran = const [], this.confidence = 0, this.note = ''});
+  const LayersGuess({this.isCommentary = false, this.pages = const [], this.quran = const [], this.note = ''});
   final bool isCommentary;
-  final List<String> matn;
+
+  /// Per sample page: matn stretches by their first and last words.
+  final List<List<(String, String)>> pages;
   final List<String> quran;
-  final double confidence;
   final String note;
 
   factory LayersGuess.fromJson(Map<String, dynamic> j) => LayersGuess(
         isCommentary: j['isCommentary'] == true,
-        matn: [for (final m in j['matnMarkers'] as List? ?? const []) '$m'],
+        pages: [
+          for (final p in j['pages'] as List? ?? const [])
+            [
+              if (p is Map)
+                for (final m in p['matn'] as List? ?? const [])
+                  if (m is Map && '${m['start'] ?? ''}'.trim().isNotEmpty) ('${m['start']}', '${m['end'] ?? m['start']}'),
+            ],
+        ],
         quran: [for (final m in j['quranMarkers'] as List? ?? const []) '$m'],
-        confidence: (j['confidence'] as num?)?.toDouble() ?? 0,
         note: j['note'] as String? ?? '',
       );
 }

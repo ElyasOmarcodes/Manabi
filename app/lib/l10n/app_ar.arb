@@ -454,5 +454,18 @@
   "pdfAlignHint": "إن لم تطابق صفحة PDF النص فحرّكها من هنا؛ تُحفظ لهذا الكتاب.",
   "pdfPage": "صفحة PDF {page}",
   "pdfOpenOutside": "فتح في المتصفح",
-  "pdfLoadingBytes": "جارٍ تحميل PDF… {size}"
+  "pdfLoadingBytes": "جارٍ تحميل PDF… {size}",
+  "matnBlockRule": "النص المطبوع أعلى كل صفحة فوق الخط هو المتن",
+  "matnBlockShort": "متن مطبوع أعلى الصفحة",
+  "markerAlwaysShort": "متن دائمًا",
+  "markerVerifiedShort": "متن إذا نُقل من المتن",
+  "markersHint": "اضغط على العلامة للتبديل: معطّلة ← متن دائمًا ← متن إذا كانت كلماته في المتن.",
+  "aiPagesLabel": "دقيق: الذكاء الاصطناعي يعلّم كل صفحة",
+  "aiPagesSub": "الأدق. يستعمل الذكاء الاصطناعي مرة لكل صفحة تفتحها، وتُحفظ النتيجة على هذا الجهاز.",
+  "layersAgreement": "يطابق الذكاء الاصطناعي في {percent}٪ من صفحات العينة",
+  "layersAutoNote": "ضُبط تلقائيًا من تنسيق الكتاب",
+  "fineTune": "ضبط دقيق",
+  "matnRulesTitle": "كيف يُقرأ هذا الكتاب",
+  "noMatnRules": "لا قواعد بعد — اضغط «اكتشاف».",
+  "moreSuggestions": "أسئلة أخرى"
 }

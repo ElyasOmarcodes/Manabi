@@ -636,5 +636,25 @@
         "type": "String"
       }
     }
-  }
+  },
+  "matnBlockRule": "The text above the line on top of each page is matn",
+  "matnBlockShort": "Matn printed on top of the page",
+  "markerAlwaysShort": "always matn",
+  "markerVerifiedShort": "matn when quoted from the matn",
+  "markersHint": "Tap a sign to switch: off → always matn → only when its words are in the matn.",
+  "aiPagesLabel": "Precise: the AI marks every page",
+  "aiPagesSub": "Most accurate. Uses the AI once for each page you open; the result is kept on this device.",
+  "layersAgreement": "Matches the AI on {percent}% of the sample pages",
+  "@layersAgreement": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "layersAutoNote": "Set automatically from the book's layout",
+  "fineTune": "Fine-tune",
+  "matnRulesTitle": "How this book is read",
+  "noMatnRules": "No matn rules yet — tap Detect.",
+  "moreSuggestions": "Other questions"
 }
