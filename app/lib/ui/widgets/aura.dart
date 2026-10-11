@@ -162,7 +162,7 @@ class GradientButton extends StatelessWidget {
           ),
           child: Row(mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min, mainAxisAlignment: MainAxisAlignment.center, children: [
             if (icon != null) ...[Icon(icon, color: Colors.white, size: 20), const SizedBox(width: 8)],
-            Flexible(child: Text(label, overflow: TextOverflow.ellipsis, style: const TextStyle(fontFamily: uiFont, color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15))),
+            Flexible(child: Text(label, overflow: TextOverflow.ellipsis, style: TextStyle(fontFamily: uiFont, color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15))),
           ]),
         ),
       ),

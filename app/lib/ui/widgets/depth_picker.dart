@@ -43,7 +43,7 @@ Future<void> showDepthSheet(BuildContext context) => showModalBottomSheet(
                   TextSpan(text: '${l.researchDepth}: ', style: TextStyle(color: a.text)),
                   TextSpan(text: depthLabel(l, s.researchDepth), style: TextStyle(color: a.accent)),
                 ]),
-                style: const TextStyle(fontFamily: uiFont, fontSize: 18, fontWeight: FontWeight.w700),
+                style: TextStyle(fontFamily: uiFont, fontSize: 18, fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 18),
               DepthSlider(value: s.researchDepth, onChanged: s.setResearchDepth),

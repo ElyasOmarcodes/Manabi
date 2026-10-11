@@ -3,6 +3,8 @@ import { createServer } from "node:http";
 import { NususError } from "nusus";
 import { LAYERS_SCHEMA, LAYERS_SYSTEM, layersPrompt } from "./prompts.mjs";
 import { createNarrators } from "./narrators.mjs";
+import { createPdfFlags } from "./pdf-flags.mjs";
+import { createAdvancedSearch, hasAdvancedOptions } from "./search.mjs";
 import { decodingTurath } from "./text.mjs";
 
 const VERSION = "1.0.0";
@@ -90,7 +92,7 @@ const stripRaw = (value) => {
 
 const positive = (value) => (value && /^[1-9]\d*$/.test(value) ? value : undefined);
 
-export const createApp = ({ config, pipeline, turath: client, catalog, gemini, narrators = createNarrators(), discovered, logger = console }) => {
+export const createApp = ({ config, pipeline, turath: client, catalog, gemini, narrators = createNarrators(), advancedSearch = createAdvancedSearch(), pdfFlags = createPdfFlags(), discovered, logger = console }) => {
   const turath = decodingTurath(client);
   const askLimiter = createRateLimiter({ limit: config.askLimit, windowMs: config.askWindowMs });
   const readLimiter = createRateLimiter({ limit: config.readLimit, windowMs: 60_000 });
@@ -131,6 +133,19 @@ export const createApp = ({ config, pipeline, turath: client, catalog, gemini, n
       const q = url.searchParams.get("q")?.trim();
       if (!q) throw Object.assign(new Error("q is required"), { code: "INVALID_ARGUMENT" });
       const option = (name) => positive(url.searchParams.get(name) ?? undefined);
+      // Turath's own search options (precision, word forms, footnotes, contents).
+      const precision = Number(url.searchParams.get("precision"));
+      const advanced = {
+        precision: [1, 2, 3].includes(precision) ? precision : undefined,
+        stem: url.searchParams.get("stem") === "0" ? false : undefined,
+        nonAuthor: url.searchParams.get("notes") === "0" ? false : undefined,
+        toc: url.searchParams.get("toc") === "1" ? true : undefined,
+      };
+      if (hasAdvancedOptions(advanced)) {
+        const found = await advancedSearch(q, { page: Number(option("page") ?? 1), bookId: option("bookId"), authorId: option("authorId"), categoryId: option("categoryId"), ...advanced });
+        for (const item of found.items) discovered?.note({ id: item.book?.id, title: item.book?.title, authorId: item.author?.id, authorName: item.author?.name, categoryId: item.category?.id });
+        return stripRaw(found);
+      }
       const result = await turath.search(q, {
         page: Number(option("page") ?? 1),
         bookIds: option("bookId") ? [option("bookId")] : undefined,
@@ -138,6 +153,11 @@ export const createApp = ({ config, pipeline, turath: client, catalog, gemini, n
         categoryIds: option("categoryId") ? [option("categoryId")] : undefined,
       });
       return stripRaw(result);
+    }],
+    // Which of these books have a scanned PDF (at most 60 ids).
+    ["GET", /^\/api\/books\/pdf$/, async (_m, url) => {
+      const ids = [...new Set((url.searchParams.get("ids") ?? "").split(",").map((s) => s.trim()).filter((s) => /^[1-9]\d{0,7}$/.test(s)))].slice(0, 60);
+      return { pdf: ids.length ? await pdfFlags.lookup(ids) : {} };
     }],
     ["GET", /^\/api\/books\/([1-9]\d*)$/, async (m) => {
       const book = await turath.getBook(m[1]);

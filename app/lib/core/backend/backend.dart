@@ -58,7 +58,7 @@ BackendException mapError(Object e) {
 /// [DirectBackend] (native only, user's own Gemini key).
 abstract class ManabiBackend {
   Stream<AskEvent> ask(AskRequest request);
-  Future<SearchResultPage> search(String query, {int page = 1, SearchScope scope = SearchScope.all});
+  Future<SearchResultPage> search(String query, {int page = 1, SearchScope scope = SearchScope.all, TextSearchOptions options = TextSearchOptions.standard});
   Future<BookDetails> book(String id);
   Future<AuthorDetails> author(String id);
   Future<PagePassage> page(String bookId, int page);
@@ -78,6 +78,9 @@ abstract class ManabiBackend {
   /// Books outside the bundled catalog that the server has met on Turath,
   /// as rows [id, title, authorId, categoryId, authorName].
   Future<List<dynamic>> discoveredBooks();
+
+  /// Which of these books have a scanned PDF (for the badge in lists).
+  Future<Map<String, bool>> pdfFlags(List<String> ids);
 }
 
 List<String> _layerSamples(List<String> pages) => [for (final p in pages.where((p) => p.trim().isNotEmpty).take(4)) p.length > 5000 ? p.substring(0, 5000) : p];
@@ -180,8 +183,8 @@ class ServerBackend implements ManabiBackend {
   }
 
   @override
-  Future<SearchResultPage> search(String query, {int page = 1, SearchScope scope = SearchScope.all}) async =>
-      SearchResultPage.fromJson(await _get('/api/search', {'q': query, 'page': '$page', ...scope.toRequest()}));
+  Future<SearchResultPage> search(String query, {int page = 1, SearchScope scope = SearchScope.all, TextSearchOptions options = TextSearchOptions.standard}) async =>
+      SearchResultPage.fromJson(await _get('/api/search', {'q': query, 'page': '$page', ...scope.toRequest(), ...options.toRequest()}));
 
   @override
   Future<BookDetails> book(String id) async => BookDetails.fromJson(await _get('/api/books/$id'));
@@ -206,6 +209,11 @@ class ServerBackend implements ManabiBackend {
   Future<Narrator> narrator(String id) async => Narrator.fromJson(await _get('/api/narrators/$id'));
   @override
   Future<List<dynamic>> discoveredBooks() async => (await _get('/api/catalog/discovered'))['books'] as List? ?? const [];
+  @override
+  Future<Map<String, bool>> pdfFlags(List<String> ids) async {
+    final j = await _get('/api/books/pdf', {'ids': ids.join(',')});
+    return {for (final e in (j['pdf'] as Map? ?? const {}).entries) '${e.key}': e.value == true};
+  }
 
   @override
   Future<LayersGuess> detectLayers(String title, List<String> pages) async {
@@ -258,8 +266,8 @@ class DirectBackend implements ManabiBackend {
   }
 
   @override
-  Future<SearchResultPage> search(String query, {int page = 1, SearchScope scope = SearchScope.all}) => _wrap(() =>
-      _turath.search(query, page: page, bookId: scope.bookId, authorId: scope.authorId, categoryId: scope.categoryId));
+  Future<SearchResultPage> search(String query, {int page = 1, SearchScope scope = SearchScope.all, TextSearchOptions options = TextSearchOptions.standard}) => _wrap(() =>
+      _turath.search(query, page: page, bookId: scope.bookId, authorId: scope.authorId, categoryId: scope.categoryId, options: options));
 
   @override
   Future<BookDetails> book(String id) => _wrap(() => _turath.getBook(id));
@@ -283,6 +291,17 @@ class DirectBackend implements ManabiBackend {
   Future<Narrator> narrator(String id) => _wrap(() => _turath.getNarrator(id));
   @override
   Future<List<dynamic>> discoveredBooks() async => const [];
+  @override
+  Future<Map<String, bool>> pdfFlags(List<String> ids) => _wrap(() async {
+        final out = <String, bool>{};
+        await Future.wait([
+          for (final id in ids)
+            _turath.bookHasPdf(id).then((v) {
+              if (v != null) out[id] = v;
+            }).catchError((Object _) {}),
+        ]);
+        return out;
+      });
 
   @override
   Future<LayersGuess> detectLayers(String title, List<String> pages) => _wrap(() async => LayersGuess.fromJson((await _gemini.generateJson(
@@ -303,7 +322,7 @@ class UnconfiguredBackend implements ManabiBackend {
   @override
   Stream<AskEvent> ask(AskRequest request) => Stream.error(BackendException(code));
   @override
-  Future<SearchResultPage> search(String query, {int page = 1, SearchScope scope = SearchScope.all}) async => _fail();
+  Future<SearchResultPage> search(String query, {int page = 1, SearchScope scope = SearchScope.all, TextSearchOptions options = TextSearchOptions.standard}) async => _fail();
   @override
   Future<BookDetails> book(String id) async => _fail();
   @override
@@ -322,4 +341,6 @@ class UnconfiguredBackend implements ManabiBackend {
   Future<Narrator> narrator(String id) async => _fail();
   @override
   Future<List<dynamic>> discoveredBooks() async => const [];
+  @override
+  Future<Map<String, bool>> pdfFlags(List<String> ids) async => const {};
 }

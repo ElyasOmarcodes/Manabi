@@ -4,7 +4,7 @@ import { createApp, createRateLimiter } from "../src/app.mjs";
 import { catalog } from "../src/catalog.mjs";
 import { createPipeline } from "../src/pipeline.mjs";
 import { normalizeArabic } from "../src/verify.mjs";
-import { fixtureTurath, scriptedGemini } from "./helpers.mjs";
+import { fixtureFetch, fixtureTurath, scriptedGemini } from "./helpers.mjs";
 
 const config = { allowedOrigins: ["*"], askLimit: 2, askWindowMs: 60_000, readLimit: 100, trustProxy: false };
 let server;
@@ -201,6 +201,56 @@ test("books outside the catalog snapshot are collected from Turath responses", a
   try {
     const body = await (await fetch(`http://127.0.0.1:${server.address().port}/api/catalog/discovered`)).json();
     assert.equal(body.count, 2);
+  } finally {
+    server.close();
+  }
+});
+
+test("search options of Turath's search screen reach the Turath API", async () => {
+  const { createAdvancedSearch } = await import("../src/search.mjs");
+  const seen = [];
+  const fetchFn = async (input) => {
+    const u = new URL(String(input));
+    seen.push(Object.fromEntries(u.searchParams));
+    return fixtureFetch()(input);
+  };
+  const app = createApp({ config, pipeline: {}, turath: fixtureTurath(), catalog, gemini, advancedSearch: createAdvancedSearch({ fetch: fetchFn }), logger: { info() {}, error() {} } });
+  const server = await app.listen(0, "127.0.0.1");
+  try {
+    const base = `http://127.0.0.1:${server.address().port}/api/search?q=${encodeURIComponent("الإسلام")}`;
+    const body = await (await fetch(`${base}&precision=3&stem=0&notes=0&toc=1&bookId=147927`)).json();
+    assert.ok(body.items.length > 0);
+    assert.equal(body.items[0].book.id, "147927");
+    assert.equal(body.items[0].raw, undefined);
+    assert.deepEqual(
+      { precision: seen[0].precision, stem: seen[0].stem, non_author: seen[0].non_author, scope: seen[0].scope, book: seen[0].book },
+      { precision: "3", stem: "0", non_author: "0", scope: "toc", book: "147927" },
+    );
+    // Default options keep using the Nusus client (with its query fallbacks).
+    await fetch(`${base}&precision=2`);
+    assert.equal(seen.length, 1);
+  } finally {
+    server.close();
+  }
+});
+
+test("PDF flags for book lists are looked up once per book", async () => {
+  const { createPdfFlags } = await import("../src/pdf-flags.mjs");
+  const asked = [];
+  const pdfFlags = createPdfFlags({
+    fetch: async (url) => {
+      const id = new URL(String(url)).searchParams.get("id");
+      asked.push(id);
+      return new Response(JSON.stringify({ meta: { pdf_links: id === "1681" ? { root: "/x/", files: ["01_1.pdf"] } : undefined } }), { status: 200 });
+    },
+  });
+  const app = createApp({ config, pipeline: {}, turath: fixtureTurath(), catalog, gemini, pdfFlags, logger: { info() {}, error() {} } });
+  const server = await app.listen(0, "127.0.0.1");
+  try {
+    const url = `http://127.0.0.1:${server.address().port}/api/books/pdf?ids=1681,8176,abc`;
+    assert.deepEqual((await (await fetch(url)).json()).pdf, { 1681: true, 8176: false });
+    await fetch(url);
+    assert.deepEqual(asked.sort(), ["1681", "8176"]);
   } finally {
     server.close();
   }

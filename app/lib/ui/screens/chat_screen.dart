@@ -397,7 +397,13 @@ class _ComposerState extends State<_Composer> {
   void initState() {
     super.initState();
     _controller.addListener(() => setState(() {}));
-    _focus.addListener(() => setState(() {}));
+    // The composer takes focus only when tapped (or filled from a starter
+    // question): coming back to the chat must not raise the keyboard.
+    _focus.canRequestFocus = false;
+    _focus.addListener(() {
+      if (!_focus.hasFocus) _focus.canRequestFocus = false;
+      setState(() {});
+    });
   }
 
   @override
@@ -425,6 +431,7 @@ class _ComposerState extends State<_Composer> {
         final d = nav.takeDraft();
         if (d != null) {
           _controller.text = d;
+          _focus.canRequestFocus = true;
           _focus.requestFocus();
         }
       });
@@ -466,8 +473,14 @@ class _ComposerState extends State<_Composer> {
             Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
               RoundIconButton(icon: Icons.add_rounded, tooltip: l.options, size: 40, filled: false, onTap: () => showOptionsSheet(context)),
               Expanded(
-                child: CallbackShortcuts(
-                  bindings: {const SingleActivator(LogicalKeyboardKey.enter): _send},
+                child: Listener(
+                  onPointerDown: (_) => _focus.canRequestFocus = true,
+                  child: CallbackShortcuts(
+                  // Enter starts a new line; Ctrl/⌘+Enter sends.
+                  bindings: {
+                    const SingleActivator(LogicalKeyboardKey.enter, control: true): _send,
+                    const SingleActivator(LogicalKeyboardKey.enter, meta: true): _send,
+                  },
                   child: TextField(
                     controller: _controller,
                     focusNode: _focus,
@@ -488,6 +501,7 @@ class _ComposerState extends State<_Composer> {
                       contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
                     ),
                   ),
+                ),
                 ),
               ),
               RoundIconButton(

@@ -9,10 +9,10 @@ import '../../core/models/library.dart';
 import '../../core/models/scope.dart';
 import '../../state/nav_controller.dart';
 import '../../state/downloads.dart';
+import '../../state/pdf_flags.dart';
 import '../../state/reading_controller.dart';
 import '../../state/settings_controller.dart';
 import '../theme.dart';
-import '../widgets/answer_card.dart' show QueryChip;
 import '../widgets/chat_list.dart' show confirmDialog;
 import '../widgets/common.dart';
 import '../widgets/save_offline.dart';
@@ -20,6 +20,7 @@ import '../widgets/scope_picker.dart';
 import 'author_screen.dart';
 import 'book_screen.dart';
 import 'reader_screen.dart';
+import 'text_search.dart';
 
 void _push(BuildContext context, Widget page) => Navigator.of(context).push(MaterialPageRoute(builder: (_) => page));
 
@@ -290,7 +291,7 @@ class _AllBooksPageState extends State<AllBooksPage> {
             onSelected: (v) => setState(() => _sort = v),
             itemBuilder: (_) => [
               for (final (v, label) in [('relevance', l.sortRelevance), ('title', l.sortTitle), ('author', l.sortAuthor)])
-                CheckedPopupMenuItem(value: v, checked: _sort == v, child: Text(label, style: const TextStyle(fontFamily: uiFont))),
+                CheckedPopupMenuItem(value: v, checked: _sort == v, child: Text(label, style: TextStyle(fontFamily: uiFont))),
             ],
           ),
         ],
@@ -375,7 +376,7 @@ class DownloadsPage extends StatelessWidget {
                         TextButton.icon(
                           onPressed: () => downloads.remove(b.bookId),
                           icon: const Icon(Icons.delete_outline_rounded, size: 18),
-                          label: Text(l.removeDownload, style: const TextStyle(fontFamily: uiFont)),
+                          label: Text(l.removeDownload, style: TextStyle(fontFamily: uiFont)),
                         ),
                       ]),
                     ),
@@ -716,142 +717,6 @@ class _NarratorSheetState extends State<_NarratorSheet> {
 }
 
 /// Full-text search across Turath with category, author and book filters.
-class FullTextPage extends StatefulWidget {
-  const FullTextPage({super.key, this.initialQuery = ''});
-  final String initialQuery;
-  @override
-  State<FullTextPage> createState() => _FullTextPageState();
-}
-
-class _FullTextPageState extends State<FullTextPage> {
-  late final _search = TextEditingController(text: widget.initialQuery);
-  late String _q = widget.initialQuery;
-  CatalogCategory? _category;
-  CatalogAuthor? _author;
-  CatalogBook? _book;
-  final _results = GlobalKey<_FullTextState>();
-
-  SearchScope get _scope => SearchScope(
-        bookId: _book?.id,
-        bookTitle: _book?.title,
-        authorId: _author?.id,
-        authorName: _author?.name,
-        categoryId: _category?.id,
-        categoryTitle: _category?.title,
-      );
-
-  @override
-  void initState() {
-    super.initState();
-    if (_q.isNotEmpty) WidgetsBinding.instance.addPostFrameCallback((_) => _run());
-  }
-
-  @override
-  void dispose() {
-    _search.dispose();
-    super.dispose();
-  }
-
-  void _run() {
-    if (_q.trim().isNotEmpty) _results.currentState?.search(_q, scope: _scope);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final l = context.l;
-    return _SectionPage(
-      title: l.fullTextSearch,
-      search: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        _SearchBar(controller: _search, hint: l.searchInText, count: '', rtl: true, onChanged: (v) => _q = v, onSubmitted: (_) => _run()),
-        _FilterChips(
-          category: _category,
-          author: _author,
-          book: _book,
-          onCategory: (c) => setState(() => _category = c),
-          onAuthor: (x) => setState(() => _author = x),
-          onBook: (b) => setState(() => _book = b),
-          onChanged: _run,
-        ),
-      ]),
-      body: ReadingWidth(maxWidth: 940, child: _FullText(key: _results, query: _q, scope: _scope)),
-    );
-  }
-}
-
-/// Category, author and book filters for the text search.
-class _FilterChips extends StatelessWidget {
-  const _FilterChips({required this.category, required this.author, required this.book, required this.onCategory, required this.onAuthor, required this.onBook, required this.onChanged});
-  final CatalogCategory? category;
-  final CatalogAuthor? author;
-  final CatalogBook? book;
-  final ValueChanged<CatalogCategory?> onCategory;
-  final ValueChanged<CatalogAuthor?> onAuthor;
-  final ValueChanged<CatalogBook?> onBook;
-  final VoidCallback onChanged;
-  @override
-  Widget build(BuildContext context) {
-    final l = context.l;
-    final a = context.aura;
-    Widget chip(String label, IconData icon, bool active, Future<void> Function() pick, VoidCallback clear) => Padding(
-          padding: const EdgeInsetsDirectional.only(end: 6),
-          child: Pressable(
-            onTap: () async {
-              await pick();
-              onChanged();
-            },
-            child: Container(
-              padding: const EdgeInsetsDirectional.fromSTEB(10, 6, 8, 6),
-              decoration: BoxDecoration(
-                color: active ? a.accentTint : a.surface,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: active ? a.accent.withValues(alpha: 0.5) : a.border),
-              ),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(icon, size: 15, color: active ? a.accent : a.muted),
-                const SizedBox(width: 5),
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 160),
-                  child: Text(label, overflow: TextOverflow.ellipsis, style: TextStyle(fontFamily: uiFont, fontSize: 12.5, fontWeight: FontWeight.w600, color: active ? a.accent : a.text)),
-                ),
-                const SizedBox(width: 2),
-                if (active)
-                  GestureDetector(
-                    onTap: () {
-                      clear();
-                      onChanged();
-                    },
-                    child: Icon(Icons.close_rounded, size: 15, color: a.accent),
-                  )
-                else
-                  Icon(Icons.expand_more_rounded, size: 16, color: a.muted),
-              ]),
-            ),
-          ),
-        );
-    return Padding(
-      padding: const EdgeInsets.only(top: 10),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(children: [
-          Padding(padding: const EdgeInsetsDirectional.only(end: 6), child: Icon(Icons.tune_rounded, size: 18, color: a.muted)),
-          chip(category?.title ?? l.anyCategory, Icons.category_outlined, category != null, () async {
-            final c = await pickFromCatalog<CatalogCategory>(context, PickKind.category);
-            if (c != null) onCategory(c);
-          }, () => onCategory(null)),
-          chip(author?.name ?? l.anyAuthor, Icons.person_outline_rounded, author != null, () async {
-            final x = await pickFromCatalog<CatalogAuthor>(context, PickKind.author);
-            if (x != null) onAuthor(x);
-          }, () => onAuthor(null)),
-          chip(book?.title ?? l.anyBook, Icons.menu_book_outlined, book != null, () async {
-            final b = await pickFromCatalog<CatalogBook>(context, PickKind.book, authorId: author?.id, categoryId: category?.id);
-            if (b != null) onBook(b);
-          }, () => onBook(null)),
-        ]),
-      ),
-    );
-  }
-}
-
 /// Books that are on Turath but not in the offline list (it is a snapshot):
 /// found through Turath's search, whose hits name their books. A number or
 /// a Turath link opens that book directly.
@@ -1060,11 +925,11 @@ class LibraryBookRow extends StatelessWidget {
     final author = catalog.author(book.authorId);
     final category = catalog.category(book.categoryId);
     final fav = reading.isFavorite(book.id);
-    final meta = [
-      if (showAuthor && author != null) author.name,
+    final rest = [
       if (showCategory && category != null) category.title,
       if (position != null) '${l.continueReading} · ${l.turathPage} ${position!.page}',
     ].join('  ·  ');
+    final metaStyle = TextStyle(fontFamily: uiFont, fontSize: 12, color: position != null ? a.accent : a.muted);
     return InkWell(
       onTap: () => readBook(context, book.id, book.title),
       child: Container(
@@ -1075,9 +940,40 @@ class LibraryBookRow extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              Text(book.title, maxLines: 2, overflow: TextOverflow.ellipsis, textDirection: TextDirection.rtl, style: arabicStyle(context, size: 15.5, weight: FontWeight.w700).copyWith(height: 1.55)),
-              if (meta.isNotEmpty)
-                Text(meta, maxLines: 1, overflow: TextOverflow.ellipsis, textDirection: TextDirection.rtl, style: TextStyle(fontFamily: uiFont, fontSize: 12, color: position != null ? a.accent : a.muted)),
+              Directionality(
+                textDirection: TextDirection.rtl,
+                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Flexible(
+                    child: Text(book.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: arabicStyle(context, size: 15.5, weight: FontWeight.w700).copyWith(height: 1.55)),
+                  ),
+                  // Books with Turath's scanned edition get a small red badge.
+                  ValueListenableBuilder<int>(
+                    valueListenable: PdfFlags.changes,
+                    builder: (context, _, _) => PdfFlags.of(book.id) == true ? const PdfBadge() : const SizedBox.shrink(),
+                  ),
+                ]),
+              ),
+              if ((showAuthor && author != null) || rest.isNotEmpty)
+                Directionality(
+                  textDirection: TextDirection.rtl,
+                  child: Row(children: [
+                    if (showAuthor && author != null)
+                      Flexible(
+                        flex: 0,
+                        child: InkWell(
+                          // The author's name opens all their books.
+                          onTap: () => openAuthor(context, author.id),
+                          borderRadius: BorderRadius.circular(6),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 2),
+                            child: Text(author.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: metaStyle.copyWith(color: a.accent, fontWeight: FontWeight.w600)),
+                          ),
+                        ),
+                      ),
+                    if (rest.isNotEmpty)
+                      Expanded(child: Text('${showAuthor && author != null ? '  ·  ' : ''}$rest', maxLines: 1, overflow: TextOverflow.ellipsis, style: metaStyle)),
+                  ]),
+                ),
             ]),
           ),
           IconButton(
@@ -1094,6 +990,18 @@ class LibraryBookRow extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Small red "PDF" label for books that have Turath's scanned edition.
+class PdfBadge extends StatelessWidget {
+  const PdfBadge({super.key});
+  @override
+  Widget build(BuildContext context) => Container(
+        margin: const EdgeInsetsDirectional.only(start: 6, top: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+        decoration: BoxDecoration(color: const Color(0xFFD32F2F), borderRadius: BorderRadius.circular(5)),
+        child: const Text('PDF', style: TextStyle(fontFamily: 'Vazirmatn', fontSize: 9.5, fontWeight: FontWeight.w800, color: Colors.white, height: 1.3)),
+      );
 }
 
 /// "About the book" sheet: details, reading, search, favourite and ask.
@@ -1271,118 +1179,6 @@ class CategoryBooksScreen extends StatelessWidget {
 }
 
 /// Live full-text search across Turath.
-class _FullText extends StatefulWidget {
-  const _FullText({super.key, required this.query, this.scope = SearchScope.all});
-  final String query;
-  final SearchScope scope;
-  @override
-  State<_FullText> createState() => _FullTextState();
-}
-
-class _FullTextState extends State<_FullText> {
-  final List<PagePassage> _items = [];
-  String _q = '';
-  int _total = 0;
-  int _page = 0;
-  bool _loading = false;
-  String? _error;
-
-  SearchScope _scope = SearchScope.all;
-
-  Future<void> search(String q, {bool more = false, SearchScope? scope}) async {
-    if (scope != null) _scope = scope;
-    if (q.trim().isEmpty || _loading) return;
-    final backend = context.read<SettingsController>().backend;
-    setState(() {
-      _q = q.trim();
-      _loading = true;
-      _error = null;
-      if (!more) {
-        _items.clear();
-        _page = 0;
-      }
-    });
-    try {
-      final r = await backend.search(_q, page: _page + 1, scope: _scope);
-      setState(() {
-        _items.addAll(r.items);
-        _total = r.totalMatches;
-        _page = r.page;
-      });
-    } catch (e) {
-      setState(() => _error = mapError(e).code);
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final l = context.l;
-    final a = context.aura;
-    if (_error != null && _items.isEmpty) return ErrorPanel(code: _error, onRetry: () => search(widget.query));
-    if (_items.isEmpty) {
-      return _loading ? const Center(child: TypingDots()) : EmptyState(icon: Icons.manage_search_rounded, text: l.fullTextSub, color: AuraHues.green);
-    }
-    return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(14, 10, 14, 24),
-      itemCount: _items.length + 2,
-      itemBuilder: (context, i) {
-        if (i == 0) {
-          return Padding(
-            padding: const EdgeInsetsDirectional.fromSTEB(6, 0, 6, 8),
-            child: Text(l.matches(_total), style: TextStyle(fontFamily: uiFont, fontSize: 12.5, fontWeight: FontWeight.w700, color: a.muted)),
-          );
-        }
-        if (i == _items.length + 1) {
-          return Padding(
-            padding: const EdgeInsets.all(12),
-            child: Center(
-              child: _items.length >= _total
-                  ? const SizedBox()
-                  : _loading
-                      ? const TypingDots()
-                      : SoftButton(onTap: () => search(_q, more: true), label: l.loadMore, icon: Icons.expand_more_rounded),
-            ),
-          );
-        }
-        final p = _items[i - 1];
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 10),
-          child: AuraCard(
-            padding: const EdgeInsets.all(16),
-            onTap: p.internalPage == null ? () => openUrl(p.url) : () => openReader(context, p.bookId, p.internalPage!, title: p.bookTitle, highlight: _q),
-            child: Directionality(
-              textDirection: TextDirection.rtl,
-              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                Row(children: [
-                  Text('$i', style: TextStyle(fontFamily: uiFont, fontSize: 12, fontWeight: FontWeight.w800, color: a.faint)),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(p.bookTitle, style: arabicStyle(context, size: 15.5, weight: FontWeight.w700, color: a.accent).copyWith(height: 1.5)),
-                      Text(p.citation ?? '', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontFamily: uiFont, fontSize: 11.5, color: a.muted)),
-                    ]),
-                  ),
-                  IconButton(
-                    visualDensity: VisualDensity.compact,
-                    tooltip: l.copy,
-                    icon: Icon(Icons.copy_rounded, size: 18, color: a.muted),
-                    onPressed: () => copyText(context, '${p.snippet ?? p.text}\n\n— ${p.citation ?? p.bookTitle}\n${p.url}'),
-                  ),
-                ]),
-                const SizedBox(height: 8),
-                Text(p.snippet ?? p.text, maxLines: 4, overflow: TextOverflow.ellipsis, style: arabicStyle(context, size: 16).copyWith(height: 1.95)),
-                if (p.headings.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 6), child: Align(alignment: AlignmentDirectional.centerStart, child: QueryChip(p.headings.last))),
-              ]),
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
 /// Every bookmarked page, newest first.
 class BookmarksScreen extends StatelessWidget {
   const BookmarksScreen({super.key});
@@ -1410,7 +1206,7 @@ class BookmarksScreen extends StatelessWidget {
                       leading: const Icon(Icons.bookmark_rounded, color: AuraHues.rose),
                       title: Text(b.bookTitle, maxLines: 1, overflow: TextOverflow.ellipsis, textDirection: TextDirection.rtl, style: arabicStyle(context, size: 15.5, weight: FontWeight.w700).copyWith(height: 1.5)),
                       subtitle: Text([if (b.heading != null) b.heading!, if (b.volume != null) '${l.volumeShort} ${b.volume}', '${l.page} ${b.printed ?? b.page}'].join(' · '),
-                          maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontFamily: uiFont, fontSize: 12.5)),
+                          maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontFamily: uiFont, fontSize: 12.5)),
                       onTap: () => openReader(context, b.bookId, b.page, title: b.bookTitle),
                     ),
                   ),

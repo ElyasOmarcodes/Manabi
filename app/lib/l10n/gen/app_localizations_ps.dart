@@ -1367,4 +1367,99 @@ class AppLocalizationsPs extends AppLocalizations {
 
   @override
   String get moreSuggestions => 'نورې پوښتنې';
+
+  @override
+  String get appFont => 'د اپ فونټ';
+
+  @override
+  String get appFontSample => 'ځواب یوازې له سرچینو راځي';
+
+  @override
+  String get showWholePage => 'ټول مخ وښایه';
+
+  @override
+  String get showLess => 'لږ وښایه';
+
+  @override
+  String get searchOptions => 'د لټون اختیارونه';
+
+  @override
+  String get precisionLabel => 'برابري';
+
+  @override
+  String get precisionSome => 'ځینې کلمې';
+
+  @override
+  String get precisionAll => 'ټولې کلمې';
+
+  @override
+  String get precisionOrder => 'ټولې کلمې په ترتیب';
+
+  @override
+  String get extendedSearch => 'پراخ لټون';
+
+  @override
+  String get extendedSearchSub => 'د کلمو نورې بڼې هم (مختاړي، جمعې…)';
+
+  @override
+  String get searchNotes => 'حاشیې او مقدمې';
+
+  @override
+  String get searchNotesSub => 'د محققینو په حاشیو او مقدمو کې هم ولټوه';
+
+  @override
+  String get searchSavedOnly => 'یوازې په دې وسیله کې ساتل شوي کتابونه';
+
+  @override
+  String get searchSavedOnlySub => 'بې انټرنېټه کار کوي';
+
+  @override
+  String get showFullResults => 'هره پایله بشپړه وښایه';
+
+  @override
+  String get hideDiacriticsResults => 'په پایلو کې حرکات پټ کړه';
+
+  @override
+  String get searchToc => 'په فهرستونو کې لټون';
+
+  @override
+  String get searchTocSub => 'د بابونو او فصلونو سرلیکونه، نه متن';
+
+  @override
+  String get logicLabel => 'څو عبارتونه («او» / «یا»)';
+
+  @override
+  String get logicAnd => 'او';
+
+  @override
+  String get logicOr => 'یا';
+
+  @override
+  String get addPhrase => 'عبارت زیات کړه';
+
+  @override
+  String phraseN(int n) {
+    return 'عبارت $n';
+  }
+
+  @override
+  String get pinnedFilters => 'ساتل شوي فلټرونه';
+
+  @override
+  String get savePinned => 'اوسني فلټرونه وساته';
+
+  @override
+  String get pinnedName => 'نوم';
+
+  @override
+  String get noPinned => 'لا ساتل شوي فلټرونه نشته';
+
+  @override
+  String savedBooksCount(int count) {
+    return 'په $count ساتل شویو کتابونو کې';
+  }
+
+  @override
+  String get logicHint =>
+      '«او»: هغه مخونه چې ټول عبارتونه لري. «یا»: چې یو یې لري.';
 }

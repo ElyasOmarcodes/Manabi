@@ -102,7 +102,7 @@ class _SavedDetail extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(gradient: a.brand, borderRadius: BorderRadius.circular(24)),
-              child: Text(turn.question, style: const TextStyle(fontFamily: uiFont, color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700, height: 1.6)),
+              child: Text(turn.question, style: TextStyle(fontFamily: uiFont, color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700, height: 1.6)),
             ),
             const SizedBox(height: 16),
             if (turn.result != null) AnswerCard(turn: turn),

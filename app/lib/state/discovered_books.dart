@@ -6,6 +6,7 @@ import 'package:hive_ce_flutter/hive_flutter.dart';
 import '../core/catalog/catalog_service.dart';
 import '../core/models/answer.dart';
 import '../core/models/library.dart';
+import 'pdf_flags.dart';
 
 /// Turath books outside the bundled catalog snapshot, found while using the
 /// app (search results, answers, opened links, the server's shared list).
@@ -58,7 +59,10 @@ class DiscoveredBooks {
     }
   }
 
-  static void noteBook(BookDetails d, {String? authorName}) => note(d.id, d.title, authorId: d.authorId, authorName: authorName, categoryId: d.categoryId);
+  static void noteBook(BookDetails d, {String? authorName}) {
+    PdfFlags.note(d.id, d.pdf != null);
+    note(d.id, d.title, authorId: d.authorId, authorName: authorName, categoryId: d.categoryId);
+  }
 
   /// Books from the server's shared list: [id, title, authorId, categoryId, authorName].
   static void noteRows(List<dynamic> rows) {

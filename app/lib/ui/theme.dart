@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 
 /// "Aura" design language: clean surfaces, a violet → blue → cyan signature
 /// gradient, warm pink/orange highlights and very soft depth.
-const uiFont = 'Vazirmatn';
+/// The interface face: 'Vazirmatn' or 'IBMPlexSansArabic' (Settings → Appearance).
+String appUiFont = 'Vazirmatn';
+String get uiFont => appUiFont;
 const arabicFont = 'NotoNaskhArabic';
 
 /// Manabi palette: one brand violet plus a small set of supporting accents.

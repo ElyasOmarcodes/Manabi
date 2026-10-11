@@ -1367,4 +1367,99 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get moreSuggestions => 'أسئلة أخرى';
+
+  @override
+  String get appFont => 'خط الواجهة';
+
+  @override
+  String get appFontSample => 'الجواب من المصادر وحدها';
+
+  @override
+  String get showWholePage => 'عرض الصفحة كاملة';
+
+  @override
+  String get showLess => 'عرض أقل';
+
+  @override
+  String get searchOptions => 'خيارات البحث';
+
+  @override
+  String get precisionLabel => 'دقة البحث';
+
+  @override
+  String get precisionSome => 'بعض الكلمات';
+
+  @override
+  String get precisionAll => 'كل الكلمات';
+
+  @override
+  String get precisionOrder => 'كل الكلمات متتالية';
+
+  @override
+  String get extendedSearch => 'البحث الموسع';
+
+  @override
+  String get extendedSearchSub => 'صيغ أخرى للكلمات أيضًا (السوابق والجموع…)';
+
+  @override
+  String get searchNotes => 'الهامش والمقدمات';
+
+  @override
+  String get searchNotesSub => 'البحث في هوامش المحققين ومقدماتهم أيضًا';
+
+  @override
+  String get searchSavedOnly => 'الكتب المحمّلة على هذا الجهاز فقط';
+
+  @override
+  String get searchSavedOnlySub => 'يعمل دون اتصال';
+
+  @override
+  String get showFullResults => 'إظهار كل نتيجة بتمامها';
+
+  @override
+  String get hideDiacriticsResults => 'إخفاء الحركات في النتائج';
+
+  @override
+  String get searchToc => 'البحث في فهارس الكتب';
+
+  @override
+  String get searchTocSub => 'عناوين الأبواب والفصول بدل النص';
+
+  @override
+  String get logicLabel => 'عدة عبارات («و» / «أو»)';
+
+  @override
+  String get logicAnd => 'و';
+
+  @override
+  String get logicOr => 'أو';
+
+  @override
+  String get addPhrase => 'إضافة عبارة';
+
+  @override
+  String phraseN(int n) {
+    return 'عبارة $n';
+  }
+
+  @override
+  String get pinnedFilters => 'الخيارات المثبتة';
+
+  @override
+  String get savePinned => 'تثبيت التصفية الحالية';
+
+  @override
+  String get pinnedName => 'الاسم';
+
+  @override
+  String get noPinned => 'لا توجد خيارات مثبتة بعد';
+
+  @override
+  String savedBooksCount(int count) {
+    return 'في $count كتابًا محمّلًا';
+  }
+
+  @override
+  String get logicHint =>
+      '«و»: الصفحات التي فيها كل العبارات. «أو»: التي فيها إحداها.';
 }

@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../state/downloads.dart';
+import '../../state/reading_controller.dart';
 import '../../state/settings_controller.dart';
 import '../theme.dart';
 import '../widgets/brand_logo.dart';
 import '../widgets/common.dart';
 import '../widgets/depth_picker.dart';
 import 'chat_screen.dart' show languageLabels;
+import 'library_screen.dart' show DownloadsPage;
 import 'settings_pages.dart';
 
 /// Settings home, ChatGPT style: short groups of rows; each row opens its
@@ -17,6 +20,8 @@ class SettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = context.watch<SettingsController>();
+    final r = context.watch<ReadingController>();
+    final downloads = context.watch<DownloadController>();
     final l = context.l;
     final a = context.aura;
     final labels = languageLabels(l);
@@ -32,17 +37,23 @@ class SettingsScreen extends StatelessWidget {
         ReadingWidth(
           maxWidth: 680,
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 22, horizontal: 16),
-              decoration: BoxDecoration(color: a.surface, borderRadius: BorderRadius.circular(22), border: Border.all(color: a.border)),
-              child: Column(children: [
-                const BrandLogo(height: 58),
-                const SizedBox(height: 10),
-                Text(l.tagline, textAlign: TextAlign.center, style: TextStyle(fontFamily: uiFont, fontSize: 13, color: a.muted, height: 1.6)),
+            // A small brand line, not a banner: the settings come first.
+            Padding(
+              padding: const EdgeInsets.fromLTRB(6, 4, 6, 4),
+              child: Row(children: [
+                const BrandLogo(height: 30),
+                const SizedBox(width: 12),
+                Expanded(child: Text(l.tagline, maxLines: 2, style: TextStyle(fontFamily: uiFont, fontSize: 12, color: a.muted, height: 1.5))),
               ]),
             ),
             SettingsGroup(title: l.settingsApp, children: [
-              SettingsRow(icon: Icons.palette_outlined, color: AuraHues.violet, title: l.appearance, value: themeName, onTap: () => push(const AppearanceSettingsPage())),
+              SettingsRow(
+                icon: Icons.palette_outlined,
+                color: AuraHues.violet,
+                title: l.appearance,
+                value: '$themeName · ${s.uiFontFamily == 'Vazirmatn' ? 'Vazirmatn' : 'IBM Plex'}',
+                onTap: () => push(const AppearanceSettingsPage()),
+              ),
               SettingsRow(
                 icon: Icons.language_rounded,
                 color: AuraHues.blue,
@@ -59,8 +70,28 @@ class SettingsScreen extends StatelessWidget {
               SettingsRow(
                 icon: Icons.chrome_reader_mode_outlined,
                 color: AuraHues.teal,
-                title: l.readingSettings,
-                subtitle: l.readingSettingsSub,
+                title: l.readerDisplay,
+                value: '${(r.fontScale * 100).round()}%',
+                onTap: () => push(const ReaderDisplaySettingsPage()),
+              ),
+              SettingsRow(
+                icon: Icons.format_color_text_rounded,
+                color: AuraHues.violet,
+                title: l.textFormatting,
+                subtitle: l.textFormattingSub,
+                onTap: () => push(const TextFormattingSettingsPage()),
+              ),
+              SettingsRow(
+                icon: Icons.download_done_rounded,
+                color: AuraHues.green,
+                title: l.tabDownloaded,
+                value: '${downloads.books.length}',
+                onTap: () => push(const DownloadsPage()),
+              ),
+              SettingsRow(
+                icon: Icons.insights_rounded,
+                color: AuraHues.blue,
+                title: l.readingData,
                 onTap: () => push(const ReadingSettingsPage()),
               ),
             ]),

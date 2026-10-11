@@ -195,7 +195,10 @@ class ReadingController extends ChangeNotifier {
   final Map<String, List<int>> _visited = {};
 
   /// Reader text size (multiplies the Arabic text size) and line spacing.
-  double fontScale = 0.95;
+  double fontScale = defaultFontScale;
+
+  /// 90% on phones, 95% on larger screens.
+  static double get defaultFontScale => defaultTargetPlatform == TargetPlatform.android || defaultTargetPlatform == TargetPlatform.iOS ? 0.9 : 0.95;
   double lineHeight = 2.1;
 
   /// 'paper' (warm page), 'sepia' (yellow page), 'plain' (follows the app
@@ -285,7 +288,7 @@ class ReadingController extends ChangeNotifier {
     } catch (_) {
       // Corrupt data is ignored rather than blocking the reader.
     }
-    fontScale = prefs.getDouble('readerFontScale') ?? 0.95;
+    fontScale = prefs.getDouble('readerFontScale') ?? defaultFontScale;
     lineHeight = prefs.getDouble('readerLineHeight') ?? 2.1;
     paper = prefs.getString('readerPaper') ?? 'plain';
     readingMode = prefs.getString('readerMode') ?? 'scroll';
@@ -493,7 +496,7 @@ class ReadingController extends ChangeNotifier {
     ]) {
       await _prefs?.remove(k);
     }
-    fontScale = 0.95;
+    fontScale = defaultFontScale;
     lineHeight = 2.1;
     paper = 'plain';
     readingMode = 'scroll';

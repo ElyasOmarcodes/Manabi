@@ -1369,4 +1369,99 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get moreSuggestions => 'پرسش‌های دیگر';
+
+  @override
+  String get appFont => 'قلم برنامه';
+
+  @override
+  String get appFontSample => 'پاسخ فقط از منابع می‌آید';
+
+  @override
+  String get showWholePage => 'نمایش کل صفحه';
+
+  @override
+  String get showLess => 'نمایش کمتر';
+
+  @override
+  String get searchOptions => 'گزینه‌های جست‌وجو';
+
+  @override
+  String get precisionLabel => 'دقت';
+
+  @override
+  String get precisionSome => 'برخی واژه‌ها';
+
+  @override
+  String get precisionAll => 'همه واژه‌ها';
+
+  @override
+  String get precisionOrder => 'همه واژه‌ها به ترتیب';
+
+  @override
+  String get extendedSearch => 'جست‌وجوی گسترده';
+
+  @override
+  String get extendedSearchSub => 'شکل‌های دیگر واژه‌ها هم (پیشوندها، جمع‌ها…)';
+
+  @override
+  String get searchNotes => 'پانوشت‌ها و مقدمه‌ها';
+
+  @override
+  String get searchNotesSub => 'در پانوشت‌ها و مقدمه‌های محققان هم';
+
+  @override
+  String get searchSavedOnly => 'فقط کتاب‌های ذخیره‌شده روی این دستگاه';
+
+  @override
+  String get searchSavedOnlySub => 'بدون اینترنت کار می‌کند';
+
+  @override
+  String get showFullResults => 'نمایش کامل هر نتیجه';
+
+  @override
+  String get hideDiacriticsResults => 'پنهان کردن حرکات در نتایج';
+
+  @override
+  String get searchToc => 'جست‌وجو در فهرست‌ها';
+
+  @override
+  String get searchTocSub => 'عنوان باب‌ها و فصل‌ها به‌جای متن';
+
+  @override
+  String get logicLabel => 'چند عبارت («و» / «یا»)';
+
+  @override
+  String get logicAnd => 'و';
+
+  @override
+  String get logicOr => 'یا';
+
+  @override
+  String get addPhrase => 'افزودن عبارت';
+
+  @override
+  String phraseN(int n) {
+    return 'عبارت $n';
+  }
+
+  @override
+  String get pinnedFilters => 'فیلترهای ذخیره‌شده';
+
+  @override
+  String get savePinned => 'ذخیره فیلترهای کنونی';
+
+  @override
+  String get pinnedName => 'نام';
+
+  @override
+  String get noPinned => 'هنوز فیلتری ذخیره نشده';
+
+  @override
+  String savedBooksCount(int count) {
+    return 'در $count کتاب ذخیره‌شده';
+  }
+
+  @override
+  String get logicHint =>
+      '«و»: صفحه‌هایی که همه عبارت‌ها را دارند. «یا»: که یکی را دارند.';
 }

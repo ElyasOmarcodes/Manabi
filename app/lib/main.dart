@@ -12,6 +12,7 @@ import 'state/chat_controller.dart';
 import 'state/downloads.dart';
 import 'state/discovered_books.dart';
 import 'state/layer_ai.dart';
+import 'state/pdf_flags.dart';
 import 'state/nav_controller.dart';
 import 'state/reading_controller.dart';
 import 'state/settings_controller.dart';
@@ -39,6 +40,7 @@ class AppServices {
     await DownloadController.open();
     await PageMatnAi.open();
     await DiscoveredBooks.open(catalog);
+    await PdfFlags.open(() => settings.backend);
     // The server's shared list of books found beyond the snapshot.
     unawaited(settings.backend.discoveredBooks().then(DiscoveredBooks.noteRows).catchError((Object _) {}));
     final chats = ChatController(store, () => settings.backend);

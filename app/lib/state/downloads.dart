@@ -201,6 +201,28 @@ class DownloadController extends ChangeNotifier {
     }
   }
 
+  /// Pages of the saved books whose text passes [test], book by book in
+  /// page order (for searching offline).
+  Future<List<PagePassage>> searchSaved(bool Function(String text) test, {Set<String>? bookIds, int limit = 300}) async {
+    final out = <PagePassage>[];
+    for (final b in books) {
+      if (bookIds != null && !bookIds.contains(b.bookId)) continue;
+      final box = await _box(b.bookId);
+      final keys = [for (final k in box.keys) if (k is String && k != 'details') int.tryParse(k)].whereType<int>().toList()..sort();
+      for (final k in keys) {
+        final raw = await box.get('$k');
+        // The saved JSON keeps Arabic as is, so most pages are ruled out
+        // before decoding.
+        if (raw == null || !test(raw)) continue;
+        final p = PagePassage.fromJson((jsonDecode(raw) as Map).cast<String, dynamic>());
+        if (!test(p.text)) continue;
+        out.add(p);
+        if (out.length >= limit) return out;
+      }
+    }
+    return out;
+  }
+
   Future<PagePassage?> page(String bookId, int page) async {
     if (!_books.containsKey(bookId)) return null;
     final raw = await (await _box(bookId)).get('$page');
@@ -253,8 +275,8 @@ class OfflineFirstBackend implements ManabiBackend {
         return e;
       });
   @override
-  Future<SearchResultPage> search(String query, {int page = 1, SearchScope scope = SearchScope.all}) async {
-    final r = await inner.search(query, page: page, scope: scope);
+  Future<SearchResultPage> search(String query, {int page = 1, SearchScope scope = SearchScope.all, TextSearchOptions options = TextSearchOptions.standard}) async {
+    final r = await inner.search(query, page: page, scope: scope, options: options);
     DiscoveredBooks.notePassages(r.items);
     return r;
   }
@@ -272,4 +294,6 @@ class OfflineFirstBackend implements ManabiBackend {
   Future<Narrator> narrator(String id) => inner.narrator(id);
   @override
   Future<List<dynamic>> discoveredBooks() => inner.discoveredBooks();
+  @override
+  Future<Map<String, bool>> pdfFlags(List<String> ids) => inner.pdfFlags(ids);
 }

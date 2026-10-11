@@ -20,7 +20,7 @@ export const narratorsIn = (raw) =>
     ? []
     : [...raw.matchAll(/<a href="inr:\/\/man-(\d+)"[^>]*>([^<]+)<\/a>/g)].map((m) => ({ id: m[1], name: decodeEntities(m[2]).trim().replace(/[،,]+$/, "").trim() }));
 
-const decodePassage = (p) => {
+export const decodePassage = (p) => {
   if (!p || typeof p !== "object") return p;
   const out = { ...p, text: decodeEntities(p.text), snippet: decodeEntities(p.snippet) };
   const narrators = narratorsIn(p.raw?.text);

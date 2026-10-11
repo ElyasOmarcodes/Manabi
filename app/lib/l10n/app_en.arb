@@ -656,5 +656,49 @@
   "fineTune": "Fine-tune",
   "matnRulesTitle": "How this book is read",
   "noMatnRules": "No matn rules yet — tap Detect.",
-  "moreSuggestions": "Other questions"
+  "moreSuggestions": "Other questions",
+  "appFont": "App font",
+  "appFontSample": "The answer comes only from the sources",
+  "showWholePage": "Show the whole page",
+  "showLess": "Show less",
+  "searchOptions": "Search options",
+  "precisionLabel": "Match",
+  "precisionSome": "Some of the words",
+  "precisionAll": "All the words",
+  "precisionOrder": "All the words, in order",
+  "extendedSearch": "Extended search",
+  "extendedSearchSub": "Other forms of the words too (prefixes, plurals…)",
+  "searchNotes": "Footnotes and introductions",
+  "searchNotesSub": "Also search editors' footnotes and introductions",
+  "searchSavedOnly": "Only books saved on this device",
+  "searchSavedOnlySub": "Works offline",
+  "showFullResults": "Show each result in full",
+  "hideDiacriticsResults": "Hide diacritics in results",
+  "searchToc": "Search the tables of contents",
+  "searchTocSub": "Chapter and section titles instead of the text",
+  "logicLabel": "Several phrases («and» / «or»)",
+  "logicAnd": "and",
+  "logicOr": "or",
+  "addPhrase": "Add a phrase",
+  "phraseN": "Phrase {n}",
+  "@phraseN": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "pinnedFilters": "Saved filters",
+  "savePinned": "Save the current filters",
+  "pinnedName": "Name",
+  "noPinned": "No saved filters yet",
+  "savedBooksCount": "In {count} saved books",
+  "@savedBooksCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "logicHint": "«and»: pages with every phrase. «or»: pages with any of them."
 }

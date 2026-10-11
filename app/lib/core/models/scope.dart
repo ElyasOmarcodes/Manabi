@@ -54,3 +54,52 @@ class SearchScope {
   @override
   int get hashCode => Object.hash(bookId, authorId, categoryId);
 }
+
+/// Options of Turath's full-text search (as on app.turath.io).
+class TextSearchOptions {
+  const TextSearchOptions({this.precision = 2, this.stem = true, this.notes = true, this.toc = false});
+  static const standard = TextSearchOptions();
+
+  /// 1: some of the words, 2: all the words, 3: the words in order.
+  final int precision;
+
+  /// Other forms of the words too (Turath's "البحث الموسع").
+  final bool stem;
+
+  /// Footnotes and editors' introductions too.
+  final bool notes;
+
+  /// Search the books' tables of contents instead of their text.
+  final bool toc;
+
+  bool get isStandard => precision == 2 && stem && notes && !toc;
+
+  TextSearchOptions copyWith({int? precision, bool? stem, bool? notes, bool? toc}) =>
+      TextSearchOptions(precision: precision ?? this.precision, stem: stem ?? this.stem, notes: notes ?? this.notes, toc: toc ?? this.toc);
+
+  /// Query parameters for the Manabi server.
+  Map<String, String> toRequest() => {
+        if (precision != 2) 'precision': '$precision',
+        if (!stem) 'stem': '0',
+        if (!notes) 'notes': '0',
+        if (toc) 'toc': '1',
+      };
+
+  /// Parameters of Turath's own API.
+  Map<String, Object> toTurath() => {
+        'precision': precision,
+        if (!stem) 'stem': 0,
+        if (!notes) 'non_author': 0,
+        if (toc) 'scope': 'toc',
+      };
+
+  Map<String, dynamic> toJson() => {'precision': precision, 'stem': stem, 'notes': notes, 'toc': toc};
+  factory TextSearchOptions.fromJson(Map<String, dynamic>? j) => j == null
+      ? standard
+      : TextSearchOptions(
+          precision: (j['precision'] as num?)?.toInt() ?? 2,
+          stem: j['stem'] != false,
+          notes: j['notes'] != false,
+          toc: j['toc'] == true,
+        );
+}

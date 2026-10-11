@@ -131,7 +131,7 @@ class _ResearchProgressState extends State<ResearchProgress> with SingleTickerPr
                         key: ValueKey(headline),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontFamily: uiFont, fontSize: 14.5, fontWeight: FontWeight.w600, height: 1.45)),
+                        style: TextStyle(fontFamily: uiFont, fontSize: 14.5, fontWeight: FontWeight.w600, height: 1.45)),
                   ),
                 ),
               ),

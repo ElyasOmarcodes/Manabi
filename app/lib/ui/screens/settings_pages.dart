@@ -79,6 +79,32 @@ class AppearanceSettingsPage extends StatelessWidget {
             ),
           ),
       ]),
+      _Label(l.appFont),
+      Row(children: [
+        for (final (family, name) in const [('Vazirmatn', 'Vazirmatn'), ('IBMPlexSansArabic', 'IBM Plex Sans Arabic')])
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Pressable(
+                onTap: () => s.setUiFont(family),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: s.uiFontFamily == family ? a.accent.withValues(alpha: a.dark ? 0.18 : 0.08) : a.surface,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: s.uiFontFamily == family ? a.accent : a.border, width: s.uiFontFamily == family ? 1.6 : 1),
+                  ),
+                  child: Column(children: [
+                    Text(l.appFontSample, textAlign: TextAlign.center, maxLines: 2, style: TextStyle(fontFamily: family, fontSize: 14.5, height: 1.6, color: a.text)),
+                    const SizedBox(height: 6),
+                    Text(name, style: TextStyle(fontFamily: family, fontSize: 11.5, color: s.uiFontFamily == family ? a.accent : a.muted, fontWeight: FontWeight.w600)),
+                  ]),
+                ),
+              ),
+            ),
+          ),
+      ]),
       _Label(l.textSize),
       _Card(
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -303,7 +329,7 @@ class _ConnectionCardState extends State<_ConnectionCard> {
           enableSuggestions: false,
           textDirection: TextDirection.ltr,
           onSubmitted: (_) => _save(),
-          style: const TextStyle(fontFamily: uiFont),
+          style: TextStyle(fontFamily: uiFont),
           decoration: InputDecoration(
             labelText: label,
             hintText: hint,

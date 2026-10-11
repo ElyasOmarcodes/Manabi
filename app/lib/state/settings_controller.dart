@@ -4,6 +4,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/backend/backend.dart';
+import '../ui/theme.dart' show appUiFont;
 import 'downloads.dart';
 import '../core/catalog/catalog_service.dart';
 
@@ -55,6 +56,8 @@ class SettingsController extends ChangeNotifier {
     c.uiLanguage = prefs.getString('uiLanguage') ?? (supportedUiLanguages.contains(systemLang) ? systemLang : 'ps');
     c.answerLanguage = prefs.getString('answerLanguage') ?? 'auto';
     c.fixedSuggestions = prefs.getBool('fixedSuggestions') ?? false;
+    c.uiFontFamily = prefs.getString('uiFont') == 'IBMPlexSansArabic' ? 'IBMPlexSansArabic' : 'Vazirmatn';
+    appUiFont = c.uiFontFamily;
     c.serverUrl = prefs.getString('serverUrl') ?? defaultServerUrl;
     final savedMode = ConnectionMode.values.asNameMap()[prefs.getString('mode')];
     c.mode = savedMode ?? (c.serverUrl.isEmpty && c.directAvailable ? ConnectionMode.direct : ConnectionMode.server);
@@ -151,6 +154,25 @@ class SettingsController extends ChangeNotifier {
     maxSources = v;
     await _prefs.setInt('maxSources', v);
     _changed();
+  }
+
+  /// Interface face: 'Vazirmatn' or 'IBMPlexSansArabic'.
+  String uiFontFamily = 'Vazirmatn';
+
+  Future<void> setUiFont(String v) async {
+    uiFontFamily = v;
+    appUiFont = v;
+    await _prefs.setString('uiFont', v);
+    _changed();
+    // Styles name the face directly, so every widget is rebuilt once.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      void rebuild(Element e) {
+        e.markNeedsBuild();
+        e.visitChildren(rebuild);
+      }
+
+      WidgetsBinding.instance.rootElement?.visitChildren(rebuild);
+    });
   }
 
   Future<void> setArabicScale(double v) async {

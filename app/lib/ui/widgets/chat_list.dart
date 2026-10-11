@@ -274,7 +274,7 @@ Future<bool> confirmDialog(BuildContext context, String message) async =>
       context: context,
       builder: (ctx) => AlertDialog(
         icon: const Icon(Icons.delete_outline_rounded, color: AuraHues.rose, size: 32),
-        content: Text(message, textAlign: TextAlign.center, style: const TextStyle(fontFamily: uiFont, fontSize: 15, height: 1.6)),
+        content: Text(message, textAlign: TextAlign.center, style: TextStyle(fontFamily: uiFont, fontSize: 15, height: 1.6)),
         actionsAlignment: MainAxisAlignment.center,
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(ctx.l.cancel)),

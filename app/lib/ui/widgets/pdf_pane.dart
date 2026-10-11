@@ -121,7 +121,7 @@ class _PdfPaneState extends State<PdfPane> {
                 TextButton.icon(
                   onPressed: widget.onShowText,
                   icon: const Icon(Icons.notes_rounded, size: 18),
-                  label: Text(l.textView, style: const TextStyle(fontFamily: uiFont, fontWeight: FontWeight.w700)),
+                  label: Text(l.textView, style: TextStyle(fontFamily: uiFont, fontWeight: FontWeight.w700)),
                 ),
                 Container(width: 1, height: 22, color: widget.muted.withValues(alpha: 0.3)),
                 const SizedBox(width: 10),

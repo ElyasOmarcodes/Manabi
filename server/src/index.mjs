@@ -12,6 +12,7 @@ import { createTurathClient } from "nusus/turath";
 import { createApp } from "./app.mjs";
 import { catalog } from "./catalog.mjs";
 import { createDiscovered } from "./discovered.mjs";
+import { createPdfFlags } from "./pdf-flags.mjs";
 import { createGemini } from "./gemini.mjs";
 import { createPipeline } from "./pipeline.mjs";
 
@@ -31,10 +32,12 @@ const config = {
 
 const discovered = createDiscovered({ catalog, dataDir: env.MANABI_DATA_DIR || undefined });
 await discovered.load();
+const pdfFlags = createPdfFlags({ dataDir: env.MANABI_DATA_DIR || undefined });
+await pdfFlags.load();
 const turath = discovered.watch(createTurathClient({ timeout: 15_000 }));
 const gemini = apiKey ? createGemini({ apiKey, model: env.GEMINI_MODEL }) : undefined;
 const pipeline = createPipeline({ gemini, turath, catalog });
-const app = createApp({ config, pipeline, turath, catalog, gemini, discovered });
+const app = createApp({ config, pipeline, turath, catalog, gemini, discovered, pdfFlags });
 
 const server = await app.listen(config.port, config.host);
 console.log(`manabi-server listening on http://${config.host}:${config.port} (gemini: ${gemini ? "configured" : "MISSING GEMINI_API_KYA"})`);

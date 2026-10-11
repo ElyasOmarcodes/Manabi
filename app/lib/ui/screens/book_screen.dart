@@ -109,7 +109,7 @@ class _BookScreenState extends State<BookScreen> {
                           dense: true,
                           leading: const Icon(Icons.bookmark_rounded, color: AuraHues.rose),
                           title: Text(b.heading ?? title, maxLines: 1, overflow: TextOverflow.ellipsis, textDirection: TextDirection.rtl, style: arabicStyle(context, size: 15).copyWith(height: 1.5)),
-                          subtitle: Text([if (b.volume != null) '${l.volumeShort} ${b.volume}', '${l.page} ${b.printed ?? b.page}'].join(' · '), style: const TextStyle(fontFamily: uiFont, fontSize: 12)),
+                          subtitle: Text([if (b.volume != null) '${l.volumeShort} ${b.volume}', '${l.page} ${b.printed ?? b.page}'].join(' · '), style: TextStyle(fontFamily: uiFont, fontSize: 12)),
                           onTap: () => openReader(context, widget.bookId, b.page, title: title),
                         ),
                     ]),

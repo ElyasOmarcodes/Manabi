@@ -25,9 +25,10 @@ Future<void> saveBookOffline(BuildContext context, String bookId, String title) 
 
 /// Save / progress + stop / saved + remove, for one book.
 class SaveOfflineButton extends StatelessWidget {
-  const SaveOfflineButton({super.key, required this.bookId, required this.title});
+  const SaveOfflineButton({super.key, required this.bookId, required this.title, this.dense = false});
   final String bookId;
   final String title;
+  final bool dense;
 
   @override
   Widget build(BuildContext context) {
@@ -37,14 +38,14 @@ class SaveOfflineButton extends StatelessWidget {
     final progress = downloads.progressOf(bookId);
     if (progress != null) {
       return Container(
-        padding: const EdgeInsets.fromLTRB(16, 10, 8, 10),
+        padding: EdgeInsets.fromLTRB(16, dense ? 4 : 10, 8, dense ? 4 : 10),
         decoration: BoxDecoration(color: AuraHues.teal.withValues(alpha: a.dark ? 0.16 : 0.09), borderRadius: BorderRadius.circular(22)),
         child: Row(children: [
           const Icon(Icons.download_rounded, size: 18, color: AuraHues.teal),
           const SizedBox(width: 8),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-              Text(l.savingOffline((progress * 100).round()), style: const TextStyle(fontFamily: uiFont, fontWeight: FontWeight.w600, fontSize: 13.5, color: AuraHues.teal)),
+              Text(l.savingOffline((progress * 100).round()), style: TextStyle(fontFamily: uiFont, fontWeight: FontWeight.w600, fontSize: 13.5, color: AuraHues.teal)),
               const SizedBox(height: 6),
               ClipRRect(
                 borderRadius: BorderRadius.circular(4),
@@ -59,12 +60,13 @@ class SaveOfflineButton extends StatelessWidget {
     final saved = downloads.saved(bookId);
     if (saved != null && saved.complete) {
       return Row(children: [
-        Expanded(child: SoftButton(icon: Icons.offline_pin_rounded, color: AuraHues.teal, label: l.savedOffline)),
+        Expanded(child: SoftButton(dense: dense, icon: Icons.offline_pin_rounded, color: AuraHues.teal, label: l.savedOffline)),
         const SizedBox(width: 8),
-        SoftButton(icon: Icons.delete_outline_rounded, color: AuraHues.rose, label: l.removeDownload, onTap: () => downloads.remove(bookId)),
+        SoftButton(dense: dense, icon: Icons.delete_outline_rounded, color: AuraHues.rose, label: dense ? '' : l.removeDownload, onTap: () => downloads.remove(bookId)),
       ]);
     }
     return SoftButton(
+      dense: dense,
       icon: Icons.download_for_offline_outlined,
       color: AuraHues.teal,
       // A stopped download resumes from the pages already kept.

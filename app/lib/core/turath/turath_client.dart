@@ -9,6 +9,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../models/library.dart';
+import '../models/scope.dart' show TextSearchOptions;
 import 'html_text.dart';
 import '../pipeline/answer_pipeline.dart' show PassageSearch, SearchHits;
 import 'excerpt.dart';
@@ -221,6 +222,14 @@ class TurathClient implements PassageSearch {
     );
   }
 
+  /// Does the book have Turath's scanned PDF? (Metadata only; null if unknown.)
+  Future<bool?> bookHasPdf(String bookId) async {
+    final raw = await _get('book', {'id': bookId, 'ver': 3});
+    if (raw is! Map || raw['meta'] is! Map) return null;
+    final files = ((raw['meta'] as Map)['pdf_links'] as Map?)?['files'];
+    return files is List && files.any((f) => f is String && f.trim().isNotEmpty);
+  }
+
   Future<AuthorDetails> getAuthor(String authorId) async {
     final raw = await _get('author', {'id': authorId, 'ver': 3});
     if (raw is! Map || raw.isEmpty) throw TurathException('NOT_FOUND', 'Author $authorId not found');
@@ -234,7 +243,7 @@ class TurathClient implements PassageSearch {
   }
 
   Future<(SearchResultPage, List<String?>)> _searchRaw(String query,
-      {int page = 1, String? bookId, String? authorId, String? categoryId}) async {
+      {int page = 1, String? bookId, String? authorId, String? categoryId, TextSearchOptions? options}) async {
     if (query.trim().isEmpty) throw const TurathException('INVALID_ARGUMENT', 'query must not be empty');
     Future<Map> run(String q) async {
       final raw = await _get('search', {
@@ -244,6 +253,7 @@ class TurathClient implements PassageSearch {
         'author': authorId,
         'book': bookId,
         'cat_id': categoryId,
+        ...?options?.toTurath(),
       });
       if (raw is! Map || raw['count'] is! num || raw['data'] is! List) {
         throw const TurathException('INVALID_RESPONSE', 'invalid search response');
@@ -278,8 +288,8 @@ class TurathClient implements PassageSearch {
     );
   }
 
-  Future<SearchResultPage> search(String query, {int page = 1, String? bookId, String? authorId, String? categoryId}) async =>
-      (await _searchRaw(query, page: page, bookId: bookId, authorId: authorId, categoryId: categoryId)).$1;
+  Future<SearchResultPage> search(String query, {int page = 1, String? bookId, String? authorId, String? categoryId, TextSearchOptions? options}) async =>
+      (await _searchRaw(query, page: page, bookId: bookId, authorId: authorId, categoryId: categoryId, options: options)).$1;
 
   @override
   Future<SearchHits> searchHits(String query, {String? bookId, String? authorId, String? categoryId}) async {

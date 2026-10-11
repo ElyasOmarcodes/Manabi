@@ -2579,6 +2579,186 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Other questions'**
   String get moreSuggestions;
+
+  /// No description provided for @appFont.
+  ///
+  /// In en, this message translates to:
+  /// **'App font'**
+  String get appFont;
+
+  /// No description provided for @appFontSample.
+  ///
+  /// In en, this message translates to:
+  /// **'The answer comes only from the sources'**
+  String get appFontSample;
+
+  /// No description provided for @showWholePage.
+  ///
+  /// In en, this message translates to:
+  /// **'Show the whole page'**
+  String get showWholePage;
+
+  /// No description provided for @showLess.
+  ///
+  /// In en, this message translates to:
+  /// **'Show less'**
+  String get showLess;
+
+  /// No description provided for @searchOptions.
+  ///
+  /// In en, this message translates to:
+  /// **'Search options'**
+  String get searchOptions;
+
+  /// No description provided for @precisionLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Match'**
+  String get precisionLabel;
+
+  /// No description provided for @precisionSome.
+  ///
+  /// In en, this message translates to:
+  /// **'Some of the words'**
+  String get precisionSome;
+
+  /// No description provided for @precisionAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All the words'**
+  String get precisionAll;
+
+  /// No description provided for @precisionOrder.
+  ///
+  /// In en, this message translates to:
+  /// **'All the words, in order'**
+  String get precisionOrder;
+
+  /// No description provided for @extendedSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Extended search'**
+  String get extendedSearch;
+
+  /// No description provided for @extendedSearchSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Other forms of the words too (prefixes, plurals…)'**
+  String get extendedSearchSub;
+
+  /// No description provided for @searchNotes.
+  ///
+  /// In en, this message translates to:
+  /// **'Footnotes and introductions'**
+  String get searchNotes;
+
+  /// No description provided for @searchNotesSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Also search editors\' footnotes and introductions'**
+  String get searchNotesSub;
+
+  /// No description provided for @searchSavedOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Only books saved on this device'**
+  String get searchSavedOnly;
+
+  /// No description provided for @searchSavedOnlySub.
+  ///
+  /// In en, this message translates to:
+  /// **'Works offline'**
+  String get searchSavedOnlySub;
+
+  /// No description provided for @showFullResults.
+  ///
+  /// In en, this message translates to:
+  /// **'Show each result in full'**
+  String get showFullResults;
+
+  /// No description provided for @hideDiacriticsResults.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide diacritics in results'**
+  String get hideDiacriticsResults;
+
+  /// No description provided for @searchToc.
+  ///
+  /// In en, this message translates to:
+  /// **'Search the tables of contents'**
+  String get searchToc;
+
+  /// No description provided for @searchTocSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Chapter and section titles instead of the text'**
+  String get searchTocSub;
+
+  /// No description provided for @logicLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Several phrases («and» / «or»)'**
+  String get logicLabel;
+
+  /// No description provided for @logicAnd.
+  ///
+  /// In en, this message translates to:
+  /// **'and'**
+  String get logicAnd;
+
+  /// No description provided for @logicOr.
+  ///
+  /// In en, this message translates to:
+  /// **'or'**
+  String get logicOr;
+
+  /// No description provided for @addPhrase.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a phrase'**
+  String get addPhrase;
+
+  /// No description provided for @phraseN.
+  ///
+  /// In en, this message translates to:
+  /// **'Phrase {n}'**
+  String phraseN(int n);
+
+  /// No description provided for @pinnedFilters.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved filters'**
+  String get pinnedFilters;
+
+  /// No description provided for @savePinned.
+  ///
+  /// In en, this message translates to:
+  /// **'Save the current filters'**
+  String get savePinned;
+
+  /// No description provided for @pinnedName.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get pinnedName;
+
+  /// No description provided for @noPinned.
+  ///
+  /// In en, this message translates to:
+  /// **'No saved filters yet'**
+  String get noPinned;
+
+  /// No description provided for @savedBooksCount.
+  ///
+  /// In en, this message translates to:
+  /// **'In {count} saved books'**
+  String savedBooksCount(int count);
+
+  /// No description provided for @logicHint.
+  ///
+  /// In en, this message translates to:
+  /// **'«and»: pages with every phrase. «or»: pages with any of them.'**
+  String get logicHint;
 }
 
 class _AppLocalizationsDelegate

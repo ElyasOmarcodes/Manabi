@@ -25,8 +25,10 @@ import '../theme.dart';
 import '../widgets/common.dart';
 import '../widgets/pdf_pane.dart';
 import '../widgets/save_offline.dart';
+import '../widgets/search_hit.dart';
+import 'book_screen.dart' show openBook;
 import 'library_screen.dart' show showNarrator;
-import 'settings_pages.dart' show ReadingSettingsPage;
+import 'settings_pages.dart' show ReaderDisplaySettingsPage, ReadingSettingsPage;
 
 /// Opens a book at an internal page. [highlight] marks a quote or search
 /// term on that page; [search] opens the in-book search right away.
@@ -320,10 +322,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
           bookId: widget.bookId,
           title: _title,
           samples: _layerSamples(),
-          current: _page,
-          onGo: _jump,
-          onShare: () => _pageAction('share', _page),
-          onFullScreen: _toggleImmersive,
+          pdfShown: _pdf,
+          onPdf: _togglePdf,
         ),
       );
 
@@ -595,7 +595,11 @@ class _ReaderScreenState extends State<ReaderScreen> {
         ),
         const SizedBox(width: 4),
         Expanded(
-          child: Directionality(
+          // The title opens the book's page (contents, details).
+          child: InkWell(
+            borderRadius: BorderRadius.circular(10),
+            onTap: () => openBook(context, widget.bookId),
+            child: Directionality(
             textDirection: TextDirection.rtl,
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
               Text.rich(
@@ -610,6 +614,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
               if (path.isNotEmpty)
                 Text(path.join('  ←  '), maxLines: 1, overflow: TextOverflow.ellipsis, style: arabicStyle(context, size: 12, color: c.muted).copyWith(height: 1.4)),
             ]),
+          ),
           ),
         ),
         RoundIconButton(
@@ -865,7 +870,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
 PopupMenuItem<String> menuItem(String value, IconData icon, String label) => PopupMenuItem(
       value: value,
-      child: Row(children: [Icon(icon, size: 20), const SizedBox(width: 12), Flexible(child: Text(label, style: const TextStyle(fontFamily: uiFont)))]),
+      child: Row(children: [Icon(icon, size: 20), const SizedBox(width: 12), Flexible(child: Text(label, style: TextStyle(fontFamily: uiFont)))]),
     );
 
 /// One book page: chapter, text with highlights and search matches,
@@ -1219,8 +1224,8 @@ class _BookPanelState extends State<_BookPanel> {
         TabBar(
           isScrollable: true,
           tabAlignment: TabAlignment.start,
-          labelStyle: const TextStyle(fontFamily: uiFont, fontSize: 13.5, fontWeight: FontWeight.w700),
-          unselectedLabelStyle: const TextStyle(fontFamily: uiFont, fontSize: 13.5),
+          labelStyle: TextStyle(fontFamily: uiFont, fontSize: 13.5, fontWeight: FontWeight.w700),
+          unselectedLabelStyle: TextStyle(fontFamily: uiFont, fontSize: 13.5),
           labelColor: a.accent,
           unselectedLabelColor: a.muted,
           indicatorColor: a.accent,
@@ -1365,7 +1370,7 @@ class _BookPanelState extends State<_BookPanel> {
           dense: true,
           leading: const Icon(Icons.bookmark_rounded, color: AuraHues.rose),
           title: Text(b.heading ?? widget.title, maxLines: 2, overflow: TextOverflow.ellipsis, textDirection: TextDirection.rtl, style: arabicStyle(context, size: 14.5).copyWith(height: 1.5)),
-          subtitle: Text(pageLabel(context, widget.book, b.page, digits: widget.digits), style: const TextStyle(fontFamily: uiFont, fontSize: 12)),
+          subtitle: Text(pageLabel(context, widget.book, b.page, digits: widget.digits), style: TextStyle(fontFamily: uiFont, fontSize: 12)),
           trailing: IconButton(icon: const Icon(Icons.close_rounded, size: 18), tooltip: context.l.removeBookmark, onPressed: () => reading.toggleBookmark(b)),
           onTap: () => widget.onJump(b.page),
         ),
@@ -1389,7 +1394,7 @@ class _BookPanelState extends State<_BookPanel> {
           dense: true,
           leading: Icon(p == widget.current ? Icons.radio_button_checked_rounded : Icons.history_rounded, size: 20, color: p == widget.current ? context.aura.accent : context.aura.muted),
           title: Text(widget.book?.headingFor(p)?.title ?? widget.title, maxLines: 1, overflow: TextOverflow.ellipsis, textDirection: TextDirection.rtl, style: arabicStyle(context, size: 14.5).copyWith(height: 1.5)),
-          subtitle: Text(pageLabel(context, widget.book, p, digits: widget.digits), style: const TextStyle(fontFamily: uiFont, fontSize: 12)),
+          subtitle: Text(pageLabel(context, widget.book, p, digits: widget.digits), style: TextStyle(fontFamily: uiFont, fontSize: 12)),
           onTap: () => widget.onJump(p),
         ),
     ]);
@@ -1452,128 +1457,105 @@ class HighlightTile extends StatelessWidget {
   }
 }
 
-/// Turath-style reading tools: text size, paper, toggles, go to a page and
-/// quick actions.
-class _ToolsSheet extends StatefulWidget {
-  const _ToolsSheet(
-      {required this.book, required this.bookId, required this.title, required this.samples, required this.current, required this.onGo, required this.onShare, required this.onFullScreen});
+/// The reading tools people reach for while reading: text size and spacing,
+/// reading mode, a few switches, the book's matn setting, and at the bottom
+/// the printed PDF and saving for offline. Page colours and fonts live in
+/// the reading settings. Smaller on phones.
+class _ToolsSheet extends StatelessWidget {
+  const _ToolsSheet({required this.book, required this.bookId, required this.title, required this.samples, required this.pdfShown, required this.onPdf});
   final BookDetails? book;
   final String bookId;
   final String title;
   final List<String> samples;
-  final int current;
-  final void Function(int page, {String? mark}) onGo;
-  final VoidCallback onShare;
-  final VoidCallback onFullScreen;
-  @override
-  State<_ToolsSheet> createState() => _ToolsSheetState();
-}
-
-class _ToolsSheetState extends State<_ToolsSheet> {
-  late String _volume = widget.book?.locate(widget.current).volume ?? widget.book?.volumes.firstOrNull ?? '1';
-  late final _number = TextEditingController(text: '${widget.book?.locate(widget.current).printed ?? widget.current}');
-
-  @override
-  void dispose() {
-    _number.dispose();
-    super.dispose();
-  }
-
-  void _go() {
-    final n = int.tryParse(_number.text.trim());
-    if (n == null) return;
-    final hasMap = widget.book?.pageMap.isNotEmpty ?? false;
-    final page = hasMap ? widget.book!.internalFor(_volume, n) : n;
-    if (page == null) return;
-    Navigator.of(context).pop();
-    widget.onGo(page);
-  }
+  final bool pdfShown;
+  final VoidCallback onPdf;
 
   @override
   Widget build(BuildContext context) {
     final r = context.watch<ReadingController>();
     final l = context.l;
     final a = context.aura;
-    final volumes = widget.book?.volumes ?? const <String>[];
-    Widget toggle(String label, IconData icon, bool value, ValueChanged<bool> onChanged) => SwitchListTile.adaptive(
-          dense: true,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-          secondary: Icon(icon, size: 20, color: a.muted),
-          title: Text(label, style: TextStyle(fontFamily: uiFont, fontSize: 14.5, color: a.text)),
-          value: value,
-          onChanged: onChanged,
+    final phone = MediaQuery.sizeOf(context).width < 600;
+    final layers = r.layersOf(bookId);
+    Widget chip(String label, IconData icon, bool value, ValueChanged<bool> onChanged) => FilterChip(
+          avatar: Icon(icon, size: phone ? 15 : 17, color: value ? a.accent : a.muted),
+          label: Text(label, style: TextStyle(fontFamily: uiFont, fontSize: phone ? 12 : 13)),
+          selected: value,
+          showCheckmark: false,
+          visualDensity: VisualDensity.compact,
+          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          onSelected: onChanged,
         );
     return SafeArea(
       child: ConstrainedBox(
-        constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.86),
+        constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.8),
         child: SingleChildScrollView(
-          padding: EdgeInsets.fromLTRB(18, 0, 18, 16 + MediaQuery.viewInsetsOf(context).bottom),
+          padding: EdgeInsets.fromLTRB(phone ? 14 : 18, 0, phone ? 14 : 18, 12),
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Row(children: [
-              Expanded(child: Text(l.readerTools, style: TextStyle(fontFamily: uiFont, fontSize: 16.5, fontWeight: FontWeight.w800, color: a.text))),
-              TextButton.icon(
-                icon: const Icon(Icons.settings_outlined, size: 18),
-                label: Text(l.moreReadingSettings, style: const TextStyle(fontFamily: uiFont)),
+              Expanded(child: Text(l.readerTools, style: TextStyle(fontFamily: uiFont, fontSize: phone ? 15 : 16.5, fontWeight: FontWeight.w800, color: a.text))),
+              IconButton(
+                tooltip: l.moreReadingSettings,
+                visualDensity: VisualDensity.compact,
+                icon: Icon(Icons.settings_outlined, size: 20, color: a.muted),
                 onPressed: () {
                   Navigator.of(context).pop();
-                  Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ReadingSettingsPage()));
+                  Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ReaderDisplaySettingsPage()));
                 },
               ),
             ]),
-            const SizedBox(height: 6),
-            ReaderTextControls(reading: r),
-            const SizedBox(height: 10),
-            PaperPicker(reading: r),
-            const SizedBox(height: 6),
+            ReaderTextControls(reading: r, dense: phone),
+            SizedBox(height: phone ? 8 : 10),
             ModePicker(reading: r),
-            const SizedBox(height: 10),
-            FontPicker(reading: r),
-            const Divider(height: 22),
-            LayersPanel(bookId: widget.bookId, title: widget.title, samples: widget.samples),
-            const Divider(height: 22),
-            toggle(l.justifyText, Icons.format_align_justify_rounded, r.justify, r.setJustify),
-            toggle(l.hideDiacritics, Icons.text_format_rounded, r.hideDiacritics, r.setHideDiacritics),
-            toggle(l.showFootnotes, Icons.notes_rounded, r.showFootnotes, r.setShowFootnotes),
-            if (!kIsWeb) toggle(l.keepScreenOn, Icons.light_mode_outlined, r.keepAwake, r.setKeepAwake),
-            const Divider(height: 22),
-            // Go to a volume and printed page.
-            Row(children: [
-              if (volumes.length > 1) ...[
-                SizedBox(
-                  width: 96,
-                  child: DropdownButtonFormField<String>(
-                    initialValue: volumes.contains(_volume) ? _volume : volumes.first,
-                    isDense: true,
-                    decoration: InputDecoration(labelText: l.volume, isDense: true),
-                    items: [for (final v in volumes) DropdownMenuItem(value: v, child: Text(v))],
-                    onChanged: (v) => setState(() => _volume = v ?? _volume),
+            SizedBox(height: phone ? 8 : 10),
+            Wrap(spacing: 6, runSpacing: 6, children: [
+              chip(l.justifyText, Icons.format_align_justify_rounded, r.justify, r.setJustify),
+              chip(l.hideDiacritics, Icons.text_format_rounded, r.hideDiacritics, r.setHideDiacritics),
+              chip(l.showFootnotes, Icons.notes_rounded, r.showFootnotes, r.setShowFootnotes),
+              if (!kIsWeb) chip(l.keepScreenOn, Icons.light_mode_outlined, r.keepAwake, r.setKeepAwake),
+            ]),
+            SizedBox(height: phone ? 6 : 10),
+            // The book's matn and commentary, in its own sheet.
+            ListTile(
+              dense: true,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+              leading: Icon(Icons.format_quote_rounded, size: 20, color: layers.enabled ? a.accent : a.muted),
+              title: Text(l.matnSection, style: TextStyle(fontFamily: uiFont, fontSize: phone ? 13.5 : 14.5, color: a.text)),
+              subtitle: Text(layers.enabled ? l.matnSeparate : l.noMatnRules,
+                  maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontFamily: uiFont, fontSize: 11.5, color: a.muted)),
+              trailing: Icon(Icons.chevron_left_rounded, color: a.muted),
+              onTap: () => showModalBottomSheet<void>(
+                context: context,
+                isScrollControlled: true,
+                showDragHandle: true,
+                builder: (_) => SafeArea(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.85),
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(18, 0, 18, 16),
+                      child: LayersPanel(bookId: bookId, title: title, samples: samples),
+                    ),
                   ),
                 ),
-                const SizedBox(width: 10),
-              ],
-              Expanded(
-                child: TextField(
-                  controller: _number,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  decoration: InputDecoration(labelText: (widget.book?.pageMap.isNotEmpty ?? false) ? l.printedPage : l.turathPage, isDense: true),
-                  onSubmitted: (_) => _go(),
-                ),
               ),
-              const SizedBox(width: 10),
-              FilledButton(onPressed: _go, child: Text(l.go)),
-            ]),
-            const SizedBox(height: 14),
+            ),
+            const Divider(height: 14),
+            // Two small actions: the printed PDF and saving for offline.
             Row(children: [
-              Expanded(child: SoftButton(icon: Icons.ios_share_rounded, label: l.sharePage, onTap: () {
-                Navigator.of(context).pop();
-                widget.onShare();
-              })),
-              const SizedBox(width: 8),
-              Expanded(child: SoftButton(icon: Icons.fullscreen_rounded, label: l.fullScreen, onTap: () {
-                Navigator.of(context).pop();
-                widget.onFullScreen();
-              })),
+              if (book?.pdf != null) ...[
+                SoftButton(
+                  dense: true,
+                  icon: pdfShown ? Icons.notes_rounded : Icons.picture_as_pdf_outlined,
+                  color: AuraHues.rose,
+                  label: pdfShown ? l.textView : l.pdfView,
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    onPdf();
+                  },
+                ),
+                const SizedBox(width: 8),
+              ],
+              Expanded(child: SaveOfflineButton(bookId: bookId, title: title, dense: true)),
             ]),
           ]),
         ),
@@ -1817,17 +1799,20 @@ class _MarkerChip extends StatelessWidget {
 
 /// Text size and line spacing steppers.
 class ReaderTextControls extends StatelessWidget {
-  const ReaderTextControls({super.key, required this.reading});
+  const ReaderTextControls({super.key, required this.reading, this.dense = false});
   final ReadingController reading;
+
+  /// Smaller, for the phone's reading tools.
+  final bool dense;
   @override
   Widget build(BuildContext context) {
     final l = context.l;
     final a = context.aura;
     Widget stepper(String label, String value, VoidCallback? minus, VoidCallback? plus, IconData lo, IconData hi) => Container(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+          padding: EdgeInsets.symmetric(horizontal: 6, vertical: dense ? 0 : 4),
           decoration: BoxDecoration(color: a.surfaceAlt, borderRadius: BorderRadius.circular(14)),
           child: Row(children: [
-            Expanded(child: Padding(padding: const EdgeInsetsDirectional.only(start: 8), child: Text(label, style: TextStyle(fontFamily: uiFont, fontSize: 13.5, color: a.text)))),
+            Expanded(child: Padding(padding: const EdgeInsetsDirectional.only(start: 8), child: Text(label, style: TextStyle(fontFamily: uiFont, fontSize: dense ? 12.5 : 13.5, color: a.text)))),
             IconButton(visualDensity: VisualDensity.compact, tooltip: l.smaller, onPressed: minus, icon: Icon(lo, size: 18)),
             SizedBox(width: 44, child: Text(value, textAlign: TextAlign.center, style: TextStyle(fontFamily: uiFont, fontWeight: FontWeight.w700, fontSize: 13, color: a.accent))),
             IconButton(visualDensity: VisualDensity.compact, tooltip: l.larger, onPressed: plus, icon: Icon(hi, size: 18)),
@@ -1838,7 +1823,7 @@ class ReaderTextControls extends StatelessWidget {
     return Column(children: [
       stepper(l.textSize, '${(size * 100).round()}%', size > 0.75 ? () => reading.setFontScale(((size - 0.1) * 10).round() / 10) : null,
           size < 1.8 ? () => reading.setFontScale(((size + 0.1) * 10).round() / 10) : null, Icons.text_decrease_rounded, Icons.text_increase_rounded),
-      const SizedBox(height: 8),
+      SizedBox(height: dense ? 6 : 8),
       stepper(l.lineSpacing, line.toStringAsFixed(1), line > 1.65 ? () => reading.setLineHeight(((line - 0.2) * 10).round() / 10) : null,
           line < 2.85 ? () => reading.setLineHeight(((line + 0.2) * 10).round() / 10) : null, Icons.density_small_rounded, Icons.density_large_rounded),
     ]);
@@ -1919,8 +1904,8 @@ class ModePicker extends StatelessWidget {
     return SegmentedButton<String>(
       showSelectedIcon: false,
       segments: [
-        ButtonSegment(value: 'scroll', icon: const Icon(Icons.view_day_outlined, size: 18), label: Text(l.modeScroll, style: const TextStyle(fontFamily: uiFont))),
-        ButtonSegment(value: 'pages', icon: const Icon(Icons.auto_stories_outlined, size: 18), label: Text(l.modePages, style: const TextStyle(fontFamily: uiFont))),
+        ButtonSegment(value: 'scroll', icon: const Icon(Icons.view_day_outlined, size: 18), label: Text(l.modeScroll, style: TextStyle(fontFamily: uiFont))),
+        ButtonSegment(value: 'pages', icon: const Icon(Icons.auto_stories_outlined, size: 18), label: Text(l.modePages, style: TextStyle(fontFamily: uiFont))),
       ],
       selected: {reading.readingMode},
       onSelectionChanged: (s) => reading.setReadingMode(s.first),
@@ -2020,33 +2005,20 @@ class _BookSearchSheetState extends State<_BookSearchSheet> {
                           }
                           final p = _items[i];
                           final where = [if (p.volume != null) '${l.volumeShort} ${p.volume}', if (p.printedPage != null) '${l.page} ${p.printedPage}'].join(' · ');
-                          return Material(
-                            color: a.surfaceAlt,
-                            borderRadius: BorderRadius.circular(16),
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(16),
-                              onTap: p.internalPage == null ? null : () => Navigator.of(context).pop((p.internalPage!, _q)),
-                              child: Padding(
-                                padding: const EdgeInsets.all(14),
-                                child: Directionality(
-                                  textDirection: TextDirection.rtl,
-                                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                    Row(children: [
-                                      Icon(Icons.description_outlined, size: 15, color: a.accent),
-                                      const SizedBox(width: 6),
-                                      Text(where.isEmpty ? '${l.turathPage} ${p.internalPage}' : where,
-                                          style: TextStyle(fontFamily: uiFont, fontSize: 12, fontWeight: FontWeight.w700, color: a.accent)),
-                                      if (p.headings.isNotEmpty) ...[
-                                        const SizedBox(width: 8),
-                                        Expanded(child: Text(p.headings.last, maxLines: 1, overflow: TextOverflow.ellipsis, style: arabicStyle(context, size: 12.5, color: a.muted))),
-                                      ],
-                                    ]),
-                                    const SizedBox(height: 6),
-                                    Text.rich(_hit(context, p.snippet ?? p.text), maxLines: 4, overflow: TextOverflow.ellipsis),
-                                  ]),
-                                ),
-                              ),
-                            ),
+                          return SearchHitCard(
+                            passage: p,
+                            query: [_q],
+                            onOpen: p.internalPage == null ? null : () => Navigator.of(context).pop((p.internalPage!, _q)),
+                            header: Row(children: [
+                              Icon(Icons.description_outlined, size: 15, color: a.accent),
+                              const SizedBox(width: 6),
+                              Text(where.isEmpty ? '${l.turathPage} ${p.internalPage}' : where,
+                                  style: TextStyle(fontFamily: uiFont, fontSize: 12, fontWeight: FontWeight.w700, color: a.accent)),
+                              if (p.headings.isNotEmpty) ...[
+                                const SizedBox(width: 8),
+                                Expanded(child: Text(p.headings.last, maxLines: 1, overflow: TextOverflow.ellipsis, style: arabicStyle(context, size: 12.5, color: a.muted))),
+                              ],
+                            ]),
                           );
                         },
                       ),
@@ -2056,22 +2028,6 @@ class _BookSearchSheetState extends State<_BookSearchSheet> {
     );
   }
 
-  TextSpan _hit(BuildContext context, String text) {
-    final style = arabicStyle(context, size: 15.5).copyWith(height: 1.85);
-    final ranges = arabicMatches(text, _q);
-    if (ranges.isEmpty) return TextSpan(text: text, style: style);
-    final spans = <TextSpan>[];
-    var at = 0;
-    for (final (s, e) in ranges) {
-      if (s < at) continue;
-      spans
-        ..add(TextSpan(text: text.substring(at, s)))
-        ..add(TextSpan(text: text.substring(s, e), style: TextStyle(color: context.aura.accent, fontWeight: FontWeight.w700)));
-      at = e;
-    }
-    spans.add(TextSpan(text: text.substring(at)));
-    return TextSpan(style: style, children: spans);
-  }
 }
 
 /// Jump to a volume and printed page, or to a Turath page number.
@@ -2107,7 +2063,7 @@ class _GoToDialogState extends State<_GoToDialog> {
     final l = context.l;
     final volumes = widget.book?.volumes ?? const <String>[];
     return AlertDialog(
-      title: Text(l.goToPage, style: const TextStyle(fontFamily: uiFont, fontWeight: FontWeight.w700)),
+      title: Text(l.goToPage, style: TextStyle(fontFamily: uiFont, fontWeight: FontWeight.w700)),
       content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         if (hasMap)
           SegmentedButton<bool>(

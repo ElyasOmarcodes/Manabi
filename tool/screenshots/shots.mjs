@@ -199,7 +199,7 @@ const ask = async (name, { lang, question, width = 1440, height = 900, theme = "
     await semantics(page);
     await tap(page, question);
     await page.waitForTimeout(500);
-    await page.keyboard.press("Enter");
+    await page.keyboard.press("Control+Enter");
     await page.waitForTimeout(2500);
     await shot(page, `${name}-progress`);
     const status = await waitForAnswer(page, done).catch(async (error) => {
@@ -239,7 +239,7 @@ await run("live-4-reader", async () => {
   // Ask, open the sources, then read the cited page.
   await tap(page, "د «إنما الأعمال بالنيات» حدیث چا روایت کړی دی؟");
   await page.waitForTimeout(500);
-  await page.keyboard.press("Enter");
+  await page.keyboard.press("Control+Enter");
   await waitForAnswer(page, ["منابع ("]);
   await page.waitForTimeout(1200);
   await tap(page, "منابع (");
@@ -250,7 +250,7 @@ await run("live-4-reader", async () => {
   await tap(page, "په کتاب کې لټون");
   await page.waitForTimeout(800);
   await page.keyboard.type("النيات");
-  await page.keyboard.press("Enter");
+  await page.keyboard.press("Control+Enter");
   await page.waitForTimeout(2500);
   await shot(page, "live-4-reader-search");
   await page.keyboard.press("Escape");

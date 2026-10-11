@@ -1372,4 +1372,101 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get moreSuggestions => 'Other questions';
+
+  @override
+  String get appFont => 'App font';
+
+  @override
+  String get appFontSample => 'The answer comes only from the sources';
+
+  @override
+  String get showWholePage => 'Show the whole page';
+
+  @override
+  String get showLess => 'Show less';
+
+  @override
+  String get searchOptions => 'Search options';
+
+  @override
+  String get precisionLabel => 'Match';
+
+  @override
+  String get precisionSome => 'Some of the words';
+
+  @override
+  String get precisionAll => 'All the words';
+
+  @override
+  String get precisionOrder => 'All the words, in order';
+
+  @override
+  String get extendedSearch => 'Extended search';
+
+  @override
+  String get extendedSearchSub =>
+      'Other forms of the words too (prefixes, plurals…)';
+
+  @override
+  String get searchNotes => 'Footnotes and introductions';
+
+  @override
+  String get searchNotesSub =>
+      'Also search editors\' footnotes and introductions';
+
+  @override
+  String get searchSavedOnly => 'Only books saved on this device';
+
+  @override
+  String get searchSavedOnlySub => 'Works offline';
+
+  @override
+  String get showFullResults => 'Show each result in full';
+
+  @override
+  String get hideDiacriticsResults => 'Hide diacritics in results';
+
+  @override
+  String get searchToc => 'Search the tables of contents';
+
+  @override
+  String get searchTocSub => 'Chapter and section titles instead of the text';
+
+  @override
+  String get logicLabel => 'Several phrases («and» / «or»)';
+
+  @override
+  String get logicAnd => 'and';
+
+  @override
+  String get logicOr => 'or';
+
+  @override
+  String get addPhrase => 'Add a phrase';
+
+  @override
+  String phraseN(int n) {
+    return 'Phrase $n';
+  }
+
+  @override
+  String get pinnedFilters => 'Saved filters';
+
+  @override
+  String get savePinned => 'Save the current filters';
+
+  @override
+  String get pinnedName => 'Name';
+
+  @override
+  String get noPinned => 'No saved filters yet';
+
+  @override
+  String savedBooksCount(int count) {
+    return 'In $count saved books';
+  }
+
+  @override
+  String get logicHint =>
+      '«and»: pages with every phrase. «or»: pages with any of them.';
 }
