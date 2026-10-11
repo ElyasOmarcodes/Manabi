@@ -29,7 +29,7 @@ jobs:
       - name: Capture Turath pages
         working-directory: tool/turath-look
         run: |
-          node network.mjs
+          node network.mjs "$GITHUB_WORKSPACE/turath-shots"
           [ "${{ github.event.inputs.network_only }}" = "true" ] || node look.mjs "$GITHUB_WORKSPACE/turath-shots"
       - name: Print screenshots (small JPEG, base64)
         if: always()
