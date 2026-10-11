@@ -124,7 +124,7 @@ void main() {
       // The sidebar opens the library (offline catalog) and settings as pages.
       await tester.tap(find.text('Library').first);
       await settle(tester);
-      expect(find.text('The Turath library'), findsOneWidget);
+      expect(find.text('Favourites'), findsOneWidget);
       await tester.tap(find.byIcon(Icons.arrow_back_rounded));
       await settle(tester);
       await tester.tap(find.text('Settings').first);

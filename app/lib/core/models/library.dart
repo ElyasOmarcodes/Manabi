@@ -93,6 +93,22 @@ class BookDetails {
     return found;
   }
 
+  /// The chain of headings above a page, outermost first
+  /// (e.g. كتاب الإيمان ← باب أمور الإيمان).
+  List<TocEntry> headingPath(int internal) {
+    final here = headingFor(internal);
+    if (here == null) return const [];
+    final path = [here];
+    var level = here.level;
+    for (var i = toc.indexOf(here) - 1; i >= 0 && level > 1; i--) {
+      if (toc[i].level < level) {
+        path.insert(0, toc[i]);
+        level = toc[i].level;
+      }
+    }
+    return path;
+  }
+
   static Map<String, (int, int)> parseBounds(Object? raw) {
     final out = <String, (int, int)>{};
     if (raw is Map) {

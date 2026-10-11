@@ -40,4 +40,52 @@ void main() {
     await again.toggleBookmark(again.bookmarks.single);
     expect(again.bookmarks, isEmpty);
   });
+
+  test('heading path walks up the table of contents', () {
+    final book = BookDetails.fromJson({
+      'id': '1',
+      'title': 'صحيح',
+      'toc': [
+        {'title': 'بدء الوحي', 'level': 1, 'page': 1},
+        {'title': 'كتاب الإيمان', 'level': 1, 'page': 3},
+        {'title': 'باب أمور الإيمان', 'level': 2, 'page': 4},
+        {'title': 'فصل', 'level': 3, 'page': 5},
+      ],
+    });
+    expect(book.headingPath(5).map((e) => e.title), ['كتاب الإيمان', 'باب أمور الإيمان', 'فصل']);
+    expect(book.headingPath(4).map((e) => e.title), ['كتاب الإيمان', 'باب أمور الإيمان']);
+    expect(book.headingPath(2).map((e) => e.title), ['بدء الوحي']);
+  });
+
+  test('favourites, highlights, visited pages and reader settings persist', () async {
+    SharedPreferences.setMockInitialValues({});
+    final r = ReadingController();
+    await r.load();
+    await r.toggleFavorite('9', 'الموطأ');
+    await r.addHighlight(Highlight(bookId: '9', bookTitle: 'الموطأ', page: 3, text: 'إنما الأعمال بالنيات', color: 2, savedAt: DateTime(2026)));
+    await r.savePosition('9', 'الموطأ', 3);
+    await r.savePosition('9', 'الموطأ', 4);
+    await r.setReadingMode('pages');
+    await r.setHideDiacritics(true);
+    await r.setDigits('latin');
+    final again = ReadingController();
+    await again.load();
+    expect(again.isFavorite('9'), isTrue);
+    expect(again.highlightsOf('9', 3).single.color, 2);
+    expect(again.visitedOf('9'), [4, 3]);
+    expect((again.readingMode, again.hideDiacritics, again.digits), ('pages', true, 'latin'));
+    await again.clearHistory();
+    expect(again.positionOf('9'), isNull);
+    expect(again.isFavorite('9'), isTrue, reason: 'clearing history keeps favourites');
+    await again.clearAll();
+    expect([...again.favorites, ...again.highlights, ...again.bookmarks], isEmpty);
+    await again.resetDisplay();
+    expect(again.readingMode, 'scroll');
+  });
+
+  test('reader text helpers', () {
+    expect(stripDiacritics('إِنَّمَا الْأَعْمَالُ'), 'إنما الأعمال');
+    expect(readerDigits(120, 'arabic'), '١٢٠');
+    expect(readerDigits('3', 'latin'), '3');
+  });
 }

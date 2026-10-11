@@ -832,4 +832,154 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get noMatchesInBook => 'No matches in this book.';
+
+  @override
+  String get readerTools => 'Reading tools';
+
+  @override
+  String get moreReadingSettings => 'More reading settings';
+
+  @override
+  String get readingSettings => 'Reading & library';
+
+  @override
+  String get readingSettingsSub => 'Reader, fonts, highlights and library';
+
+  @override
+  String get readingMode => 'Reading mode';
+
+  @override
+  String get modeScroll => 'Continuous';
+
+  @override
+  String get modePages => 'Page by page';
+
+  @override
+  String get modeScrollInfo => 'Pages flow one after another, like Turath.';
+
+  @override
+  String get modePagesInfo => 'Swipe to turn each page, like a printed book.';
+
+  @override
+  String get bookFont => 'Book font';
+
+  @override
+  String get fontNaskh => 'Naskh';
+
+  @override
+  String get fontModern => 'Modern';
+
+  @override
+  String get justifyText => 'Justify lines';
+
+  @override
+  String get hideDiacritics => 'Hide diacritics';
+
+  @override
+  String get showFootnotes => 'Show footnotes';
+
+  @override
+  String get keepScreenOn => 'Keep screen on';
+
+  @override
+  String get numberStyle => 'Number style';
+
+  @override
+  String get highlightColor => 'Highlight colour';
+
+  @override
+  String get highlights => 'Highlights';
+
+  @override
+  String get highlight => 'Highlight';
+
+  @override
+  String get highlightSaved => 'Highlighted';
+
+  @override
+  String get removeHighlight => 'Remove highlight';
+
+  @override
+  String get noHighlights => 'Select text in a book and choose Highlight.';
+
+  @override
+  String get copyWithCitation => 'Copy with citation';
+
+  @override
+  String get tabFavorites => 'Favourites';
+
+  @override
+  String get addFavorite => 'Add to favourites';
+
+  @override
+  String get removeFavorite => 'Remove from favourites';
+
+  @override
+  String get noFavoriteBooks => 'Star a book to keep it here.';
+
+  @override
+  String get bookInfo => 'About the book';
+
+  @override
+  String get visitedPages => 'History';
+
+  @override
+  String get noVisited => 'Pages you open appear here.';
+
+  @override
+  String get noBookmarksYet => 'No bookmarks in this book yet.';
+
+  @override
+  String get searchHeadings => 'Search headings…';
+
+  @override
+  String get fullScreen => 'Full screen';
+
+  @override
+  String get exitFullScreen => 'Exit full screen';
+
+  @override
+  String get paperSepia => 'Yellow';
+
+  @override
+  String get clearReadingHistory => 'Clear reading history';
+
+  @override
+  String get clearReadingHistoryConfirm =>
+      'Forget where you stopped in every book? Bookmarks, highlights and favourites stay.';
+
+  @override
+  String get clearReadingData => 'Delete all reading data';
+
+  @override
+  String get clearReadingDataConfirm =>
+      'Delete all bookmarks, highlights, favourites and history on this device?';
+
+  @override
+  String get resetReader => 'Reset reader settings';
+
+  @override
+  String get libraryStartTab => 'Library opens on';
+
+  @override
+  String get readingData => 'Your reading data';
+
+  @override
+  String get smaller => 'Smaller';
+
+  @override
+  String get larger => 'Larger';
+
+  @override
+  String get readerPreview => 'Preview';
+
+  @override
+  String get pageText => 'Page';
+
+  @override
+  String get reader => 'Reader';
+
+  @override
+  String get shortcutsHint =>
+      'Arrow keys turn pages · Ctrl+F searches the book';
 }

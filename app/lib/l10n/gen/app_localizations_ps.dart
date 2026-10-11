@@ -828,4 +828,154 @@ class AppLocalizationsPs extends AppLocalizations {
 
   @override
   String get noMatchesInBook => 'په دې کتاب کې پایله ونه موندل شوه.';
+
+  @override
+  String get readerTools => 'د لوستلو وسایل';
+
+  @override
+  String get moreReadingSettings => 'د لوستلو نور تنظیمات';
+
+  @override
+  String get readingSettings => 'لوستل او کتابتون';
+
+  @override
+  String get readingSettingsSub => 'لوستونکی، لیکبڼې، نښې او کتابتون';
+
+  @override
+  String get readingMode => 'د لوستلو بڼه';
+
+  @override
+  String get modeScroll => 'پرله‌پسې';
+
+  @override
+  String get modePages => 'مخ په مخ';
+
+  @override
+  String get modeScrollInfo => 'مخونه یو د بل پسې راځي، لکه تراث.';
+
+  @override
+  String get modePagesInfo => 'د هر مخ اړولو لپاره ګوته ښوروئ، لکه چاپي کتاب.';
+
+  @override
+  String get bookFont => 'د کتاب لیکبڼه';
+
+  @override
+  String get fontNaskh => 'نسخ';
+
+  @override
+  String get fontModern => 'عصري';
+
+  @override
+  String get justifyText => 'کرښې برابرې کړئ';
+
+  @override
+  String get hideDiacritics => 'حرکات پټ کړئ';
+
+  @override
+  String get showFootnotes => 'حاشیې ښکاره کړئ';
+
+  @override
+  String get keepScreenOn => 'پرده روښانه وساتئ';
+
+  @override
+  String get numberStyle => 'د شمېرو بڼه';
+
+  @override
+  String get highlightColor => 'د نښه کولو رنګ';
+
+  @override
+  String get highlights => 'نښه شوي متنونه';
+
+  @override
+  String get highlight => 'نښه کول';
+
+  @override
+  String get highlightSaved => 'نښه شو';
+
+  @override
+  String get removeHighlight => 'نښه لرې کول';
+
+  @override
+  String get noHighlights => 'په کتاب کې متن وټاکئ او «نښه کول» غوره کړئ.';
+
+  @override
+  String get copyWithCitation => 'د حوالې سره کاپي';
+
+  @override
+  String get tabFavorites => 'غوره';
+
+  @override
+  String get addFavorite => 'غوره کې ورزیات کړئ';
+
+  @override
+  String get removeFavorite => 'له غوره څخه لرې کړئ';
+
+  @override
+  String get noFavoriteBooks => 'کتاب ته ستوری ورکړئ چې دلته پاتې شي.';
+
+  @override
+  String get bookInfo => 'د کتاب په اړه';
+
+  @override
+  String get visitedPages => 'تاریخچه';
+
+  @override
+  String get noVisited => 'هغه مخونه چې خلاصوئ دلته ښکاري.';
+
+  @override
+  String get noBookmarksYet => 'په دې کتاب کې لا نښه نشته.';
+
+  @override
+  String get searchHeadings => 'په سرلیکونو کې لټون…';
+
+  @override
+  String get fullScreen => 'بشپړه پرده';
+
+  @override
+  String get exitFullScreen => 'له بشپړې پردې وتل';
+
+  @override
+  String get paperSepia => 'ژېړ';
+
+  @override
+  String get clearReadingHistory => 'د لوستلو تاریخچه پاکول';
+
+  @override
+  String get clearReadingHistoryConfirm =>
+      'په ټولو کتابونو کې ستاسو د درېدو ځای هېر شي؟ نښې، نښه شوي متنونه او غوره کتابونه پاتې کیږي.';
+
+  @override
+  String get clearReadingData => 'د لوستلو ټول معلومات ړنګول';
+
+  @override
+  String get clearReadingDataConfirm =>
+      'په دې وسیله کې ټولې نښې، نښه شوي متنونه، غوره کتابونه او تاریخچه ړنګ شي؟';
+
+  @override
+  String get resetReader => 'د لوستونکي تنظیمات اصلي حالت ته';
+
+  @override
+  String get libraryStartTab => 'کتابتون په دې خلاصیږي';
+
+  @override
+  String get readingData => 'ستاسو د لوستلو معلومات';
+
+  @override
+  String get smaller => 'کوچنی';
+
+  @override
+  String get larger => 'لوی';
+
+  @override
+  String get readerPreview => 'مخکتنه';
+
+  @override
+  String get pageText => 'مخ';
+
+  @override
+  String get reader => 'لوستونکی';
+
+  @override
+  String get shortcutsHint =>
+      'د غشي تڼۍ مخونه اړوي · Ctrl+F په کتاب کې لټون کوي';
 }

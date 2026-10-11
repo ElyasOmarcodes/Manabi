@@ -55,6 +55,15 @@ class SettingsScreen extends StatelessWidget {
                 },
               ),
             ]),
+            SettingsGroup(title: l.library, children: [
+              SettingsRow(
+                icon: Icons.chrome_reader_mode_outlined,
+                color: AuraHues.teal,
+                title: l.readingSettings,
+                subtitle: l.readingSettingsSub,
+                onTap: () => push(const ReadingSettingsPage()),
+              ),
+            ]),
             SettingsGroup(title: l.settingsAnswersGroup, children: [
               SettingsRow(icon: Icons.auto_awesome_outlined, color: AuraHues.amber, title: l.aiStyle, value: depthLabel(l, s.researchDepth), onTap: () => push(const AiStyleSettingsPage())),
               SettingsRow(

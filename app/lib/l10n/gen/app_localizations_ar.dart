@@ -830,4 +830,153 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get noMatchesInBook => 'لا نتائج في هذا الكتاب.';
+
+  @override
+  String get readerTools => 'أدوات القراءة';
+
+  @override
+  String get moreReadingSettings => 'المزيد من إعدادات القراءة';
+
+  @override
+  String get readingSettings => 'القراءة والمكتبة';
+
+  @override
+  String get readingSettingsSub => 'القارئ والخطوط والتظليل والمكتبة';
+
+  @override
+  String get readingMode => 'طريقة العرض';
+
+  @override
+  String get modeScroll => 'متصل';
+
+  @override
+  String get modePages => 'صفحة صفحة';
+
+  @override
+  String get modeScrollInfo => 'تتوالى الصفحات تحت بعضها كما في تراث.';
+
+  @override
+  String get modePagesInfo => 'اسحب لتقليب كل صفحة كالكتاب المطبوع.';
+
+  @override
+  String get bookFont => 'خط الكتاب';
+
+  @override
+  String get fontNaskh => 'نسخ';
+
+  @override
+  String get fontModern => 'حديث';
+
+  @override
+  String get justifyText => 'ضبط النص';
+
+  @override
+  String get hideDiacritics => 'إخفاء الحركات';
+
+  @override
+  String get showFootnotes => 'إظهار الحواشي';
+
+  @override
+  String get keepScreenOn => 'إبقاء الشاشة مضاءة';
+
+  @override
+  String get numberStyle => 'شكل الأرقام';
+
+  @override
+  String get highlightColor => 'لون التظليل';
+
+  @override
+  String get highlights => 'التظليلات';
+
+  @override
+  String get highlight => 'تظليل';
+
+  @override
+  String get highlightSaved => 'تم التظليل';
+
+  @override
+  String get removeHighlight => 'إزالة التظليل';
+
+  @override
+  String get noHighlights => 'حدّد نصًا في الكتاب واختر «تظليل».';
+
+  @override
+  String get copyWithCitation => 'نسخ مع التوثيق';
+
+  @override
+  String get tabFavorites => 'المفضلة';
+
+  @override
+  String get addFavorite => 'إضافة إلى المفضلة';
+
+  @override
+  String get removeFavorite => 'إزالة من المفضلة';
+
+  @override
+  String get noFavoriteBooks => 'ضع نجمة على كتاب ليظهر هنا.';
+
+  @override
+  String get bookInfo => 'عن الكتاب';
+
+  @override
+  String get visitedPages => 'السجل';
+
+  @override
+  String get noVisited => 'تظهر هنا الصفحات التي تفتحها.';
+
+  @override
+  String get noBookmarksYet => 'لا علامات في هذا الكتاب بعد.';
+
+  @override
+  String get searchHeadings => 'ابحث في العناوين…';
+
+  @override
+  String get fullScreen => 'ملء الشاشة';
+
+  @override
+  String get exitFullScreen => 'الخروج من ملء الشاشة';
+
+  @override
+  String get paperSepia => 'أصفر';
+
+  @override
+  String get clearReadingHistory => 'مسح سجل القراءة';
+
+  @override
+  String get clearReadingHistoryConfirm =>
+      'نسيان موضع توقفك في كل كتاب؟ تبقى العلامات والتظليلات والمفضلة.';
+
+  @override
+  String get clearReadingData => 'حذف كل بيانات القراءة';
+
+  @override
+  String get clearReadingDataConfirm =>
+      'حذف كل العلامات والتظليلات والمفضلة والسجل من هذا الجهاز؟';
+
+  @override
+  String get resetReader => 'استعادة إعدادات القارئ';
+
+  @override
+  String get libraryStartTab => 'تفتح المكتبة على';
+
+  @override
+  String get readingData => 'بيانات قراءتك';
+
+  @override
+  String get smaller => 'أصغر';
+
+  @override
+  String get larger => 'أكبر';
+
+  @override
+  String get readerPreview => 'معاينة';
+
+  @override
+  String get pageText => 'الصفحة';
+
+  @override
+  String get reader => 'القارئ';
+
+  @override
+  String get shortcutsHint => 'الأسهم تقلّب الصفحات · Ctrl+F للبحث في الكتاب';
 }

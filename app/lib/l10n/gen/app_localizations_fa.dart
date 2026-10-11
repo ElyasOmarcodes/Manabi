@@ -829,4 +829,154 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get noMatchesInBook => 'در این کتاب نتیجه‌ای پیدا نشد.';
+
+  @override
+  String get readerTools => 'ابزار مطالعه';
+
+  @override
+  String get moreReadingSettings => 'تنظیمات بیشتر مطالعه';
+
+  @override
+  String get readingSettings => 'مطالعه و کتابخانه';
+
+  @override
+  String get readingSettingsSub => 'خواننده، قلم‌ها، هایلایت و کتابخانه';
+
+  @override
+  String get readingMode => 'حالت مطالعه';
+
+  @override
+  String get modeScroll => 'پیوسته';
+
+  @override
+  String get modePages => 'صفحه به صفحه';
+
+  @override
+  String get modeScrollInfo => 'صفحه‌ها پشت سر هم می‌آیند، مانند تراث.';
+
+  @override
+  String get modePagesInfo => 'برای ورق زدن هر صفحه بکشید، مانند کتاب چاپی.';
+
+  @override
+  String get bookFont => 'قلم کتاب';
+
+  @override
+  String get fontNaskh => 'نسخ';
+
+  @override
+  String get fontModern => 'مدرن';
+
+  @override
+  String get justifyText => 'تراز کردن سطرها';
+
+  @override
+  String get hideDiacritics => 'پنهان کردن اعراب';
+
+  @override
+  String get showFootnotes => 'نمایش پاورقی‌ها';
+
+  @override
+  String get keepScreenOn => 'روشن ماندن صفحه';
+
+  @override
+  String get numberStyle => 'شکل اعداد';
+
+  @override
+  String get highlightColor => 'رنگ هایلایت';
+
+  @override
+  String get highlights => 'هایلایت‌ها';
+
+  @override
+  String get highlight => 'هایلایت';
+
+  @override
+  String get highlightSaved => 'هایلایت شد';
+
+  @override
+  String get removeHighlight => 'حذف هایلایت';
+
+  @override
+  String get noHighlights => 'متنی را در کتاب انتخاب و «هایلایت» را بزنید.';
+
+  @override
+  String get copyWithCitation => 'کپی با ارجاع';
+
+  @override
+  String get tabFavorites => 'برگزیده';
+
+  @override
+  String get addFavorite => 'افزودن به برگزیده‌ها';
+
+  @override
+  String get removeFavorite => 'حذف از برگزیده‌ها';
+
+  @override
+  String get noFavoriteBooks => 'به کتابی ستاره بدهید تا اینجا بماند.';
+
+  @override
+  String get bookInfo => 'درباره کتاب';
+
+  @override
+  String get visitedPages => 'تاریخچه';
+
+  @override
+  String get noVisited => 'صفحه‌هایی که باز می‌کنید اینجا می‌آیند.';
+
+  @override
+  String get noBookmarksYet => 'هنوز نشانکی در این کتاب نیست.';
+
+  @override
+  String get searchHeadings => 'جستجو در عنوان‌ها…';
+
+  @override
+  String get fullScreen => 'تمام صفحه';
+
+  @override
+  String get exitFullScreen => 'خروج از تمام صفحه';
+
+  @override
+  String get paperSepia => 'زرد';
+
+  @override
+  String get clearReadingHistory => 'پاک کردن تاریخچه مطالعه';
+
+  @override
+  String get clearReadingHistoryConfirm =>
+      'محل توقف شما در همه کتاب‌ها فراموش شود؟ نشانک‌ها، هایلایت‌ها و برگزیده‌ها می‌مانند.';
+
+  @override
+  String get clearReadingData => 'حذف همه داده‌های مطالعه';
+
+  @override
+  String get clearReadingDataConfirm =>
+      'همه نشانک‌ها، هایلایت‌ها، برگزیده‌ها و تاریخچه از این دستگاه حذف شوند؟';
+
+  @override
+  String get resetReader => 'بازنشانی تنظیمات خواننده';
+
+  @override
+  String get libraryStartTab => 'کتابخانه با این باز شود';
+
+  @override
+  String get readingData => 'داده‌های مطالعه شما';
+
+  @override
+  String get smaller => 'کوچک‌تر';
+
+  @override
+  String get larger => 'بزرگ‌تر';
+
+  @override
+  String get readerPreview => 'پیش‌نمایش';
+
+  @override
+  String get pageText => 'صفحه';
+
+  @override
+  String get reader => 'خواننده';
+
+  @override
+  String get shortcutsHint =>
+      'کلیدهای جهت صفحه را ورق می‌زنند · Ctrl+F جستجو در کتاب';
 }

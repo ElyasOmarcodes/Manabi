@@ -1607,6 +1607,300 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No matches in this book.'**
   String get noMatchesInBook;
+
+  /// No description provided for @readerTools.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading tools'**
+  String get readerTools;
+
+  /// No description provided for @moreReadingSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'More reading settings'**
+  String get moreReadingSettings;
+
+  /// No description provided for @readingSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading & library'**
+  String get readingSettings;
+
+  /// No description provided for @readingSettingsSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Reader, fonts, highlights and library'**
+  String get readingSettingsSub;
+
+  /// No description provided for @readingMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading mode'**
+  String get readingMode;
+
+  /// No description provided for @modeScroll.
+  ///
+  /// In en, this message translates to:
+  /// **'Continuous'**
+  String get modeScroll;
+
+  /// No description provided for @modePages.
+  ///
+  /// In en, this message translates to:
+  /// **'Page by page'**
+  String get modePages;
+
+  /// No description provided for @modeScrollInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Pages flow one after another, like Turath.'**
+  String get modeScrollInfo;
+
+  /// No description provided for @modePagesInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Swipe to turn each page, like a printed book.'**
+  String get modePagesInfo;
+
+  /// No description provided for @bookFont.
+  ///
+  /// In en, this message translates to:
+  /// **'Book font'**
+  String get bookFont;
+
+  /// No description provided for @fontNaskh.
+  ///
+  /// In en, this message translates to:
+  /// **'Naskh'**
+  String get fontNaskh;
+
+  /// No description provided for @fontModern.
+  ///
+  /// In en, this message translates to:
+  /// **'Modern'**
+  String get fontModern;
+
+  /// No description provided for @justifyText.
+  ///
+  /// In en, this message translates to:
+  /// **'Justify lines'**
+  String get justifyText;
+
+  /// No description provided for @hideDiacritics.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide diacritics'**
+  String get hideDiacritics;
+
+  /// No description provided for @showFootnotes.
+  ///
+  /// In en, this message translates to:
+  /// **'Show footnotes'**
+  String get showFootnotes;
+
+  /// No description provided for @keepScreenOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep screen on'**
+  String get keepScreenOn;
+
+  /// No description provided for @numberStyle.
+  ///
+  /// In en, this message translates to:
+  /// **'Number style'**
+  String get numberStyle;
+
+  /// No description provided for @highlightColor.
+  ///
+  /// In en, this message translates to:
+  /// **'Highlight colour'**
+  String get highlightColor;
+
+  /// No description provided for @highlights.
+  ///
+  /// In en, this message translates to:
+  /// **'Highlights'**
+  String get highlights;
+
+  /// No description provided for @highlight.
+  ///
+  /// In en, this message translates to:
+  /// **'Highlight'**
+  String get highlight;
+
+  /// No description provided for @highlightSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Highlighted'**
+  String get highlightSaved;
+
+  /// No description provided for @removeHighlight.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove highlight'**
+  String get removeHighlight;
+
+  /// No description provided for @noHighlights.
+  ///
+  /// In en, this message translates to:
+  /// **'Select text in a book and choose Highlight.'**
+  String get noHighlights;
+
+  /// No description provided for @copyWithCitation.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy with citation'**
+  String get copyWithCitation;
+
+  /// No description provided for @tabFavorites.
+  ///
+  /// In en, this message translates to:
+  /// **'Favourites'**
+  String get tabFavorites;
+
+  /// No description provided for @addFavorite.
+  ///
+  /// In en, this message translates to:
+  /// **'Add to favourites'**
+  String get addFavorite;
+
+  /// No description provided for @removeFavorite.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove from favourites'**
+  String get removeFavorite;
+
+  /// No description provided for @noFavoriteBooks.
+  ///
+  /// In en, this message translates to:
+  /// **'Star a book to keep it here.'**
+  String get noFavoriteBooks;
+
+  /// No description provided for @bookInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'About the book'**
+  String get bookInfo;
+
+  /// No description provided for @visitedPages.
+  ///
+  /// In en, this message translates to:
+  /// **'History'**
+  String get visitedPages;
+
+  /// No description provided for @noVisited.
+  ///
+  /// In en, this message translates to:
+  /// **'Pages you open appear here.'**
+  String get noVisited;
+
+  /// No description provided for @noBookmarksYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No bookmarks in this book yet.'**
+  String get noBookmarksYet;
+
+  /// No description provided for @searchHeadings.
+  ///
+  /// In en, this message translates to:
+  /// **'Search headings…'**
+  String get searchHeadings;
+
+  /// No description provided for @fullScreen.
+  ///
+  /// In en, this message translates to:
+  /// **'Full screen'**
+  String get fullScreen;
+
+  /// No description provided for @exitFullScreen.
+  ///
+  /// In en, this message translates to:
+  /// **'Exit full screen'**
+  String get exitFullScreen;
+
+  /// No description provided for @paperSepia.
+  ///
+  /// In en, this message translates to:
+  /// **'Yellow'**
+  String get paperSepia;
+
+  /// No description provided for @clearReadingHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear reading history'**
+  String get clearReadingHistory;
+
+  /// No description provided for @clearReadingHistoryConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Forget where you stopped in every book? Bookmarks, highlights and favourites stay.'**
+  String get clearReadingHistoryConfirm;
+
+  /// No description provided for @clearReadingData.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete all reading data'**
+  String get clearReadingData;
+
+  /// No description provided for @clearReadingDataConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete all bookmarks, highlights, favourites and history on this device?'**
+  String get clearReadingDataConfirm;
+
+  /// No description provided for @resetReader.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset reader settings'**
+  String get resetReader;
+
+  /// No description provided for @libraryStartTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Library opens on'**
+  String get libraryStartTab;
+
+  /// No description provided for @readingData.
+  ///
+  /// In en, this message translates to:
+  /// **'Your reading data'**
+  String get readingData;
+
+  /// No description provided for @smaller.
+  ///
+  /// In en, this message translates to:
+  /// **'Smaller'**
+  String get smaller;
+
+  /// No description provided for @larger.
+  ///
+  /// In en, this message translates to:
+  /// **'Larger'**
+  String get larger;
+
+  /// No description provided for @readerPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview'**
+  String get readerPreview;
+
+  /// No description provided for @pageText.
+  ///
+  /// In en, this message translates to:
+  /// **'Page'**
+  String get pageText;
+
+  /// No description provided for @reader.
+  ///
+  /// In en, this message translates to:
+  /// **'Reader'**
+  String get reader;
+
+  /// No description provided for @shortcutsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Arrow keys turn pages · Ctrl+F searches the book'**
+  String get shortcutsHint;
 }
 
 class _AppLocalizationsDelegate

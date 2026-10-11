@@ -4,7 +4,9 @@ import 'package:provider/provider.dart';
 
 import '../../core/backend/backend.dart';
 import '../../core/catalog/catalog_service.dart';
+import '../../core/turath/arabic_match.dart';
 import '../../state/chat_controller.dart';
+import '../../state/reading_controller.dart';
 import '../../state/settings_controller.dart';
 import '../theme.dart';
 import '../widgets/brand_logo.dart';
@@ -12,6 +14,7 @@ import '../widgets/chat_list.dart' show confirmDialog;
 import '../widgets/common.dart';
 import '../widgets/depth_picker.dart';
 import 'chat_screen.dart' show languageLabels;
+import 'reader_screen.dart' show ModePicker, PaperPicker, ReaderTextControls, bookTextStyle, readerColors;
 
 /// Shared frame of a settings sub-page.
 class _SettingsPage extends StatelessWidget {
@@ -414,6 +417,162 @@ class DataSettingsPage extends StatelessWidget {
           },
         ),
       ]),
+    ]);
+  }
+}
+
+// ── Reading & library ───────────────────────────────────────────────────
+
+const _sampleText = 'قَالَ رَسُولُ اللَّهِ ﷺ: «إِنَّمَا الْأَعْمَالُ بِالنِّيَّاتِ، وَإِنَّمَا لِكُلِّ امْرِئٍ مَا نَوَى».';
+
+/// Everything about the reader and the library, with a live preview page.
+class ReadingSettingsPage extends StatelessWidget {
+  const ReadingSettingsPage({super.key});
+  @override
+  Widget build(BuildContext context) {
+    final r = context.watch<ReadingController>();
+    final l = context.l;
+    final a = context.aura;
+    final c = readerColors(context, r.paper);
+    final sample = r.hideDiacritics ? stripDiacritics(_sampleText) : _sampleText;
+    final mark = arabicMatches(sample, 'إنما الأعمال بالنيات').firstOrNull ?? (0, 0);
+    Widget toggle(IconData icon, Color color, String title, bool value, ValueChanged<bool> onChanged, {String? subtitle}) => SettingsRow(
+          icon: icon,
+          color: color,
+          title: title,
+          subtitle: subtitle,
+          trailing: Switch.adaptive(value: value, onChanged: onChanged),
+          onTap: () => onChanged(!value),
+        );
+    final tabs = {'books': l.books, 'authors': l.authors, 'categories': l.categories, 'favorites': l.tabFavorites, 'search': l.fullTextSearch};
+    return _SettingsPage(title: l.readingSettings, children: [
+      _Label(l.readerPreview),
+      AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+        decoration: BoxDecoration(color: c.bg, borderRadius: BorderRadius.circular(18), border: Border.all(color: a.border)),
+        child: Directionality(
+          textDirection: TextDirection.rtl,
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Text('بَابُ بَدْءِ الْوَحْيِ', style: bookTextStyle(context, r, size: 16, weight: FontWeight.w700, color: a.accent).copyWith(height: 1.7)),
+            Text.rich(
+              TextSpan(children: [
+                TextSpan(text: sample.substring(0, mark.$1)),
+                TextSpan(text: sample.substring(mark.$1, mark.$2), style: TextStyle(backgroundColor: highlightColors[r.highlightColor].withValues(alpha: a.dark ? 0.38 : 0.45))),
+                TextSpan(text: sample.substring(mark.$2)),
+              ]),
+              textAlign: r.justify ? TextAlign.justify : TextAlign.start,
+              style: bookTextStyle(context, r, color: c.text),
+            ),
+            const SizedBox(height: 6),
+            Text('${l.volumeShort} ${readerDigits(1, r.digits)} · ${l.page} ${readerDigits(6, r.digits)}',
+                textAlign: TextAlign.center, style: TextStyle(fontFamily: uiFont, fontSize: 12, color: c.muted)),
+          ]),
+        ),
+      ),
+      _Label(l.readingMode),
+      ModePicker(reading: r),
+      Padding(
+        padding: const EdgeInsetsDirectional.fromSTEB(14, 8, 14, 0),
+        child: Text(r.readingMode == 'pages' ? l.modePagesInfo : l.modeScrollInfo, style: TextStyle(fontFamily: uiFont, fontSize: 12.5, color: a.faint, height: 1.5)),
+      ),
+      _Label(l.paperTheme),
+      PaperPicker(reading: r),
+      _Label(l.textSize),
+      ReaderTextControls(reading: r),
+      SettingsGroup(title: l.bookFont, children: [
+        for (final (value, name, family) in [('naskh', l.fontNaskh, arabicFont), ('vazir', l.fontModern, uiFont)])
+          SettingsRow(
+            icon: Icons.font_download_outlined,
+            color: AuraHues.violet,
+            title: name,
+            value: 'بسم الله',
+            trailing: Padding(
+              padding: const EdgeInsetsDirectional.only(start: 8),
+              child: Icon(r.fontFamily == value ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded, color: r.fontFamily == value ? a.accent : a.faint, size: 22),
+            ),
+            subtitle: family == arabicFont ? 'Noto Naskh Arabic' : 'Vazirmatn',
+            onTap: () => r.setFontFamily(value),
+          ),
+      ]),
+      SettingsGroup(title: l.reader, children: [
+        toggle(Icons.format_align_justify_rounded, AuraHues.blue, l.justifyText, r.justify, r.setJustify),
+        toggle(Icons.text_format_rounded, AuraHues.teal, l.hideDiacritics, r.hideDiacritics, r.setHideDiacritics),
+        toggle(Icons.notes_rounded, AuraHues.green, l.showFootnotes, r.showFootnotes, r.setShowFootnotes),
+        toggle(Icons.light_mode_outlined, AuraHues.amber, l.keepScreenOn, r.keepAwake, r.setKeepAwake),
+        SettingsRow(
+          icon: Icons.pin_outlined,
+          color: AuraHues.rose,
+          title: l.numberStyle,
+          value: r.digits == 'arabic' ? '١٢٣' : '123',
+          onTap: () async {
+            final v = await showChoiceDialog(context, title: l.numberStyle, options: const {'arabic': '١٢٣ – ٠١٢٣٤٥٦٧٨٩', 'latin': '123 – 0123456789'}, selected: r.digits);
+            if (v != null) await r.setDigits(v);
+          },
+        ),
+      ]),
+      _Label(l.highlightColor),
+      Row(children: [
+        for (var i = 0; i < highlightColors.length; i++)
+          Padding(
+            padding: const EdgeInsetsDirectional.only(start: 10),
+            child: Pressable(
+              onTap: () => r.setHighlightColor(i),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: highlightColors[i],
+                  shape: BoxShape.circle,
+                  border: Border.all(color: r.highlightColor == i ? a.text : Colors.transparent, width: 2.5),
+                ),
+                child: r.highlightColor == i ? const Icon(Icons.check_rounded, color: Colors.black87, size: 20) : null,
+              ),
+            ),
+          ),
+      ]),
+      SettingsGroup(title: l.library, children: [
+        SettingsRow(
+          icon: Icons.local_library_outlined,
+          color: AuraHues.teal,
+          title: l.libraryStartTab,
+          value: tabs[r.libraryTab] ?? l.books,
+          onTap: () async {
+            final v = await showChoiceDialog(context, title: l.libraryStartTab, options: tabs, selected: r.libraryTab);
+            if (v != null) await r.setLibraryTab(v);
+          },
+        ),
+      ]),
+      SettingsGroup(title: l.readingData, children: [
+        SettingsRow(
+          icon: Icons.insights_rounded,
+          color: AuraHues.violet,
+          title: '${l.bookmarks} · ${l.highlights} · ${l.tabFavorites}',
+          value: '${r.bookmarks.length} · ${r.highlights.length} · ${r.favorites.length}',
+        ),
+        SettingsRow(
+          icon: Icons.history_toggle_off_rounded,
+          title: l.clearReadingHistory,
+          danger: true,
+          onTap: () async {
+            if (await confirmDialog(context, l.clearReadingHistoryConfirm) && context.mounted) await r.clearHistory();
+          },
+        ),
+        SettingsRow(
+          icon: Icons.delete_forever_outlined,
+          title: l.clearReadingData,
+          danger: true,
+          onTap: () async {
+            if (await confirmDialog(context, l.clearReadingDataConfirm) && context.mounted) await r.clearAll();
+          },
+        ),
+        SettingsRow(icon: Icons.restart_alt_rounded, title: l.resetReader, danger: true, onTap: r.resetDisplay),
+      ]),
+      Padding(
+        padding: const EdgeInsetsDirectional.fromSTEB(14, 14, 14, 0),
+        child: Text(l.shortcutsHint, style: TextStyle(fontFamily: uiFont, fontSize: 12, color: a.faint, height: 1.5)),
+      ),
     ]);
   }
 }
