@@ -17,6 +17,8 @@ import '../widgets/answer_card.dart';
 import '../widgets/brand_logo.dart';
 import '../widgets/common.dart';
 import '../widgets/depth_picker.dart';
+import '../widgets/message_sheet.dart';
+import '../widgets/research_progress.dart';
 import '../widgets/scope_picker.dart';
 
 /// Chat page in the familiar ChatGPT layout: a quiet top bar, the
@@ -68,7 +70,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   controller: _scroll,
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                   itemCount: chat.turns.length,
-                  itemBuilder: (context, i) => ReadingWidth(maxWidth: 740, child: _TurnView(turn: chat.turns[i], progress: chats.progress[chat.turns[i].id])),
+                  itemBuilder: (context, i) => ReadingWidth(maxWidth: 740, child: _TurnView(chat: chat, turn: chat.turns[i], progress: chats.progress[chat.turns[i].id])),
                 ),
         ),
         if (empty) const _Suggestions(),
@@ -97,11 +99,21 @@ class _TopBar extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: hasTurns
-                ? Text(chat!.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: wide ? TextAlign.start : TextAlign.center,
-                    style: TextStyle(fontFamily: uiFont, fontSize: 15, fontWeight: FontWeight.w600, color: a.text))
+                ? Tooltip(
+                    message: l.chatDetails,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(10),
+                      onTap: () => showChatDetails(context, chat!),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 6),
+                        child: Text(chat!.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: wide ? TextAlign.start : TextAlign.center,
+                            style: TextStyle(fontFamily: uiFont, fontSize: 15, fontWeight: FontWeight.w600, color: a.text)),
+                      ),
+                    ),
+                  )
                 : (wide ? const SizedBox() : const Center(child: BrandLogo(height: 26, latin: false))),
           ),
           const SizedBox(width: 10),
@@ -209,7 +221,8 @@ class _Suggestions extends StatelessWidget {
 }
 
 class _TurnView extends StatelessWidget {
-  const _TurnView({required this.turn, required this.progress});
+  const _TurnView({required this.chat, required this.turn, required this.progress});
+  final Chat chat;
   final ChatTurn turn;
   final AskProgress? progress;
 
@@ -221,7 +234,11 @@ class _TurnView extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 26),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        _UserBubble(turn: turn),
+        GestureDetector(
+          onLongPress: () => showMessageSheet(context, chat: chat, turn: turn, question: true),
+          onSecondaryTap: () => showMessageSheet(context, chat: chat, turn: turn, question: true),
+          child: _UserBubble(turn: turn),
+        ),
         const SizedBox(height: 18),
         AnimatedSwitcher(
           duration: const Duration(milliseconds: 380),
@@ -229,8 +246,13 @@ class _TurnView extends StatelessWidget {
           transitionBuilder: (child, a) => FadeTransition(opacity: a, child: child),
           layoutBuilder: (current, previous) => Stack(alignment: AlignmentDirectional.topStart, children: [...previous, ?current]),
           child: switch (turn.state) {
-            MessageState.pending => StageTimeline(key: const ValueKey('p'), progress: progress ?? AskProgress()),
-            MessageState.done when turn.result != null => AnswerCard(key: ValueKey('a${turn.id}'), turn: turn, onRetry: retry),
+            MessageState.pending => ResearchProgress(key: const ValueKey('p'), progress: progress ?? AskProgress(), rtlDraft: isRtlLanguage(turn.language)),
+            MessageState.done when turn.result != null => GestureDetector(
+                key: ValueKey('a${turn.id}'),
+                onLongPress: () => showMessageSheet(context, chat: chat, turn: turn, question: false),
+                onSecondaryTap: () => showMessageSheet(context, chat: chat, turn: turn, question: false),
+                child: AnswerCard(turn: turn, onRetry: retry, onMore: () => showMessageSheet(context, chat: chat, turn: turn, question: false)),
+              ),
             _ => _ErrorLine(key: const ValueKey('e'), code: turn.errorCode, detail: turn.errorDetail, onRetry: retry),
           },
         ),
@@ -255,7 +277,7 @@ class _UserBubble extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             decoration: BoxDecoration(color: a.surfaceAlt, borderRadius: BorderRadius.circular(22)),
-            child: SelectableText(turn.question, style: TextStyle(fontFamily: uiFont, color: a.text, fontSize: 15, height: 1.6)),
+            child: Text(turn.question, style: TextStyle(fontFamily: uiFont, color: a.text, fontSize: 15, height: 1.6)),
           ),
           if (label.isNotEmpty)
             Padding(

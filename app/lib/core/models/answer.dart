@@ -127,6 +127,32 @@ class Opinion {
   Map<String, dynamic> toJson() => {'holder': holder, 'view': view, 'sources': sources};
 }
 
+/// Gemini tokens spent on one answer (all calls added up).
+class TokenUsage {
+  const TokenUsage({this.input = 0, this.output = 0, this.thoughts = 0, this.calls = 0, this.peak = 0});
+  final int input;
+  final int output;
+  final int thoughts;
+  final int calls;
+
+  /// Input tokens of the largest single call: how full the context window got.
+  final int peak;
+
+  int get total => input + output + thoughts;
+  bool get isEmpty => calls == 0 && total == 0;
+
+  TokenUsage operator +(TokenUsage o) =>
+      TokenUsage(input: input + o.input, output: output + o.output, thoughts: thoughts + o.thoughts, calls: calls + o.calls, peak: peak > o.peak ? peak : o.peak);
+
+  factory TokenUsage.fromJson(Object? v) {
+    final j = v is Map ? v : const {};
+    int n(Object? x) => x is num ? x.toInt() : 0;
+    return TokenUsage(input: n(j['input']), output: n(j['output']), thoughts: n(j['thoughts']), calls: n(j['calls']), peak: n(j['peak']));
+  }
+
+  Map<String, dynamic> toJson() => {'input': input, 'output': output, 'thoughts': thoughts, 'calls': calls, 'peak': peak};
+}
+
 class AnswerResult {
   const AnswerResult({
     required this.status,
@@ -142,6 +168,7 @@ class AnswerResult {
     this.model,
     this.totalMatches,
     this.elapsedMs,
+    this.usage = const TokenUsage(),
   });
 
   final AnswerStatus status;
@@ -163,6 +190,7 @@ class AnswerResult {
   final String? model;
   final int? totalMatches;
   final int? elapsedMs;
+  final TokenUsage usage;
 
   bool get isDocumented => status != AnswerStatus.insufficient;
 
@@ -192,6 +220,7 @@ class AnswerResult {
         model: _str(j['model']),
         totalMatches: _int(j['totalMatches']),
         elapsedMs: _int(j['elapsedMs']),
+        usage: TokenUsage.fromJson(j['usage']),
       );
 
   Map<String, dynamic> toJson() => {
@@ -208,6 +237,7 @@ class AnswerResult {
         if (model != null) 'model': model,
         if (totalMatches != null) 'totalMatches': totalMatches,
         if (elapsedMs != null) 'elapsedMs': elapsedMs,
+        if (!usage.isEmpty) 'usage': usage.toJson(),
       };
 }
 
@@ -232,6 +262,28 @@ class AskSourcesEvent extends AskEvent {
   const AskSourcesEvent(this.count, this.totalMatches);
   final int count;
   final int totalMatches;
+}
+
+/// One line of the live research log (a search, a ranking, a page read…).
+class AskActivityEvent extends AskEvent {
+  const AskActivityEvent(this.kind, this.data, this.elapsedMs);
+
+  /// plan, search, found, rank, ranked, followup, read, compose, verify, resumed, retry
+  final String kind;
+  final Map<String, dynamic> data;
+  final int elapsedMs;
+}
+
+/// Tokens spent so far.
+class AskUsageEvent extends AskEvent {
+  const AskUsageEvent(this.usage);
+  final TokenUsage usage;
+}
+
+/// The answer text as it is being written (before verification).
+class AskDraftEvent extends AskEvent {
+  const AskDraftEvent(this.text);
+  final String text;
 }
 
 class AskResultEvent extends AskEvent {

@@ -10,22 +10,48 @@ import '../core/models/scope.dart';
 import '../core/pipeline/answer_pipeline.dart';
 import '../core/pipeline/prompts.dart';
 import '../core/storage/chat_store.dart';
+import 'keep_alive.dart';
 
 /// Live progress of a pending answer (not persisted).
 class AskProgress {
+  AskProgress({DateTime? startedAt, List<AskActivityEvent>? activity}) : startedAt = startedAt ?? DateTime.now(), activity = activity ?? [];
+  final DateTime startedAt;
   AskStage stage = AskStage.planning;
   List<String> queries = const [];
   int? sourcesFound;
+
+  /// The live research log, oldest first.
+  final List<AskActivityEvent> activity;
+  TokenUsage usage = const TokenUsage();
+
+  /// The answer as it is being written.
+  String? draft;
+
+  /// Set while waiting to try again after a dropped connection.
+  int? retryIn;
+  int attempt = 0;
 }
 
 /// Errors that happen when the connection drops (e.g. the phone put the app
 /// in the background); such answers are resumed automatically.
 const _transientCodes = {'NETWORK', 'GEMINI_UNAVAILABLE', 'TURATH_UNAVAILABLE', 'INTERRUPTED', 'INTERNAL'};
 
+/// Waits before each automatic retry of an interrupted answer.
+const _defaultRetryDelays = [Duration(seconds: 2), Duration(seconds: 6), Duration(seconds: 15)];
+
 class ChatController extends ChangeNotifier with WidgetsBindingObserver {
-  ChatController(this._store, this._backend) : chats = _store.loadAll() {
+  ChatController(this._store, this._backend, {AnswerKeepAlive? keepAlive, List<Duration> retryDelays = _defaultRetryDelays})
+      : chats = _store.loadAll(),
+        _retryDelays = retryDelays,
+        _keepAlive = keepAlive ?? AnswerKeepAlive.platform() {
     WidgetsBinding.instance.addObserver(this);
   }
+
+  /// Keeps the app (and its connection) alive while answers are prepared.
+  final AnswerKeepAlive _keepAlive;
+  final List<Duration> _retryDelays;
+  final Map<String, int> _attempts = {};
+  final Map<String, Timer> _retryTimers = {};
 
   final ChatStore _store;
   ManabiBackend Function() _backend;
@@ -34,13 +60,15 @@ class ChatController extends ChangeNotifier with WidgetsBindingObserver {
   final Map<String, StreamSubscription<AskEvent>> _running = {};
   final Map<String, ({String fallbackLanguage, String depth, String requestId})> _requests = {};
   final Set<String> _sawBackground = {};
-  final Set<String> _autoRetried = {};
   final Set<String> _resumeQueue = {};
   bool _inBackground = false;
   String? currentId;
   static const _uuid = Uuid();
 
   set backendProvider(ManabiBackend Function() fn) => _backend = fn;
+
+  /// Text of the "preparing your answer" notification.
+  set keepAliveLabels(({String title, String text}) value) => _keepAlive.labels = value;
 
   Chat? get current => currentId == null ? null : chats.where((c) => c.id == currentId).firstOrNull;
 
@@ -87,7 +115,7 @@ class ChatController extends ChangeNotifier with WidgetsBindingObserver {
       _resumeQueue.clear();
       for (final id in queued) {
         final found = _find(id);
-        if (found != null) _start(found.$1, found.$2);
+        if (found != null && found.$2.state == MessageState.pending) _start(found.$1, found.$2, keepProgress: true);
       }
     }
   }
@@ -125,24 +153,34 @@ class ChatController extends ChangeNotifier with WidgetsBindingObserver {
     // returned at once without asking Gemini again.
     final previous = _requests[turn.id];
     _requests[turn.id] = (fallbackLanguage: fallbackLanguage, depth: depth, requestId: previous?.requestId ?? _uuid.v4());
-    _autoRetried.remove(turn.id);
+    _attempts.remove(turn.id);
+    _retryTimers.remove(turn.id)?.cancel();
     _start(chat, turn);
   }
 
-  void _start(Chat chat, ChatTurn turn) {
+  void _start(Chat chat, ChatTurn turn, {bool keepProgress = false}) {
     turn
       ..state = MessageState.pending
       ..errorCode = null
       ..errorDetail = null
       ..result = null;
+    if (!keepProgress) progress.remove(turn.id);
     final r = _requests[turn.id] ?? (fallbackLanguage: 'en', depth: 'standard', requestId: _uuid.v4());
     _run(chat, turn, fallbackLanguage: r.fallbackLanguage, depth: r.depth, requestId: r.requestId);
+  }
+
+  void _syncKeepAlive() {
+    final busy = _running.isNotEmpty || _retryTimers.isNotEmpty || _resumeQueue.isNotEmpty;
+    busy ? _keepAlive.start() : _keepAlive.stop();
   }
 
   void cancel(ChatTurn turn) {
     _running.remove(turn.id)?.cancel();
     _resumeQueue.remove(turn.id);
+    _retryTimers.remove(turn.id)?.cancel();
+    _attempts.remove(turn.id);
     progress.remove(turn.id);
+    _syncKeepAlive();
     turn
       ..state = MessageState.failed
       ..errorCode = 'CANCELLED';
@@ -160,7 +198,9 @@ class ChatController extends ChangeNotifier with WidgetsBindingObserver {
           [for (final src in t.result?.sources ?? const []) src.bookTitle],
         ),
     ];
-    final p = progress[turn.id] = AskProgress();
+    final before = progress[turn.id];
+    final p = progress[turn.id] = AskProgress(startedAt: before?.startedAt, activity: before?.activity)..attempt = _attempts[turn.id] ?? 0;
+    if (before != null) p.usage = before.usage;
     if (_inBackground) _sawBackground.add(turn.id);
     notifyListeners();
     final request = AskRequest(
@@ -180,6 +220,12 @@ class ChatController extends ChangeNotifier with WidgetsBindingObserver {
             p.queries = queries;
           case AskSourcesEvent(:final count):
             p.sourcesFound = count;
+          case AskActivityEvent():
+            p.activity.add(event);
+          case AskUsageEvent(:final usage):
+            p.usage = usage;
+          case AskDraftEvent(:final text):
+            p.draft = text;
           case AskResultEvent(:final result):
             turn
               ..result = result
@@ -197,19 +243,39 @@ class ChatController extends ChangeNotifier with WidgetsBindingObserver {
       },
       cancelOnError: true,
     );
+    _syncKeepAlive();
   }
 
   void _fail(Chat chat, ChatTurn turn, String code, {String? detail}) {
     _running.remove(turn.id);
-    // The connection dropped while the app was in the background: resume
-    // the answer once the app is back (or right away if it already is).
-    if (_transientCodes.contains(code) && _sawBackground.contains(turn.id) && _autoRetried.add(turn.id)) {
-      _sawBackground.remove(turn.id);
-      if (_inBackground) {
-        _resumeQueue.add(turn.id);
-      } else {
-        _start(chat, turn);
+    // A dropped connection (often the phone suspending the app): try again
+    // with the same request id, which resumes from the finished steps.
+    final attempt = _attempts[turn.id] ?? 0;
+    if (_transientCodes.contains(code) && attempt < _retryDelays.length) {
+      _attempts[turn.id] = attempt + 1;
+      final p = progress[turn.id];
+      if (p != null) p.activity.add(AskActivityEvent('retry', {'code': code, 'attempt': attempt + 1}, DateTime.now().difference(p.startedAt).inMilliseconds));
+      if (_inBackground || _sawBackground.contains(turn.id)) {
+        _sawBackground.remove(turn.id);
+        if (_inBackground) {
+          _resumeQueue.add(turn.id);
+          notifyListeners();
+          return;
+        }
       }
+      final delay = _retryDelays[attempt];
+      p?.retryIn = delay.inSeconds;
+      notifyListeners();
+      _retryTimers[turn.id]?.cancel();
+      _retryTimers[turn.id] = Timer(delay, () {
+        _retryTimers.remove(turn.id);
+        if (turn.state != MessageState.pending) return;
+        if (_inBackground) {
+          _resumeQueue.add(turn.id);
+        } else {
+          _start(chat, turn, keepProgress: true);
+        }
+      });
       return;
     }
     turn
@@ -222,7 +288,10 @@ class ChatController extends ChangeNotifier with WidgetsBindingObserver {
   void _finish(Chat chat, ChatTurn turn) {
     _sawBackground.remove(turn.id);
     _running.remove(turn.id);
+    _attempts.remove(turn.id);
+    _retryTimers.remove(turn.id)?.cancel();
     progress.remove(turn.id);
+    _syncKeepAlive();
     chat.updatedAt = DateTime.now();
     _store.save(chat);
     notifyListeners();

@@ -11,13 +11,17 @@ import '../screens/reader_screen.dart';
 import '../theme.dart';
 import 'answer_markdown.dart';
 import 'common.dart';
+import 'research_progress.dart' show formatTokens;
 
 /// Assistant reply in a clean chatbot style: plain text on the page, inline
 /// verified Arabic quotes, a quiet action row and a references sheet.
 class AnswerCard extends StatelessWidget {
-  const AnswerCard({super.key, required this.turn, this.onRetry});
+  const AnswerCard({super.key, required this.turn, this.onRetry, this.onMore});
   final ChatTurn turn;
   final VoidCallback? onRetry;
+
+  /// Opens the message menu (actions and token usage).
+  final VoidCallback? onMore;
 
   @override
   Widget build(BuildContext context) {
@@ -201,6 +205,12 @@ class AnswerCard extends StatelessWidget {
                 onTap: () => showExportSheet(context, title: turn.question, turns: [turn], uiLanguage: context.read<SettingsController>().uiLanguage),
               ),
               if (onRetry != null) _Action(icon: Icons.refresh_rounded, tooltip: l.retry, onTap: onRetry!),
+              if (onMore != null) _Action(icon: Icons.more_horiz_rounded, tooltip: l.options, onTap: onMore!),
+              if (!r.usage.isEmpty)
+                Padding(
+                  padding: const EdgeInsetsDirectional.only(start: 6),
+                  child: Text(l.tokensCount(formatTokens(r.usage.total)), style: TextStyle(fontFamily: uiFont, fontSize: 11.5, color: a.faint)),
+                ),
             ],
           ),
         ],
@@ -558,132 +568,3 @@ class _RelatedTile extends StatelessWidget {
   );
 }
 
-/// Gemini-style progress: a rotating brand sparkle with the current step,
-/// expandable to show the search details.
-class StageTimeline extends StatefulWidget {
-  const StageTimeline({super.key, required this.progress, this.onCancel});
-  final AskProgress progress;
-  final VoidCallback? onCancel;
-  @override
-  State<StageTimeline> createState() => _StageTimelineState();
-}
-
-class _StageTimelineState extends State<StageTimeline> with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 1600))..repeat();
-  bool _open = false;
-
-  @override
-  void dispose() {
-    _c.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final l = context.l;
-    final a = context.aura;
-    final p = widget.progress;
-    final label = switch (p.stage) {
-      AskStage.planning => l.stagePlanning,
-      AskStage.searching => l.stageSearching,
-      AskStage.reading => l.stageReading,
-      AskStage.composing => l.stageComposing,
-      AskStage.verifying => l.stageVerifying,
-    };
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: () => setState(() => _open = !_open),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 6),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                RotationTransition(
-                  turns: _c,
-                  child: ShaderMask(
-                    blendMode: BlendMode.srcIn,
-                    shaderCallback: (r) => a.brand.createShader(Offset.zero & r.size),
-                    child: const Icon(Icons.auto_awesome_rounded, size: 22),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                AnimatedBuilder(
-                  animation: _c,
-                  builder: (context, child) => ShaderMask(
-                    blendMode: BlendMode.srcIn,
-                    shaderCallback: (r) => LinearGradient(
-                      colors: [a.muted, a.text, a.muted],
-                      stops: [(_c.value - 0.3).clamp(0, 1), _c.value, (_c.value + 0.3).clamp(0, 1)],
-                    ).createShader(Offset.zero & r.size),
-                    child: child,
-                  ),
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 250),
-                    child: Text(
-                      label,
-                      key: ValueKey(label),
-                      style: const TextStyle(fontFamily: uiFont, fontSize: 15, fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 4),
-                Icon(_open ? Icons.expand_less_rounded : Icons.expand_more_rounded, size: 20, color: a.faint),
-              ],
-            ),
-          ),
-        ),
-        AnimatedSize(
-          duration: const Duration(milliseconds: 250),
-          alignment: Alignment.topCenter,
-          child: !_open
-              ? const SizedBox(width: double.infinity)
-              : Padding(
-                  padding: const EdgeInsetsDirectional.only(start: 32, top: 4, bottom: 4),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      for (final stage in AskStage.values)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 2),
-                          child: Row(
-                            children: [
-                              Icon(
-                                stage.index < p.stage.index ? Icons.check_rounded : Icons.circle,
-                                size: stage.index < p.stage.index ? 15 : 6,
-                                color: stage.index <= p.stage.index ? a.accent : a.faint,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(switch (stage) {
-                                AskStage.planning => l.stagePlanning,
-                                AskStage.searching => l.stageSearching,
-                                AskStage.reading => l.stageReading,
-                                AskStage.composing => l.stageComposing,
-                                AskStage.verifying => l.stageVerifying,
-                              }, style: TextStyle(fontFamily: uiFont, fontSize: 13, color: stage.index <= p.stage.index ? a.text : a.faint)),
-                            ],
-                          ),
-                        ),
-                      if (p.queries.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 6),
-                          child: Wrap(spacing: 6, runSpacing: 6, children: [for (final q in p.queries) QueryChip(q)]),
-                        ),
-                      if (p.sourcesFound != null)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 6),
-                          child: Text(
-                            l.foundSources(p.sourcesFound!),
-                            style: TextStyle(fontFamily: uiFont, fontSize: 12.5, color: a.muted),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-        ),
-      ],
-    );
-  }
-}

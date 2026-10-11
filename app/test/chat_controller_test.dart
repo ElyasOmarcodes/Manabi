@@ -54,15 +54,22 @@ void main() {
     chats.dispose();
   });
 
-  test('a connection error in the foreground is reported, not retried', () async {
+  test('a dropped connection in the foreground is retried, then reported', () async {
     final backend = FlakyBackend();
-    final chats = ChatController(await ChatStore.openAt(tmp.path), () => backend);
+    final chats = ChatController(await ChatStore.openAt(tmp.path), () => backend, retryDelays: const [Duration(milliseconds: 5)]);
     await chats.ask('q', language: 'en', fallbackLanguage: 'en');
     await idle();
     final turn = chats.current!.turns.single;
-    expect(turn.state, MessageState.failed);
+    expect(turn.state, MessageState.done, reason: 'one automatic retry with the same request id');
+    expect(backend.requests, hasLength(2));
+    expect(backend.requests.last.requestId, backend.requests.first.requestId);
+
+    backend.failures = 5;
+    chats.retry(turn, fallbackLanguage: 'en');
+    await idle();
+    expect(turn.state, MessageState.failed, reason: 'gives up after the retries');
     expect(turn.errorCode, 'NETWORK');
-    expect(backend.requests, hasLength(1));
+    expect(backend.requests, hasLength(4));
     chats.dispose();
   });
 }

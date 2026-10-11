@@ -27,6 +27,7 @@ dependencies:
   uuid: ^4.5.1
   package_info_plus: ^10.0.0
   wakelock_plus: ^1.8.1
+  flutter_foreground_task: ^11.0.3
 
 dev_dependencies:
   flutter_test:

@@ -6,7 +6,8 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
-import '../pipeline/answer_pipeline.dart' show JsonModel, ModelTier;
+import '../models/answer.dart' show TokenUsage;
+import '../pipeline/answer_pipeline.dart' show JsonModel, ModelReply, ModelTier;
 
 const _api = 'https://generativelanguage.googleapis.com/v1beta';
 
@@ -98,21 +99,96 @@ class GeminiClient implements JsonModel {
     } catch (e) {
       throw const GeminiException('NETWORK', 'Could not reach Gemini', retryable: true);
     }
-    Map<String, dynamic> json;
-    try {
-      json = (jsonDecode(utf8.decode(res.bodyBytes)) as Map).cast<String, dynamic>();
-    } catch (_) {
-      json = const {};
-    }
+    final json = _json(utf8.decode(res.bodyBytes));
     final status = res.statusCode;
     if (status >= 200 && status < 300) return json;
+    throw _failure(status, json);
+  }
+
+  static Map<String, dynamic> _json(String text) {
+    try {
+      return (jsonDecode(text) as Map).cast<String, dynamic>();
+    } catch (_) {
+      return const {};
+    }
+  }
+
+  static GeminiException _failure(int status, Map<String, dynamic> json) {
     final message = (json['error'] as Map?)?['message'] as String? ?? 'Gemini HTTP $status';
     if ((status == 400 && message.toLowerCase().contains('api key')) || status == 401 || status == 403) {
-      throw GeminiException('AUTH', message, status: status);
+      return GeminiException('AUTH', message, status: status);
     }
-    if (status == 404) throw GeminiException('MODEL_NOT_FOUND', message, status: status);
-    if (status == 429) throw GeminiException('QUOTA', message, retryable: !_isExhausted(message), status: status);
-    throw GeminiException('HTTP', message, retryable: status >= 500, status: status);
+    if (status == 404) return GeminiException('MODEL_NOT_FOUND', message, status: status);
+    if (status == 429) return GeminiException('QUOTA', message, retryable: !_isExhausted(message), status: status);
+    return GeminiException('HTTP', message, retryable: status >= 500, status: status);
+  }
+
+  /// A streamed (alt=sse) call; [onText] gets the answer text as it grows.
+  Future<({String text, Map<String, dynamic>? usage, String? blockReason, bool finished})> _stream(
+      String url, Object body, Duration timeout, void Function(String text) onText) async {
+    final request = http.Request('POST', Uri.parse(url))
+      ..headers.addAll({'content-type': 'application/json', 'x-goog-api-key': apiKey})
+      ..body = jsonEncode(body);
+    Future<({String text, Map<String, dynamic>? usage, String? blockReason, bool finished})> run() async {
+      final http.StreamedResponse res;
+      try {
+        res = await _http.send(request);
+      } catch (_) {
+        throw const GeminiException('NETWORK', 'Could not reach Gemini', retryable: true);
+      }
+      if (res.statusCode < 200 || res.statusCode >= 300) throw _failure(res.statusCode, _json(await res.stream.bytesToString()));
+      final text = StringBuffer();
+      Map<String, dynamic>? usage;
+      String? blocked;
+      var finished = false;
+      try {
+        await for (final line in res.stream.transform(utf8.decoder).transform(const LineSplitter())) {
+          if (!line.startsWith('data:')) continue;
+          final chunk = _json(line.substring(5).trim());
+          if (chunk['usageMetadata'] is Map) usage = (chunk['usageMetadata'] as Map).cast<String, dynamic>();
+          final reason = (chunk['promptFeedback'] as Map?)?['blockReason'];
+          if (reason != null) blocked = '$reason';
+          final candidates = chunk['candidates'] as List?;
+          if (candidates == null || candidates.isEmpty) continue;
+          finished = true;
+          final parts = ((candidates.first as Map)['content'] as Map?)?['parts'] as List? ?? const [];
+          final piece = parts.whereType<Map>().where((p) => p['text'] is String && p['thought'] != true).map((p) => p['text']).join();
+          if (piece.isNotEmpty) {
+            text.write(piece);
+            onText(text.toString());
+          }
+        }
+      } on GeminiException {
+        rethrow;
+      } catch (_) {
+        throw const GeminiException('NETWORK', 'The connection to Gemini was interrupted', retryable: true);
+      }
+      return (text: text.toString(), usage: usage, blockReason: blocked, finished: finished);
+    }
+
+    try {
+      return await run().timeout(timeout);
+    } on TimeoutException {
+      throw GeminiException('TIMEOUT', 'Gemini did not answer within ${timeout.inSeconds}s', retryable: true);
+    }
+  }
+
+  /// Thinking kept short on Flash models: most of the latency was thinking.
+  final _noThinking = <String>{};
+  Map<String, dynamic>? _thinkingFor(String name) {
+    final m = RegExp(r'^gemini-(\d+)(?:\.(\d+))?-(flash-lite|flash|pro)$').firstMatch(name);
+    if (m == null || m.group(3) != 'flash' || _noThinking.contains(name)) return null;
+    final major = int.parse(m.group(1)!);
+    final minor = int.parse(m.group(2) ?? '0');
+    if (major >= 3) return {'thinkingLevel': 'low'};
+    if (major == 2 && minor >= 5) return {'thinkingBudget': 1024};
+    return null;
+  }
+
+  static TokenUsage _usage(Object? meta) {
+    final m = meta is Map ? meta : const {};
+    int n(Object? v) => v is num ? v.toInt() : 0;
+    return TokenUsage(input: n(m['promptTokenCount']), output: n(m['candidatesTokenCount']), thoughts: n(m['thoughtsTokenCount']), calls: 1, peak: n(m['promptTokenCount']));
   }
 
   Future<List<Map<String, dynamic>>> _listModels() async {
@@ -159,33 +235,43 @@ class GeminiClient implements JsonModel {
   /// Runs one JSON-schema constrained generation. A model that is slow,
   /// overloaded, out of quota or retired is skipped for a while and the next
   /// one is tried at once; switching does not use up the retry budget, and
-  /// the whole call has a time limit.
+  /// the whole call has a time limit. With [onText] the reply is streamed.
   @override
-  Future<({Map<String, dynamic> data, String model})> generateJson({
+  Future<ModelReply> generateJson({
     required String system,
     required String prompt,
     required Map<String, dynamic> schema,
     double temperature = 0.2,
     ModelTier tier = ModelTier.main,
+    void Function(String text)? onText,
   }) async {
     final budget = limits[tier] ?? TierLimits.defaults[tier]!;
     final deadline = DateTime.now().add(budget.total);
-    final body = {
-      'systemInstruction': {
-        'parts': [
-          {'text': system}
-        ]
-      },
-      'contents': [
-        {
-          'role': 'user',
+    Map<String, dynamic> bodyFor(String name) {
+      final thinking = _thinkingFor(name);
+      return {
+        'systemInstruction': {
           'parts': [
-            {'text': prompt}
+            {'text': system}
           ]
-        }
-      ],
-      'generationConfig': {'temperature': temperature, 'responseMimeType': 'application/json', 'responseSchema': schema},
-    };
+        },
+        'contents': [
+          {
+            'role': 'user',
+            'parts': [
+              {'text': prompt}
+            ]
+          }
+        ],
+        'generationConfig': {
+          'temperature': temperature,
+          'responseMimeType': 'application/json',
+          'responseSchema': schema,
+          'thinkingConfig': ?thinking,
+        },
+      };
+    }
+
     GeminiException? last;
     final tried = <String>{};
     var retries = 0;
@@ -199,24 +285,44 @@ class GeminiClient implements JsonModel {
             stored.firstOrNull ??
             const GeminiException('UNAVAILABLE', 'No Gemini model is available right now');
       }
+      final body = bodyFor(name);
       try {
         final left = deadline.difference(DateTime.now());
         final remaining = left < const Duration(seconds: 5) ? const Duration(seconds: 5) : left;
         final timeout = remaining < budget.call ? remaining : budget.call;
-        final result = await _call('POST', '$_api/models/${Uri.encodeComponent(name)}:generateContent', body: body, timeout: timeout);
-        final candidates = result['candidates'] as List?;
-        if (candidates == null || candidates.isEmpty) {
-          final reason = (result['promptFeedback'] as Map?)?['blockReason'];
-          throw GeminiException('BLOCKED', reason != null ? 'Gemini blocked the request: $reason' : 'Gemini returned no answer');
+        final model = Uri.encodeComponent(name);
+        String text;
+        Object? usage;
+        if (onText != null) {
+          final out = await _stream('$_api/models/$model:streamGenerateContent?alt=sse', body, timeout, onText);
+          if (!out.finished) {
+            throw GeminiException('BLOCKED', out.blockReason != null ? 'Gemini blocked the request: ${out.blockReason}' : 'Gemini returned no answer');
+          }
+          text = out.text;
+          usage = out.usage;
+        } else {
+          final result = await _call('POST', '$_api/models/$model:generateContent', body: body, timeout: timeout);
+          final candidates = result['candidates'] as List?;
+          if (candidates == null || candidates.isEmpty) {
+            final reason = (result['promptFeedback'] as Map?)?['blockReason'];
+            throw GeminiException('BLOCKED', reason != null ? 'Gemini blocked the request: $reason' : 'Gemini returned no answer');
+          }
+          final parts = ((candidates.first as Map)['content'] as Map?)?['parts'] as List? ?? const [];
+          text = parts.whereType<Map>().where((p) => p['text'] is String && p['thought'] != true).map((p) => p['text']).join();
+          usage = result['usageMetadata'];
         }
-        final parts = ((candidates.first as Map)['content'] as Map?)?['parts'] as List? ?? const [];
-        final text = parts.whereType<Map>().where((p) => p['text'] is String && p['thought'] != true).map((p) => p['text']).join();
         try {
-          return (data: (jsonDecode(text) as Map).cast<String, dynamic>(), model: name);
+          return (data: (jsonDecode(text) as Map).cast<String, dynamic>(), model: name, usage: _usage(usage));
         } catch (_) {
           throw const GeminiException('BAD_OUTPUT', 'Gemini returned malformed JSON', retryable: true);
         }
       } on GeminiException catch (raw) {
+        // A model that does not accept the thinking setting: ask again without it.
+        final config = body['generationConfig'] as Map;
+        if (raw.status == 400 && config.containsKey('thinkingConfig') && raw.message.toLowerCase().contains('think')) {
+          _noThinking.add(name);
+          continue;
+        }
         // Keep the model name with the error so the UI can show what failed.
         final e = GeminiException(raw.code, '${raw.message} [$name]', retryable: raw.retryable, status: raw.status);
         last = e;
@@ -226,7 +332,7 @@ class GeminiClient implements JsonModel {
           tried.add(name);
         } else if (!raw.retryable) {
           throw e; // bad key, blocked prompt, invalid request: another model will not help
-        } else if (retries < 2) {
+        } else if (retries < (raw.code == 'NETWORK' ? 4 : 2)) {
           retries++;
           await Future<void>.delayed(Duration(milliseconds: 800 * (1 << retries)));
         } else if (_pinned || raw.code == 'NETWORK') {

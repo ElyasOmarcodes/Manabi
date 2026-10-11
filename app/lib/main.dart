@@ -110,6 +110,8 @@ class _App extends StatelessWidget {
       ],
       supportedLocales: AppLocalizations.supportedLocales,
       builder: (context, child) {
+        final l = AppLocalizations.of(context);
+        context.read<ChatController>().keepAliveLabels = (title: l.appName, text: l.keepAliveText);
         // Phones get a slightly more compact type scale; the user can adjust it in Appearance.
         final mq = MediaQuery.of(context);
         final base = mq.textScaler.scale(100) / 100;

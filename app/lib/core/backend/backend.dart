@@ -145,6 +145,12 @@ class ServerBackend implements ManabiBackend {
             yield AskPlanEvent((payload['queries'] as List?)?.whereType<String>().toList() ?? const []);
           case 'sources':
             yield AskSourcesEvent((payload['count'] as num?)?.toInt() ?? 0, (payload['totalMatches'] as num?)?.toInt() ?? 0);
+          case 'activity':
+            yield AskActivityEvent('${payload['kind'] ?? ''}', {...payload}..remove('kind')..remove('t'), (payload['t'] as num?)?.toInt() ?? 0);
+          case 'usage':
+            yield AskUsageEvent(TokenUsage.fromJson(payload));
+          case 'draft':
+            yield AskDraftEvent('${payload['text'] ?? ''}');
           case 'result':
             gotResult = true;
             yield AskResultEvent(AnswerResult.fromJson(payload));

@@ -90,3 +90,42 @@ test("when every model is out of quota the quota error is reported", async () =>
   await assert.rejects(gemini.generateJson({ system: "s", prompt: "p", schema: {} }), (e) => e.code === "QUOTA");
   await assert.rejects(gemini.generateJson({ system: "s", prompt: "p", schema: {} }), (e) => e.code === "QUOTA", "fails fast once everything is benched");
 });
+
+test("a streamed generation reports the growing text and the token usage", async () => {
+  const models = listed(["gemini-3.8-flash"]);
+  const sse = (obj) => `data: ${JSON.stringify(obj)}\r\n\r\n`;
+  const chunks = [
+    sse({ candidates: [{ content: { parts: [{ text: "thinking…", thought: true }] } }] }),
+    sse({ candidates: [{ content: { parts: [{ text: '{"answer":"ab' }] } }] }),
+    sse({ candidates: [{ content: { parts: [{ text: 'c"}' }] } }], usageMetadata: { promptTokenCount: 50, candidatesTokenCount: 7, thoughtsTokenCount: 3 } }),
+  ];
+  let url;
+  const fetch = async (u) => {
+    if (u.includes("/models?")) return json(200, { models });
+    url = u;
+    const enc = new TextEncoder();
+    return { ok: true, status: 200, body: (async function* () { for (const c of chunks) yield enc.encode(c); })() };
+  };
+  const seen = [];
+  const out = await createGemini({ apiKey: "k", fetch }).generateJson({ system: "s", prompt: "p", schema: {}, onText: (t) => seen.push(t) });
+  assert.match(url, /:streamGenerateContent\?alt=sse$/);
+  assert.deepEqual(seen, ['{"answer":"ab', '{"answer":"abc"}']);
+  assert.deepEqual(out.data, { answer: "abc" });
+  assert.deepEqual(out.usage, { input: 50, output: 7, thoughts: 3 });
+});
+
+test("Flash thinks briefly, and a model that rejects the setting is asked again without it", async () => {
+  const models = listed(["gemini-3.8-flash"]);
+  const bodies = [];
+  const fetch = async (url, init) => {
+    if (url.includes("/models?")) return json(200, { models });
+    const body = JSON.parse(init.body);
+    bodies.push(body.generationConfig.thinkingConfig);
+    if (body.generationConfig.thinkingConfig) return json(400, { error: { message: "thinking_level is not supported for this model" } });
+    return answer({ ok: true });
+  };
+  const gemini = createGemini({ apiKey: "k", fetch });
+  const out = await gemini.generateJson({ system: "s", prompt: "p", schema: {} });
+  assert.deepEqual(out.data, { ok: true });
+  assert.deepEqual(bodies, [{ thinkingLevel: "low" }, undefined]);
+});

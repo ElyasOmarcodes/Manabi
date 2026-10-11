@@ -7,6 +7,7 @@
 //                 answers are downgraded to "insufficient".
 //
 // Keep in sync with app/lib/core/pipeline/answer_pipeline.dart.
+import { partialJsonString } from "./partial.mjs";
 import {
   COMPOSE_SCHEMA,
   LANGUAGES,
@@ -234,8 +235,14 @@ export const searchPlan = ({ queries, scope, madhhabs = [], requestedBookIds = [
 };
 
 /** Runs searches and merges their hits into a de-duplicated, interleaved candidate pool. */
-export const collectCandidates = async ({ turath, catalog, plan, existing = [], limits: L = LIMITS }) => {
-  const settled = await settleAll(plan.map((s) => () => turath.search(s.query, { ...s.scope })));
+export const collectCandidates = async ({ turath, catalog, plan, existing = [], limits: L = LIMITS, onSearch }) => {
+  const settled = await settleAll(
+    plan.map((s) => async () => {
+      const value = await turath.search(s.query, { ...s.scope });
+      onSearch?.(s, value);
+      return value;
+    }),
+  );
   const failures = settled.filter((r) => !r.ok).length;
   const lists = settled.map((r, i) => (r.ok ? r.value.items.slice(0, plan[i].take) : []));
   const totalMatches = settled.reduce((sum, r) => sum + (r.ok ? r.value.totalMatches : 0), 0);
@@ -364,9 +371,37 @@ export const finalize = ({ composed, sources, language }) => {
 
 const error = (code, message) => Object.assign(new Error(message), { code });
 
+/** Gemini output (or search) steps kept per request, so a retry resumes where it stopped. */
+export const createMemo = () => new Map();
+
 export const createPipeline = ({ gemini, turath, catalog }) => {
-  const ask = async (input, onEvent = () => {}) => {
+  const ask = async (input, onEvent = () => {}, memo = createMemo()) => {
     const started = Date.now();
+    const usage = { input: 0, output: 0, thoughts: 0, calls: 0, peak: 0 };
+    const act = (kind, data = {}) => onEvent("activity", { kind, t: Date.now() - started, ...data });
+    const generate = async (key, request) => {
+      if (memo.has(key)) {
+        act("resumed", { step: key });
+        return memo.get(key);
+      }
+      const result = await gemini.generateJson(request);
+      usage.input += result.usage?.input ?? 0;
+      usage.output += result.usage?.output ?? 0;
+      usage.thoughts += result.usage?.thoughts ?? 0;
+      usage.calls += 1;
+      usage.peak = Math.max(usage.peak, result.usage?.input ?? 0);
+      onEvent("usage", { ...usage });
+      memo.set(key, result);
+      return result;
+    };
+    const bookTitle = (s) => (s.scope?.bookIds?.length === 1 ? catalog.book(s.scope.bookIds[0])?.title : undefined);
+    const onSearch = (s, value) => act("search", { query: s.query, within: s.kind, book: bookTitle(s), hits: value?.totalMatches ?? 0 });
+    const collect = async (key, args) => {
+      if (memo.has(key)) return memo.get(key);
+      const result = await collectCandidates({ ...args, onSearch });
+      if (!result.failed) memo.set(key, result);
+      return result;
+    };
     const question = String(input?.question ?? "").trim();
     if (!question) throw error("INVALID_ARGUMENT", "question must not be empty");
     if (question.length > 2000) throw error("INVALID_ARGUMENT", "question is too long (max 2000 characters)");
@@ -379,7 +414,7 @@ export const createPipeline = ({ gemini, turath, catalog }) => {
 
     // 1. plan
     onEvent("stage", { stage: "planning" });
-    const plan = await gemini.generateJson({
+    const plan = await generate("plan", {
       system: PLAN_SYSTEM,
       prompt: planPrompt({ question, history, scopeLabel: scopeLabel(scope, catalog) }),
       schema: PLAN_SCHEMA,
@@ -395,14 +430,16 @@ export const createPipeline = ({ gemini, turath, catalog }) => {
     const requestedBookIds = resolveBooks(cleanTitles(p.requestedBooks, LIMITS.requestedBooks), catalog, 2);
     const referenceBookIds = resolveBooks(cleanTitles(p.referenceBooks, 6), catalog, 1).filter((id) => !requestedBookIds.includes(id));
     const standalone = typeof p.standaloneQuestion === "string" && p.standaloneQuestion.trim() ? p.standaloneQuestion.trim() : question;
-    onEvent("plan", { queries, language, books: [...requestedBookIds, ...referenceBookIds].map((id) => catalog.book(id)?.title).filter(Boolean) });
+    const plannedBooks = [...requestedBookIds, ...referenceBookIds].map((id) => catalog.book(id)?.title).filter(Boolean);
+    onEvent("plan", { queries, language, books: plannedBooks });
+    act("plan", { queries, books: plannedBooks, madhhabs });
 
-    const done = (result, extra = {}) => ({ ...result, queries, language, depth, model: plan.model, elapsedMs: Date.now() - started, ...extra });
+    const done = (result, extra = {}) => ({ ...result, queries, language, depth, model: plan.model, elapsedMs: Date.now() - started, usage: { ...usage }, ...extra });
     if (!queries.length) return done(finalize({ composed: { status: "insufficient" }, sources: [], language }));
 
     // 2. search
     onEvent("stage", { stage: "searching" });
-    const first = await collectCandidates({
+    const first = await collect("search0", {
       turath,
       catalog,
       limits: L,
@@ -412,30 +449,37 @@ export const createPipeline = ({ gemini, turath, catalog }) => {
     let candidates = first.candidates.map((c, i) => ({ ...c, key: `C${i + 1}` }));
     let totalMatches = first.totalMatches;
     onEvent("sources", { count: candidates.length, totalMatches });
+    act("found", { count: candidates.length, total: totalMatches });
     if (!candidates.length) return done(finalize({ composed: { status: "insufficient" }, sources: [], language }), { totalMatches });
 
     // 3. read: rank, then follow-up rounds if something is missing
     onEvent("stage", { stage: "reading" });
-    const rank = async (pool, usedQueries) =>
-      (
-        await gemini.generateJson({
-          system: RERANK_SYSTEM,
-          prompt: rerankPrompt({ question: standalone, candidates: pool, queries: usedQueries }),
-          schema: RERANK_SCHEMA,
-          temperature: 0.1,
-        })
-      ).data ?? {};
+    const rank = async (key, pool, usedQueries) => {
+      act("rank", { pool: pool.length });
+      const ranked =
+        (
+          await generate(key, {
+            system: RERANK_SYSTEM,
+            prompt: rerankPrompt({ question: standalone, candidates: pool, queries: usedQueries }),
+            schema: RERANK_SCHEMA,
+            temperature: 0.1,
+          })
+        ).data ?? {};
+      act("ranked", { selected: Array.isArray(ranked.selected) ? ranked.selected.length : 0, coverage: ranked.coverage, missing: typeof ranked.missing === "string" ? ranked.missing.slice(0, 200) : undefined });
+      return ranked;
+    };
     let usedQueries = [...queries];
-    let ranking = await rank(candidates, usedQueries);
+    let ranking = await rank("rank0", candidates, usedQueries);
     // Follow-up rounds: the reader names what is still missing (deeper research allows more rounds).
     for (let round = 0; round < L.followUpRounds && ranking.coverage !== "full"; round += 1) {
       const followQueries = cleanQueries(ranking.followUpQueries, 5).filter((q) => !usedQueries.includes(q));
       const followBooks = resolveBooks(cleanTitles(ranking.followUpBooks, 4), catalog, 1);
       if (!followQueries.length && !followBooks.length) break;
       onEvent("stage", { stage: "searching" });
+      act("followup", { queries: followQueries, books: followBooks.map((id) => catalog.book(id)?.title).filter(Boolean) });
       const selectedFirst = new Set((ranking.selected ?? []).map((k) => String(k).toUpperCase()));
       const keep = candidates.filter((c) => selectedFirst.has(c.key));
-      const extra = await collectCandidates({
+      const extra = await collect(`search${round + 1}`, {
         turath,
         catalog,
         existing: keep,
@@ -455,7 +499,7 @@ export const createPipeline = ({ gemini, turath, catalog }) => {
       candidates = [...keep, ...extra.candidates].map((c, i) => ({ ...c, key: `C${i + 1}` }));
       onEvent("sources", { count: candidates.length, totalMatches });
       onEvent("stage", { stage: "reading" });
-      ranking = await rank(candidates, usedQueries);
+      ranking = await rank(`rank${round + 1}`, candidates, usedQueries);
     }
     const byKey = new Map(candidates.map((c) => [c.key, c]));
     let selected = [...new Set((ranking.selected ?? []).map((k) => String(k).trim().toUpperCase()))].map((k) => byKey.get(k)).filter(Boolean);
@@ -466,10 +510,19 @@ export const createPipeline = ({ gemini, turath, catalog }) => {
     }
     const expanded = typeof turath.getPage === "function" ? await addContinuations({ turath, catalog, selected, limit: L.continuationPages }) : selected;
     const sources = expanded.map((c, i) => ({ ...c, key: `S${i + 1}` }));
+    act("read", { books: [...new Set(sources.map((s) => s.bookTitle))].slice(0, 8), pages: sources.length });
 
-    // 4. compose
+    // 4. compose (streamed: the draft answer is shown while it is written)
     onEvent("stage", { stage: "composing" });
-    const composed = await gemini.generateJson({
+    act("compose", { sources: sources.length });
+    let lastDraft = 0;
+    const composed = await generate("compose", {
+      onText: (text) => {
+        if (Date.now() - lastDraft < 350) return;
+        lastDraft = Date.now();
+        const draft = partialJsonString(text, "answer");
+        if (draft) onEvent("draft", { text: draft });
+      },
       system: composeSystem(LANGUAGES[language]),
       prompt: composePrompt({ question: standalone, history, sources, languageName: LANGUAGES[language], missing: ranking.coverage === "full" ? "" : ranking.missing }),
       schema: COMPOSE_SCHEMA,
@@ -478,6 +531,7 @@ export const createPipeline = ({ gemini, turath, catalog }) => {
 
     // 5. verify
     onEvent("stage", { stage: "verifying" });
+    act("verify", {});
     return done(finalize({ composed: composed.data, sources, language }), { totalMatches, model: composed.model });
   };
   return { ask };

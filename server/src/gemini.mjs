@@ -1,8 +1,8 @@
 // Minimal Gemini REST client (generateContent with JSON schema output).
 // The API key is only ever sent in the x-goog-api-key header, never logged.
 //
-// Two tiers: "fast" (Flash-Lite, for planning and ranking) and "main"
-// (Flash, for writing the answer). Each model has its own quota, so when a
+// Two tiers: "fast" (Flash-Lite, for planning) and "main" (Flash, for
+// ranking and writing the answer, with short thinking). Each model has its own quota, so when a
 // model reports an exhausted quota the client moves on to the next one.
 
 const API = "https://generativelanguage.googleapis.com/v1beta";
@@ -54,7 +54,25 @@ export const createGemini = ({ apiKey, model, fetch: fetcher = fetch, timeoutMs 
   let available; // models listed by the API
   const benched = new Map(); // model → { until, error }: skipped until then
 
-  const call = async (url, init = {}, limitMs = timeoutMs) => {
+  const failFor = (status, body) => {
+    const message = body?.error?.message ?? `Gemini HTTP ${status}`;
+    if (status === 400 && /api key/i.test(message)) return new GeminiError("AUTH", "Invalid Gemini API key", { status: 400 });
+    if (status === 401 || status === 403) return new GeminiError("AUTH", message, { status });
+    if (status === 404) return new GeminiError("MODEL_NOT_FOUND", message, { status: 404 });
+    if (status === 429) return new GeminiError("QUOTA", message, { status: 429, retryable: !isExhausted(message) });
+    return new GeminiError("HTTP", message, { status, retryable: status >= 500 });
+  };
+
+  const parseBody = (text) => {
+    try {
+      return text ? JSON.parse(text) : {};
+    } catch {
+      return { raw: text.slice(0, 200) };
+    }
+  };
+
+  /** One HTTP call with a time limit; [consume] reads a successful response. */
+  const call = async (url, init = {}, limitMs = timeoutMs, consume = async (response) => parseBody(await response.text())) => {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), limitMs);
     try {
@@ -63,22 +81,8 @@ export const createGemini = ({ apiKey, model, fetch: fetcher = fetch, timeoutMs 
         headers: { "content-type": "application/json", "x-goog-api-key": apiKey, ...init.headers },
         signal: controller.signal,
       });
-      const text = await response.text();
-      let body;
-      try {
-        body = text ? JSON.parse(text) : {};
-      } catch {
-        body = { raw: text.slice(0, 200) };
-      }
-      if (!response.ok) {
-        const message = body?.error?.message ?? `Gemini HTTP ${response.status}`;
-        if (response.status === 400 && /api key/i.test(message)) throw new GeminiError("AUTH", "Invalid Gemini API key", { status: 400 });
-        if (response.status === 401 || response.status === 403) throw new GeminiError("AUTH", message, { status: response.status });
-        if (response.status === 404) throw new GeminiError("MODEL_NOT_FOUND", message, { status: 404 });
-        if (response.status === 429) throw new GeminiError("QUOTA", message, { status: 429, retryable: !isExhausted(message) });
-        throw new GeminiError("HTTP", message, { status: response.status, retryable: response.status >= 500 });
-      }
-      return body;
+      if (!response.ok) throw failFor(response.status, parseBody(await response.text()));
+      return await consume(response);
     } catch (error) {
       if (error instanceof GeminiError) throw error;
       if (error?.name === "AbortError") throw new GeminiError("TIMEOUT", "Gemini request timed out", { retryable: true });
@@ -86,6 +90,42 @@ export const createGemini = ({ apiKey, model, fetch: fetcher = fetch, timeoutMs 
     } finally {
       clearTimeout(timer);
     }
+  };
+
+  /** Reads a streamed (alt=sse) response, reporting the text as it grows. */
+  const readStream = (onText) => async (response) => {
+    const out = { text: "", usage: undefined, blockReason: undefined, finished: false };
+    const handle = (line) => {
+      if (!line.startsWith("data:")) return;
+      const chunk = parseBody(line.slice(5).trim());
+      if (chunk.usageMetadata) out.usage = chunk.usageMetadata;
+      if (chunk.promptFeedback?.blockReason) out.blockReason = chunk.promptFeedback.blockReason;
+      const candidate = chunk.candidates?.[0];
+      if (!candidate) return;
+      out.finished = true;
+      const piece = (candidate.content?.parts ?? []).filter((p) => typeof p.text === "string" && !p.thought).map((p) => p.text).join("");
+      if (piece) {
+        out.text += piece;
+        onText(out.text);
+      }
+    };
+    const body = response.body;
+    if (body && typeof body[Symbol.asyncIterator] === "function") {
+      const decoder = new TextDecoder();
+      let buffer = "";
+      for await (const bytes of body) {
+        buffer += typeof bytes === "string" ? bytes : decoder.decode(bytes, { stream: true });
+        let nl;
+        while ((nl = buffer.indexOf("\n")) >= 0) {
+          handle(buffer.slice(0, nl).replace(/\r$/, ""));
+          buffer = buffer.slice(nl + 1);
+        }
+      }
+      handle(buffer);
+    } else {
+      for (const line of (await response.text()).split(/\r?\n/)) handle(line);
+    }
+    return out;
   };
 
   const listModels = async () => {
@@ -119,19 +159,36 @@ export const createGemini = ({ apiKey, model, fetch: fetcher = fetch, timeoutMs 
     return undefined;
   };
 
+  /** Thinking kept short on Flash models: most of the latency was thinking. */
+  const noThinking = new Set();
+  const thinkingFor = (name) => {
+    const v = parse(name);
+    if (!v || v.kind !== "flash" || noThinking.has(name)) return undefined;
+    if (v.major >= 3) return { thinkingLevel: "low" };
+    if (v.major === 2 && v.minor >= 5) return { thinkingBudget: 1024 };
+    return undefined;
+  };
+
+  const usageOf = (meta) => ({ input: meta?.promptTokenCount ?? 0, output: meta?.candidatesTokenCount ?? 0, thoughts: meta?.thoughtsTokenCount ?? 0 });
+
   /**
-   * Runs one JSON-schema constrained generation and returns the parsed object.
+   * Runs one JSON-schema constrained generation and returns the parsed object
+   * with the model and its token usage. With [onText] the response is
+   * streamed and the raw text reported as it grows.
    * A model that is slow, overloaded, out of quota or retired is skipped for a
    * while and the next model is tried at once; switching models does not use
    * up the retry budget, and the whole call has a time limit.
    */
-  const generateJson = async ({ system, prompt, schema, temperature = 0.2, tier = "main" }) => {
+  const generateJson = async ({ system, prompt, schema, temperature = 0.2, tier = "main", onText }) => {
     const limits = tierLimits[tier] ?? tierLimits.main;
     const deadline = now() + limits.totalMs;
-    const body = {
-      systemInstruction: { parts: [{ text: system }] },
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-      generationConfig: { temperature, responseMimeType: "application/json", responseSchema: schema },
+    const bodyFor = (name) => {
+      const thinkingConfig = thinkingFor(name);
+      return {
+        systemInstruction: { parts: [{ text: system }] },
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: { temperature, responseMimeType: "application/json", responseSchema: schema, ...(thinkingConfig ? { thinkingConfig } : {}) },
+      };
     };
     let lastError;
     let retries = 0;
@@ -143,21 +200,39 @@ export const createGemini = ({ apiKey, model, fetch: fetcher = fetch, timeoutMs 
         const stored = [...benched.values()].map((b) => b.error);
         throw stored.find((e) => e.code === "QUOTA") ?? lastError ?? stored[0] ?? new GeminiError("UNAVAILABLE", "No Gemini model is available right now");
       }
+      const body = bodyFor(name);
       try {
         const remaining = Math.max(5_000, deadline - now());
-        const result = await call(`${API}/models/${encodeURIComponent(name)}:generateContent`, { method: "POST", body: JSON.stringify(body) }, Math.min(limits.callMs, remaining));
-        const candidate = result.candidates?.[0];
-        if (!candidate) {
-          const reason = result.promptFeedback?.blockReason;
-          throw new GeminiError("BLOCKED", reason ? `Gemini blocked the request: ${reason}` : "Gemini returned no answer");
+        const limit = Math.min(limits.callMs, remaining);
+        const model_ = encodeURIComponent(name);
+        let text;
+        let usage;
+        if (onText) {
+          const out = await call(`${API}/models/${model_}:streamGenerateContent?alt=sse`, { method: "POST", body: JSON.stringify(body) }, limit, readStream(onText));
+          if (!out.finished) throw new GeminiError("BLOCKED", out.blockReason ? `Gemini blocked the request: ${out.blockReason}` : "Gemini returned no answer");
+          text = out.text;
+          usage = out.usage;
+        } else {
+          const result = await call(`${API}/models/${model_}:generateContent`, { method: "POST", body: JSON.stringify(body) }, limit);
+          const candidate = result.candidates?.[0];
+          if (!candidate) {
+            const reason = result.promptFeedback?.blockReason;
+            throw new GeminiError("BLOCKED", reason ? `Gemini blocked the request: ${reason}` : "Gemini returned no answer");
+          }
+          text = (candidate.content?.parts ?? []).filter((p) => typeof p.text === "string" && !p.thought).map((p) => p.text).join("");
+          usage = result.usageMetadata;
         }
-        const text = (candidate.content?.parts ?? []).filter((p) => typeof p.text === "string" && !p.thought).map((p) => p.text).join("");
         try {
-          return { data: JSON.parse(text), model: name };
+          return { data: JSON.parse(text), model: name, usage: usageOf(usage) };
         } catch {
           throw new GeminiError("BAD_OUTPUT", "Gemini returned malformed JSON", { retryable: true });
         }
       } catch (raw) {
+        // A model that does not accept the thinking setting: ask again without it.
+        if (raw instanceof GeminiError && raw.status === 400 && body.generationConfig.thinkingConfig && /think/i.test(raw.message)) {
+          noThinking.add(name);
+          continue;
+        }
         const error = raw instanceof GeminiError ? new GeminiError(raw.code, `${raw.message} [${name}]`, { status: raw.status, retryable: raw.retryable }) : raw;
         lastError = error;
         const reason = model ? undefined : benchReason(raw);
@@ -166,7 +241,7 @@ export const createGemini = ({ apiKey, model, fetch: fetcher = fetch, timeoutMs 
           tried.add(name);
         } else if (!raw.retryable) {
           throw error; // bad key, blocked prompt, invalid request: another model will not help
-        } else if (retries < 2) {
+        } else if (retries < (raw.code === "NETWORK" ? 3 : 2)) {
           retries += 1;
           await sleep(800 * 2 ** retries);
         } else if (model || raw.code === "NETWORK") {

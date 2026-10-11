@@ -1901,6 +1901,300 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Arrow keys turn pages · Ctrl+F searches the book'**
   String get shortcutsHint;
+
+  /// No description provided for @actPlan.
+  ///
+  /// In en, this message translates to:
+  /// **'Planned {count} searches'**
+  String actPlan(int count);
+
+  /// No description provided for @actSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Searched «{query}»{where} — {hits} results'**
+  String actSearch(String query, String where, int hits);
+
+  /// No description provided for @actIn.
+  ///
+  /// In en, this message translates to:
+  /// **' in {book}'**
+  String actIn(String book);
+
+  /// No description provided for @actFound.
+  ///
+  /// In en, this message translates to:
+  /// **'Collected {count} passages from {total} matches'**
+  String actFound(int count, int total);
+
+  /// No description provided for @actRank.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading and weighing {count} passages'**
+  String actRank(int count);
+
+  /// No description provided for @actRanked.
+  ///
+  /// In en, this message translates to:
+  /// **'Kept {count} passages · coverage: {coverage}'**
+  String actRanked(int count, String coverage);
+
+  /// No description provided for @coverageFull.
+  ///
+  /// In en, this message translates to:
+  /// **'complete'**
+  String get coverageFull;
+
+  /// No description provided for @coveragePartial.
+  ///
+  /// In en, this message translates to:
+  /// **'partial'**
+  String get coveragePartial;
+
+  /// No description provided for @coverageNone.
+  ///
+  /// In en, this message translates to:
+  /// **'none'**
+  String get coverageNone;
+
+  /// No description provided for @actFollowup.
+  ///
+  /// In en, this message translates to:
+  /// **'Looking further: {queries}'**
+  String actFollowup(String queries);
+
+  /// No description provided for @actRead.
+  ///
+  /// In en, this message translates to:
+  /// **'Opened {pages} pages from {books} books'**
+  String actRead(int pages, int books);
+
+  /// No description provided for @actCompose.
+  ///
+  /// In en, this message translates to:
+  /// **'Writing the answer from {count} pages'**
+  String actCompose(int count);
+
+  /// No description provided for @actVerify.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking every quote against the books'**
+  String get actVerify;
+
+  /// No description provided for @actResumed.
+  ///
+  /// In en, this message translates to:
+  /// **'Continued from a finished step'**
+  String get actResumed;
+
+  /// No description provided for @actRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection dropped — trying again ({count})'**
+  String actRetry(int count);
+
+  /// No description provided for @reconnectingIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Reconnecting in {seconds}s…'**
+  String reconnectingIn(int seconds);
+
+  /// No description provided for @showSteps.
+  ///
+  /// In en, this message translates to:
+  /// **'Show steps'**
+  String get showSteps;
+
+  /// No description provided for @hideSteps.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide steps'**
+  String get hideSteps;
+
+  /// No description provided for @writingDraft.
+  ///
+  /// In en, this message translates to:
+  /// **'Draft — quotes are checked when it is finished'**
+  String get writingDraft;
+
+  /// No description provided for @tokensCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} tokens'**
+  String tokensCount(String count);
+
+  /// No description provided for @tokenUsage.
+  ///
+  /// In en, this message translates to:
+  /// **'Token usage'**
+  String get tokenUsage;
+
+  /// No description provided for @tokensInput.
+  ///
+  /// In en, this message translates to:
+  /// **'Input'**
+  String get tokensInput;
+
+  /// No description provided for @tokensOutput.
+  ///
+  /// In en, this message translates to:
+  /// **'Output'**
+  String get tokensOutput;
+
+  /// No description provided for @tokensThinking.
+  ///
+  /// In en, this message translates to:
+  /// **'Thinking'**
+  String get tokensThinking;
+
+  /// No description provided for @tokensTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Total'**
+  String get tokensTotal;
+
+  /// No description provided for @modelCalls.
+  ///
+  /// In en, this message translates to:
+  /// **'Model calls'**
+  String get modelCalls;
+
+  /// No description provided for @answerTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Time'**
+  String get answerTime;
+
+  /// No description provided for @thisAnswer.
+  ///
+  /// In en, this message translates to:
+  /// **'This answer'**
+  String get thisAnswer;
+
+  /// No description provided for @thisQuestion.
+  ///
+  /// In en, this message translates to:
+  /// **'This question'**
+  String get thisQuestion;
+
+  /// No description provided for @thisChat.
+  ///
+  /// In en, this message translates to:
+  /// **'This chat'**
+  String get thisChat;
+
+  /// No description provided for @chatDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat details'**
+  String get chatDetails;
+
+  /// No description provided for @contextWindow.
+  ///
+  /// In en, this message translates to:
+  /// **'Context window'**
+  String get contextWindow;
+
+  /// No description provided for @contextWindowInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Largest request in this chat: {used} of {limit} tokens'**
+  String contextWindowInfo(String used, String limit);
+
+  /// No description provided for @questionsCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Questions'**
+  String get questionsCount;
+
+  /// No description provided for @noUsageYet.
+  ///
+  /// In en, this message translates to:
+  /// **'Token counts appear for answers made with this version.'**
+  String get noUsageYet;
+
+  /// No description provided for @copyQuestion.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy question'**
+  String get copyQuestion;
+
+  /// No description provided for @askAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask again'**
+  String get askAgain;
+
+  /// No description provided for @keepAliveText.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing your answer from the sources…'**
+  String get keepAliveText;
+
+  /// No description provided for @pdfBook.
+  ///
+  /// In en, this message translates to:
+  /// **'PDF'**
+  String get pdfBook;
+
+  /// No description provided for @openPdf.
+  ///
+  /// In en, this message translates to:
+  /// **'Open the printed PDF'**
+  String get openPdf;
+
+  /// No description provided for @noPdf.
+  ///
+  /// In en, this message translates to:
+  /// **'This book has no PDF on Turath.'**
+  String get noPdf;
+
+  /// No description provided for @onTurath.
+  ///
+  /// In en, this message translates to:
+  /// **'More on Turath'**
+  String get onTurath;
+
+  /// No description provided for @onTurathInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Books not in the offline list, found on Turath'**
+  String get onTurathInfo;
+
+  /// No description provided for @searchingTurath.
+  ///
+  /// In en, this message translates to:
+  /// **'Searching Turath…'**
+  String get searchingTurath;
+
+  /// No description provided for @fontAmiri.
+  ///
+  /// In en, this message translates to:
+  /// **'Amiri (classic Naskh)'**
+  String get fontAmiri;
+
+  /// No description provided for @fontScheherazade.
+  ///
+  /// In en, this message translates to:
+  /// **'Scheherazade'**
+  String get fontScheherazade;
+
+  /// No description provided for @fontPlex.
+  ///
+  /// In en, this message translates to:
+  /// **'IBM Plex Sans Arabic'**
+  String get fontPlex;
+
+  /// No description provided for @fontNotoNaskh.
+  ///
+  /// In en, this message translates to:
+  /// **'Noto Naskh'**
+  String get fontNotoNaskh;
+
+  /// No description provided for @fontVazir.
+  ///
+  /// In en, this message translates to:
+  /// **'Vazirmatn'**
+  String get fontVazir;
 }
 
 class _AppLocalizationsDelegate

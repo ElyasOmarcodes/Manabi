@@ -982,4 +982,178 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get shortcutsHint =>
       'Arrow keys turn pages · Ctrl+F searches the book';
+
+  @override
+  String actPlan(int count) {
+    return 'Planned $count searches';
+  }
+
+  @override
+  String actSearch(String query, String where, int hits) {
+    return 'Searched «$query»$where — $hits results';
+  }
+
+  @override
+  String actIn(String book) {
+    return ' in $book';
+  }
+
+  @override
+  String actFound(int count, int total) {
+    return 'Collected $count passages from $total matches';
+  }
+
+  @override
+  String actRank(int count) {
+    return 'Reading and weighing $count passages';
+  }
+
+  @override
+  String actRanked(int count, String coverage) {
+    return 'Kept $count passages · coverage: $coverage';
+  }
+
+  @override
+  String get coverageFull => 'complete';
+
+  @override
+  String get coveragePartial => 'partial';
+
+  @override
+  String get coverageNone => 'none';
+
+  @override
+  String actFollowup(String queries) {
+    return 'Looking further: $queries';
+  }
+
+  @override
+  String actRead(int pages, int books) {
+    return 'Opened $pages pages from $books books';
+  }
+
+  @override
+  String actCompose(int count) {
+    return 'Writing the answer from $count pages';
+  }
+
+  @override
+  String get actVerify => 'Checking every quote against the books';
+
+  @override
+  String get actResumed => 'Continued from a finished step';
+
+  @override
+  String actRetry(int count) {
+    return 'Connection dropped — trying again ($count)';
+  }
+
+  @override
+  String reconnectingIn(int seconds) {
+    return 'Reconnecting in ${seconds}s…';
+  }
+
+  @override
+  String get showSteps => 'Show steps';
+
+  @override
+  String get hideSteps => 'Hide steps';
+
+  @override
+  String get writingDraft => 'Draft — quotes are checked when it is finished';
+
+  @override
+  String tokensCount(String count) {
+    return '$count tokens';
+  }
+
+  @override
+  String get tokenUsage => 'Token usage';
+
+  @override
+  String get tokensInput => 'Input';
+
+  @override
+  String get tokensOutput => 'Output';
+
+  @override
+  String get tokensThinking => 'Thinking';
+
+  @override
+  String get tokensTotal => 'Total';
+
+  @override
+  String get modelCalls => 'Model calls';
+
+  @override
+  String get answerTime => 'Time';
+
+  @override
+  String get thisAnswer => 'This answer';
+
+  @override
+  String get thisQuestion => 'This question';
+
+  @override
+  String get thisChat => 'This chat';
+
+  @override
+  String get chatDetails => 'Chat details';
+
+  @override
+  String get contextWindow => 'Context window';
+
+  @override
+  String contextWindowInfo(String used, String limit) {
+    return 'Largest request in this chat: $used of $limit tokens';
+  }
+
+  @override
+  String get questionsCount => 'Questions';
+
+  @override
+  String get noUsageYet =>
+      'Token counts appear for answers made with this version.';
+
+  @override
+  String get copyQuestion => 'Copy question';
+
+  @override
+  String get askAgain => 'Ask again';
+
+  @override
+  String get keepAliveText => 'Preparing your answer from the sources…';
+
+  @override
+  String get pdfBook => 'PDF';
+
+  @override
+  String get openPdf => 'Open the printed PDF';
+
+  @override
+  String get noPdf => 'This book has no PDF on Turath.';
+
+  @override
+  String get onTurath => 'More on Turath';
+
+  @override
+  String get onTurathInfo => 'Books not in the offline list, found on Turath';
+
+  @override
+  String get searchingTurath => 'Searching Turath…';
+
+  @override
+  String get fontAmiri => 'Amiri (classic Naskh)';
+
+  @override
+  String get fontScheherazade => 'Scheherazade';
+
+  @override
+  String get fontPlex => 'IBM Plex Sans Arabic';
+
+  @override
+  String get fontNotoNaskh => 'Noto Naskh';
+
+  @override
+  String get fontVazir => 'Vazirmatn';
 }

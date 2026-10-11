@@ -15,11 +15,16 @@ class TimedModel implements JsonModel {
   TimedModel(this.inner);
   final GeminiClient inner;
   @override
-  Future<({Map<String, dynamic> data, String model})> generateJson(
-      {required String system, required String prompt, required Map<String, dynamic> schema, double temperature = 0.2, ModelTier tier = ModelTier.main}) async {
+  Future<ModelReply> generateJson(
+      {required String system,
+      required String prompt,
+      required Map<String, dynamic> schema,
+      double temperature = 0.2,
+      ModelTier tier = ModelTier.main,
+      void Function(String text)? onText}) async {
     final watch = Stopwatch()..start();
     try {
-      final out = await inner.generateJson(system: system, prompt: prompt, schema: schema, temperature: temperature, tier: tier);
+      final out = await inner.generateJson(system: system, prompt: prompt, schema: schema, temperature: temperature, tier: tier, onText: onText);
       print('gemini ok tier=${tier.name} model=${out.model} ${watch.elapsedMilliseconds}ms');
       return out;
     } catch (e) {

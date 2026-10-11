@@ -57,16 +57,19 @@ class ScriptedModel implements JsonModel {
   final List<Object> outputs;
   final prompts = <String>[];
   @override
-  Future<({Map<String, dynamic> data, String model})> generateJson(
+  Future<ModelReply> generateJson(
       {required String system,
       required String prompt,
       required Map<String, dynamic> schema,
       double temperature = 0.2,
-      ModelTier tier = ModelTier.main}) async {
+      ModelTier tier = ModelTier.main,
+      void Function(String text)? onText}) async {
     prompts.add(prompt);
     final next = outputs.removeAt(0);
+    if (next is Exception) throw next;
     final data = next is Map<String, dynamic> Function(String) ? next(prompt) : next as Map<String, dynamic>;
-    return (data: data, model: 'test-model');
+    onText?.call('{"status":"answered","answer":"draft');
+    return (data: data, model: 'test-model', usage: const TokenUsage(input: 100, output: 10, calls: 1));
   }
 }
 
@@ -135,6 +138,43 @@ void main() {
   group('pipeline', () {
     Map<String, dynamic> Function(String) rankPage(int page) =>
         (prompt) => {'selected': [keyFor(prompt, page, 'C')], 'coverage': 'full', 'followUpQueries': [], 'followUpBooks': []};
+
+    test('live log, token usage, streamed draft, and a retry resumes the finished steps', () async {
+      Map<String, dynamic> compose(String prompt) {
+        final key = keyFor(prompt, 5, 'S');
+        return {
+          'status': 'answered',
+          'answer': 'ځواب [$key].\n[[Q1]]',
+          'citations': [
+            {'id': 'Q1', 'sourceId': key, 'quote': 'إنما الأعمال بالنيات وإنما لكل امرئ ما نوى'}
+          ],
+          'opinions': [],
+        };
+      }
+
+      final model = ScriptedModel([plan(), rankPage(5), Exception('connection dropped'), compose]);
+      final pipeline = AnswerPipeline(model: model, turath: TurathClient(client: turathMock()), catalog: catalog);
+      const request = AskRequest(question: 'د نیت حدیث', language: 'ps', requestId: 'resume-test-1');
+      final first = <AskEvent>[];
+      await expectLater(pipeline.ask(request).forEach(first.add), throwsException);
+      final kinds = first.whereType<AskActivityEvent>().map((e) => e.kind).toSet();
+      expect(kinds.containsAll(['plan', 'search', 'found', 'rank', 'ranked', 'read', 'compose']), isTrue, reason: '$kinds');
+      expect(first.whereType<AskUsageEvent>().last.usage.calls, 2);
+      expect(model.prompts, hasLength(3));
+
+      final again = await pipeline.ask(request).toList();
+      expect(model.prompts, hasLength(4), reason: 'only the answer is written again');
+      expect(again.whereType<AskDraftEvent>().single.text, 'draft');
+      final r = (again.last as AskResultEvent).result;
+      expect(r.status, AnswerStatus.answered);
+      expect(r.usage.calls, 1);
+    });
+
+    test('partial JSON strings are read while streaming', () {
+      expect(partialJsonString(r'{"status":"answered","answer":"a\nb \"q\" ا', 'answer'), 'a\nb "q" ا');
+      expect(partialJsonString('{"answer":"x","summary":"y"}', 'answer'), 'x');
+      expect(partialJsonString('{"status":"ans', 'answer'), isNull);
+    });
 
     test('grounded answer: metadata from Turath, inline verified quotes, markers renumbered', () async {
       final model = ScriptedModel([

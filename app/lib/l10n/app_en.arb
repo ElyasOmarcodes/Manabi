@@ -371,5 +371,163 @@
   "readerPreview": "Preview",
   "pageText": "Page",
   "reader": "Reader",
-  "shortcutsHint": "Arrow keys turn pages · Ctrl+F searches the book"
+  "shortcutsHint": "Arrow keys turn pages · Ctrl+F searches the book",
+  "actPlan": "Planned {count} searches",
+  "@actPlan": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "actSearch": "Searched «{query}»{where} — {hits} results",
+  "@actSearch": {
+    "placeholders": {
+      "query": {
+        "type": "String"
+      },
+      "where": {
+        "type": "String"
+      },
+      "hits": {
+        "type": "int"
+      }
+    }
+  },
+  "actIn": " in {book}",
+  "@actIn": {
+    "placeholders": {
+      "book": {
+        "type": "String"
+      }
+    }
+  },
+  "actFound": "Collected {count} passages from {total} matches",
+  "@actFound": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "actRank": "Reading and weighing {count} passages",
+  "@actRank": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "actRanked": "Kept {count} passages · coverage: {coverage}",
+  "@actRanked": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "coverage": {
+        "type": "String"
+      }
+    }
+  },
+  "coverageFull": "complete",
+  "coveragePartial": "partial",
+  "coverageNone": "none",
+  "actFollowup": "Looking further: {queries}",
+  "@actFollowup": {
+    "placeholders": {
+      "queries": {
+        "type": "String"
+      }
+    }
+  },
+  "actRead": "Opened {pages} pages from {books} books",
+  "@actRead": {
+    "placeholders": {
+      "pages": {
+        "type": "int"
+      },
+      "books": {
+        "type": "int"
+      }
+    }
+  },
+  "actCompose": "Writing the answer from {count} pages",
+  "@actCompose": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "actVerify": "Checking every quote against the books",
+  "actResumed": "Continued from a finished step",
+  "actRetry": "Connection dropped — trying again ({count})",
+  "@actRetry": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "reconnectingIn": "Reconnecting in {seconds}s…",
+  "@reconnectingIn": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "showSteps": "Show steps",
+  "hideSteps": "Hide steps",
+  "writingDraft": "Draft — quotes are checked when it is finished",
+  "tokensCount": "{count} tokens",
+  "@tokensCount": {
+    "placeholders": {
+      "count": {
+        "type": "String"
+      }
+    }
+  },
+  "tokenUsage": "Token usage",
+  "tokensInput": "Input",
+  "tokensOutput": "Output",
+  "tokensThinking": "Thinking",
+  "tokensTotal": "Total",
+  "modelCalls": "Model calls",
+  "answerTime": "Time",
+  "thisAnswer": "This answer",
+  "thisQuestion": "This question",
+  "thisChat": "This chat",
+  "chatDetails": "Chat details",
+  "contextWindow": "Context window",
+  "contextWindowInfo": "Largest request in this chat: {used} of {limit} tokens",
+  "@contextWindowInfo": {
+    "placeholders": {
+      "used": {
+        "type": "String"
+      },
+      "limit": {
+        "type": "String"
+      }
+    }
+  },
+  "questionsCount": "Questions",
+  "noUsageYet": "Token counts appear for answers made with this version.",
+  "copyQuestion": "Copy question",
+  "askAgain": "Ask again",
+  "keepAliveText": "Preparing your answer from the sources…",
+  "pdfBook": "PDF",
+  "openPdf": "Open the printed PDF",
+  "noPdf": "This book has no PDF on Turath.",
+  "onTurath": "More on Turath",
+  "onTurathInfo": "Books not in the offline list, found on Turath",
+  "searchingTurath": "Searching Turath…",
+  "fontAmiri": "Amiri (classic Naskh)",
+  "fontScheherazade": "Scheherazade",
+  "fontPlex": "IBM Plex Sans Arabic",
+  "fontNotoNaskh": "Noto Naskh",
+  "fontVazir": "Vazirmatn"
 }

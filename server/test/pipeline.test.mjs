@@ -179,3 +179,44 @@ test("quick research skips the follow-up round", async () => {
   assert.equal(gemini.prompts.length, 3, "plan, one ranking and compose: no follow-up search");
   assert.equal(result.depth, "quick");
 });
+
+test("progress: activity log, token usage, a streamed draft, and a retry resumes finished steps", async () => {
+  const composeAnswer = (request) => {
+    const key = keyFor(request.prompt, 5, "S");
+    return { status: "answered", answer: `ځواب [${key}].\n[[Q1]]`, summary: "", citations: [{ id: "Q1", sourceId: key, quote: "إنما الأعمال بالنيات وإنما لكل امرئ ما نوى" }], opinions: [] };
+  };
+  const calls = [];
+  let failCompose = true;
+  const scripted = { plan: plan(), rank: selectPage(5) };
+  const gemini = {
+    resolveModel: async () => "test-model",
+    generateJson: async (request) => {
+      const step = request.schema?.properties?.queries ? "plan" : request.schema?.properties?.coverage ? "rank" : "compose";
+      calls.push(step);
+      if (step === "compose") {
+        if (failCompose) throw Object.assign(new Error("Could not reach Gemini"), { code: "NETWORK" });
+        request.onText?.('{"status":"answered","answer":"ځواب په');
+      }
+      const data = step === "compose" ? composeAnswer(request) : typeof scripted[step] === "function" ? scripted[step](request) : scripted[step];
+      return { data, model: "test-model", usage: { input: 100, output: 10, thoughts: 5 } };
+    },
+  };
+  const pipeline = createPipeline({ gemini, turath: fixtureTurath(), catalog });
+  const memo = new Map();
+  const events = [];
+  await assert.rejects(pipeline.ask({ question: "د نیت حدیث څه دی؟", language: "ps" }, (e, d) => events.push([e, d]), memo));
+  assert.deepEqual(calls, ["plan", "rank", "compose"]);
+  const kinds = events.filter(([e]) => e === "activity").map(([, d]) => d.kind);
+  for (const k of ["plan", "search", "found", "rank", "ranked", "read", "compose"]) assert.ok(kinds.includes(k), `activity ${k}`);
+  assert.deepEqual(events.filter(([e]) => e === "usage").at(-1)[1], { input: 200, output: 20, thoughts: 10, calls: 2, peak: 100 });
+
+  // The retry with the same memo only asks Gemini to write the answer again.
+  failCompose = false;
+  calls.length = 0;
+  events.length = 0;
+  const result = await pipeline.ask({ question: "د نیت حدیث څه دی؟", language: "ps" }, (e, d) => events.push([e, d]), memo);
+  assert.deepEqual(calls, ["compose"]);
+  assert.equal(result.status, "answered");
+  assert.equal(result.usage.calls, 1);
+  assert.ok(events.some(([e, d]) => e === "draft" && d.text === "ځواب په"));
+});

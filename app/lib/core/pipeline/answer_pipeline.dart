@@ -95,13 +95,18 @@ class Limits {
 /// `fast` is used for planning and ranking, `main` for writing the answer.
 enum ModelTier { fast, main }
 
+/// A model reply: the parsed JSON, the model that wrote it and its tokens.
+typedef ModelReply = ({Map<String, dynamic> data, String model, TokenUsage usage});
+
 abstract interface class JsonModel {
-  Future<({Map<String, dynamic> data, String model})> generateJson(
+  /// With [onText] the reply is streamed and its raw text reported as it grows.
+  Future<ModelReply> generateJson(
       {required String system,
       required String prompt,
       required Map<String, dynamic> schema,
       double temperature = 0.2,
-      ModelTier tier = ModelTier.main});
+      ModelTier tier = ModelTier.main,
+      void Function(String text)? onText});
 }
 
 class SearchHits {
@@ -446,7 +451,8 @@ class AnswerPipeline {
       ].join(', ');
 
   /// Runs searches (bounded concurrency 6) and merges hits into a de-duplicated pool.
-  Future<({List<PipelineSource> candidates, int total, bool failed})> _collect(List<PlannedSearch> plan, {List<PipelineSource> existing = const [], Limits limits = Limits.standard}) async {
+  Future<({List<PipelineSource> candidates, int total, bool failed})> _collect(List<PlannedSearch> plan,
+      {List<PipelineSource> existing = const [], Limits limits = Limits.standard, void Function(PlannedSearch search, SearchHits hits)? onSearch}) async {
     final results = List<SearchHits?>.filled(plan.length, null);
     var failures = 0;
     var cursor = 0;
@@ -455,7 +461,8 @@ class AnswerPipeline {
         final i = cursor++;
         final s = plan[i];
         try {
-          results[i] = await turath.searchHits(s.query, bookId: s.bookId, authorId: s.authorId, categoryId: s.categoryId);
+          final hits = results[i] = await turath.searchHits(s.query, bookId: s.bookId, authorId: s.authorId, categoryId: s.categoryId);
+          onSearch?.call(s, hits);
         } catch (_) {
           failures++;
         }
@@ -513,25 +520,86 @@ class AnswerPipeline {
     return out;
   }
 
-  Future<Map<String, dynamic>> _rank(String question, List<PipelineSource> pool, List<String> queries) async => (await model.generateJson(
-        system: rerankSystem,
-        prompt: rerankPrompt(question: question, candidates: [for (final c in pool) c.prompt(full: false)], queries: queries),
-        schema: rerankSchema,
-        temperature: 0.1,
-      ))
-          .data;
+  /// Finished steps per request id, so a retry after a dropped connection
+  /// resumes where it stopped instead of starting over.
+  static final _memos = <String, ({DateTime at, Map<String, Object> steps})>{};
 
-  Stream<AskEvent> ask(AskRequest request) async* {
+  Map<String, Object> _memoFor(String? requestId) {
+    final now = DateTime.now();
+    _memos.removeWhere((_, m) => now.difference(m.at) > const Duration(minutes: 20));
+    if (requestId == null) return {};
+    return _memos.putIfAbsent(requestId, () => (at: now, steps: <String, Object>{})).steps;
+  }
+
+  /// Streams progress events, the draft answer and finally the result.
+  Stream<AskEvent> ask(AskRequest request) {
+    final controller = StreamController<AskEvent>();
+    _ask(request, controller.add).then((_) => controller.close(), onError: (Object e, StackTrace st) {
+      controller.addError(e, st);
+      controller.close();
+    });
+    return controller.stream;
+  }
+
+  Future<void> _ask(AskRequest request, void Function(AskEvent) emit) async {
     final started = DateTime.now();
     final question = request.question.trim();
     if (question.isEmpty) throw const PipelineException('INVALID_ARGUMENT', 'question must not be empty');
     if (question.length > 2000) throw const PipelineException('INVALID_ARGUMENT', 'question is too long');
     final scope = request.scope;
     final limits = Limits.forDepth(request.depth);
+    final memo = _memoFor(request.requestId);
+    var usage = const TokenUsage();
+    int elapsed() => DateTime.now().difference(started).inMilliseconds;
+    void act(String kind, [Map<String, dynamic> data = const {}]) => emit(AskActivityEvent(kind, data, elapsed()));
+
+    Future<ModelReply> generate(String key, {required String system, required String prompt, required Map<String, dynamic> schema, double temperature = 0.2, ModelTier tier = ModelTier.main, void Function(String)? onText}) async {
+      final kept = memo[key];
+      if (kept is ModelReply) {
+        act('resumed', {'step': key});
+        return kept;
+      }
+      final reply = await model.generateJson(system: system, prompt: prompt, schema: schema, temperature: temperature, tier: tier, onText: onText);
+      usage = usage + reply.usage;
+      emit(AskUsageEvent(usage));
+      memo[key] = reply;
+      return reply;
+    }
+
+    void onSearch(PlannedSearch s, SearchHits hits) => act('search', {
+          'query': s.query,
+          'within': s.kind,
+          if (s.bookId != null) 'book': catalog.book(s.bookId)?.title,
+          'hits': hits.totalMatches,
+        });
+    Future<({List<PipelineSource> candidates, int total, bool failed})> collect(String key, List<PlannedSearch> plan, {List<PipelineSource> existing = const []}) async {
+      final kept = memo[key];
+      if (kept is ({List<PipelineSource> candidates, int total, bool failed})) return kept;
+      final result = await _collect(plan, existing: existing, limits: limits, onSearch: onSearch);
+      if (!result.failed) memo[key] = result;
+      return result;
+    }
+
+    Future<Map<String, dynamic>> rank(String key, String question, List<PipelineSource> pool, List<String> queries) async {
+      act('rank', {'pool': pool.length});
+      final ranked = (await generate(key,
+              system: rerankSystem,
+              prompt: rerankPrompt(question: question, candidates: [for (final c in pool) c.prompt(full: false)], queries: queries),
+              schema: rerankSchema,
+              temperature: 0.1))
+          .data;
+      act('ranked', {
+        'selected': (ranked['selected'] as List?)?.length ?? 0,
+        'coverage': ranked['coverage'],
+        if (ranked['missing'] is String) 'missing': ranked['missing'],
+      });
+      return ranked;
+    }
 
     // 1. plan
-    yield const AskStageEvent(AskStage.planning);
-    final plan = await model.generateJson(
+    emit(const AskStageEvent(AskStage.planning));
+    final plan = await generate(
+      'plan',
       system: planSystem,
       prompt: planPrompt(question: question, history: request.history, scopeLabel: _scopeLabel(scope)),
       schema: planSchema,
@@ -550,7 +618,12 @@ class AnswerPipeline {
     final requestedIds = resolveBooks(_titles(p['requestedBooks'], limits.requestedBooks), catalog, perTitle: 2);
     final referenceIds = resolveBooks(_titles(p['referenceBooks'], 6), catalog).where((id) => !requestedIds.contains(id)).toList();
     final standalone = (p['standaloneQuestion'] as String?)?.trim().isNotEmpty == true ? (p['standaloneQuestion'] as String).trim() : question;
-    yield AskPlanEvent(queries);
+    emit(AskPlanEvent(queries));
+    act('plan', {
+      'queries': queries,
+      'books': [for (final id in [...requestedIds, ...referenceIds]) ?catalog.book(id)?.title],
+      'madhhabs': madhhabs,
+    });
 
     AnswerResult withMeta(AnswerResult r, {int? total, String? modelName}) => AnswerResult(
           status: r.status,
@@ -565,70 +638,76 @@ class AnswerPipeline {
           language: language,
           model: modelName ?? plan.model,
           totalMatches: total,
-          elapsedMs: DateTime.now().difference(started).inMilliseconds,
+          elapsedMs: elapsed(),
+          usage: usage,
         );
     AnswerResult nothing({int? total, List<PipelineSource> related = const []}) =>
         withMeta(finalizeAnswer(composed: const {'status': 'insufficient'}, sources: related, language: language), total: total);
 
     if (queries.isEmpty) {
-      yield AskResultEvent(nothing());
+      emit(AskResultEvent(nothing()));
       return;
     }
 
     // 2. search
-    yield const AskStageEvent(AskStage.searching);
-    final first = await _collect(
-        searchPlan(queries: queries, scope: scope, madhhabs: madhhabs, requestedBookIds: requestedIds, referenceBookIds: referenceIds, limits: limits),
-        limits: limits);
+    emit(const AskStageEvent(AskStage.searching));
+    final first = await collect(
+        'search0', searchPlan(queries: queries, scope: scope, madhhabs: madhhabs, requestedBookIds: requestedIds, referenceBookIds: referenceIds, limits: limits));
     if (first.failed) throw const PipelineException('TURATH_UNAVAILABLE', 'The Turath library could not be reached');
     var candidates = [for (var i = 0; i < first.candidates.length; i++) first.candidates[i].withKey('C${i + 1}')];
     var total = first.total;
-    yield AskSourcesEvent(candidates.length, total);
+    emit(AskSourcesEvent(candidates.length, total));
+    act('found', {'count': candidates.length, 'total': total});
     if (candidates.isEmpty) {
-      yield AskResultEvent(nothing(total: total));
+      emit(AskResultEvent(nothing(total: total)));
       return;
     }
 
     // 3. read & rank, then follow-up rounds if something is missing
-    yield const AskStageEvent(AskStage.reading);
+    emit(const AskStageEvent(AskStage.reading));
     var used = [...queries];
-    var ranking = await _rank(standalone, candidates, used);
+    var ranking = await rank('rank0', standalone, candidates, used);
     for (var round = 0; round < limits.followUpRounds && ranking['coverage'] != 'full'; round++) {
       final followQueries = cleanQueries(ranking['followUpQueries'], max: 5).where((q) => !used.contains(q)).toList();
       final followBooks = resolveBooks(_titles(ranking['followUpBooks'], 4), catalog);
       if (followQueries.isEmpty && followBooks.isEmpty) break;
-      yield const AskStageEvent(AskStage.searching);
+      emit(const AskStageEvent(AskStage.searching));
+      act('followup', {'queries': followQueries, 'books': [for (final id in followBooks) ?catalog.book(id)?.title]});
       final keepKeys = (ranking['selected'] as List? ?? const []).map((k) => '$k'.toUpperCase()).toSet();
       final keep = candidates.where((c) => keepKeys.contains(c.key)).toList();
-      final extra = await _collect(
+      final extra = await collect(
+        'search${round + 1}',
         searchPlan(queries: followQueries.isNotEmpty ? followQueries : queries.take(3).toList(), scope: scope, requestedBookIds: followBooks, limits: limits),
         existing: keep,
-        limits: limits,
       );
       total += extra.total;
       if (extra.candidates.isEmpty) break;
       used = [...used, ...followQueries];
       final merged = [...keep, ...extra.candidates];
       candidates = [for (var i = 0; i < merged.length; i++) merged[i].withKey('C${i + 1}')];
-      yield AskSourcesEvent(candidates.length, total);
-      yield const AskStageEvent(AskStage.reading);
-      ranking = await _rank(standalone, candidates, used);
+      emit(AskSourcesEvent(candidates.length, total));
+      emit(const AskStageEvent(AskStage.reading));
+      ranking = await rank('rank${round + 1}', standalone, candidates, used);
     }
     final byKey = {for (final c in candidates) c.key: c};
     var selected = (ranking['selected'] as List? ?? const []).map((k) => '$k'.trim().toUpperCase()).toSet().map((k) => byKey[k]).whereType<PipelineSource>().toList();
     if (selected.isEmpty && ranking['coverage'] != 'none') selected = candidates.take(6).toList();
     selected = selected.take((request.maxSources ?? limits.maxSelected).clamp(3, limits.maxSelected)).toList();
     if (selected.isEmpty) {
-      yield AskResultEvent(nothing(total: total, related: [for (var i = 0; i < candidates.length && i < 6; i++) candidates[i].withKey('S${i + 1}')]));
+      emit(AskResultEvent(nothing(total: total, related: [for (var i = 0; i < candidates.length && i < 6; i++) candidates[i].withKey('S${i + 1}')])));
       return;
     }
     final expanded = await _withContinuations(selected, limits.continuationPages);
     final sources = [for (var i = 0; i < expanded.length; i++) expanded[i].withKey('S${i + 1}')];
+    act('read', {'books': {for (final s in sources) s.passage.bookTitle}.take(8).toList(), 'pages': sources.length});
 
-    // 4. compose
-    yield const AskStageEvent(AskStage.composing);
+    // 4. compose (streamed: the draft is shown while it is written)
+    emit(const AskStageEvent(AskStage.composing));
+    act('compose', {'sources': sources.length});
     final languageName = languageNames[language]!;
-    final composed = await model.generateJson(
+    var lastDraft = DateTime.fromMillisecondsSinceEpoch(0);
+    final composed = await generate(
+      'compose',
       system: composeSystem(languageName),
       prompt: composePrompt(
         question: standalone,
@@ -639,10 +718,58 @@ class AnswerPipeline {
       ),
       schema: composeSchema,
       temperature: 0.2,
+      onText: (text) {
+        final now = DateTime.now();
+        if (now.difference(lastDraft) < const Duration(milliseconds: 350)) return;
+        lastDraft = now;
+        final draft = partialJsonString(text, 'answer');
+        if (draft != null && draft.isNotEmpty) emit(AskDraftEvent(draft));
+      },
     );
 
     // 5. verify
-    yield const AskStageEvent(AskStage.verifying);
-    yield AskResultEvent(withMeta(finalizeAnswer(composed: composed.data, sources: sources, language: language), total: total, modelName: composed.model));
+    emit(const AskStageEvent(AskStage.verifying));
+    act('verify');
+    emit(AskResultEvent(withMeta(finalizeAnswer(composed: composed.data, sources: sources, language: language), total: total, modelName: composed.model)));
   }
+}
+
+const _escapes = {'"': '"', r'\': r'\', '/': '/', 'b': '\b', 'f': '\f', 'n': '\n', 'r': '\r', 't': '\t'};
+
+/// Reads one string field out of JSON that is still being streamed (the
+/// closing quote may not have arrived yet).
+String? partialJsonString(String text, String key) {
+  final at = text.indexOf('"$key"');
+  if (at < 0) return null;
+  var i = text.indexOf(':', at + key.length + 2);
+  if (i < 0) return null;
+  i++;
+  while (i < text.length && text[i].trim().isEmpty) {
+    i++;
+  }
+  if (i >= text.length || text[i] != '"') return null;
+  i++;
+  final out = StringBuffer();
+  while (i < text.length) {
+    final c = text[i];
+    if (c == '"') return out.toString();
+    if (c != r'\') {
+      out.write(c);
+      i++;
+      continue;
+    }
+    if (i + 1 >= text.length) break;
+    final e = text[i + 1];
+    if (e == 'u') {
+      if (i + 6 > text.length) break;
+      final code = int.tryParse(text.substring(i + 2, i + 6), radix: 16);
+      if (code == null) break;
+      out.writeCharCode(code);
+      i += 6;
+    } else {
+      out.write(_escapes[e] ?? e);
+      i += 2;
+    }
+  }
+  return out.toString();
 }

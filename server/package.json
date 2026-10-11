@@ -5,7 +5,7 @@
   "main": "src/index.mjs",
   "scripts": {
     "start": "node src/index.mjs",
-    "test": "node --test test/verify.test.mjs test/pipeline.test.mjs test/app.test.mjs test/gemini.test.mjs",
+    "test": "node --test test/partial.test.mjs test/verify.test.mjs test/pipeline.test.mjs test/app.test.mjs test/gemini.test.mjs",
     "test:live": "MANABI_LIVE=1 node --test --test-concurrency=1 test/live.test.mjs",
     "export-catalog": "node scripts/export-catalog.mjs"
   },

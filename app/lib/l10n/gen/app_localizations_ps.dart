@@ -978,4 +978,178 @@ class AppLocalizationsPs extends AppLocalizations {
   @override
   String get shortcutsHint =>
       'د غشي تڼۍ مخونه اړوي · Ctrl+F په کتاب کې لټون کوي';
+
+  @override
+  String actPlan(int count) {
+    return '$count لټونونه پلان شول';
+  }
+
+  @override
+  String actSearch(String query, String where, int hits) {
+    return '«$query» ولټول شو$where — $hits پایلې';
+  }
+
+  @override
+  String actIn(String book) {
+    return ' په $book کې';
+  }
+
+  @override
+  String actFound(int count, int total) {
+    return 'له $total پایلو $count برخې راټولې شوې';
+  }
+
+  @override
+  String actRank(int count) {
+    return '$count برخې لوستل او ارزول کیږي';
+  }
+
+  @override
+  String actRanked(int count, String coverage) {
+    return '$count برخې وساتل شوې · پوښښ: $coverage';
+  }
+
+  @override
+  String get coverageFull => 'بشپړ';
+
+  @override
+  String get coveragePartial => 'نیمګړی';
+
+  @override
+  String get coverageNone => 'هیڅ';
+
+  @override
+  String actFollowup(String queries) {
+    return 'نور لټون: $queries';
+  }
+
+  @override
+  String actRead(int pages, int books) {
+    return 'له $books کتابونو $pages مخونه خلاص شول';
+  }
+
+  @override
+  String actCompose(int count) {
+    return 'له $count مخونو ځواب لیکل کیږي';
+  }
+
+  @override
+  String get actVerify => 'هر نقل‌قول له کتابونو سره پرتله کیږي';
+
+  @override
+  String get actResumed => 'له بشپړ شوي پړاو څخه دوام ورکړل شو';
+
+  @override
+  String actRetry(int count) {
+    return 'اړیکه پرې شوه — بیا هڅه ($count)';
+  }
+
+  @override
+  String reconnectingIn(int seconds) {
+    return 'په $seconds ثانیو کې بیا نښلېږي…';
+  }
+
+  @override
+  String get showSteps => 'پړاوونه ښکاره کړه';
+
+  @override
+  String get hideSteps => 'پړاوونه پټ کړه';
+
+  @override
+  String get writingDraft => 'مسوده — نقل‌قولونه د بشپړېدو وروسته کتل کیږي';
+
+  @override
+  String tokensCount(String count) {
+    return '$count ټوکنونه';
+  }
+
+  @override
+  String get tokenUsage => 'د ټوکنونو مصرف';
+
+  @override
+  String get tokensInput => 'انپوټ';
+
+  @override
+  String get tokensOutput => 'اوټپوټ';
+
+  @override
+  String get tokensThinking => 'فکر کول';
+
+  @override
+  String get tokensTotal => 'ټول';
+
+  @override
+  String get modelCalls => 'د ماډل غوښتنې';
+
+  @override
+  String get answerTime => 'وخت';
+
+  @override
+  String get thisAnswer => 'دا ځواب';
+
+  @override
+  String get thisQuestion => 'دا پوښتنه';
+
+  @override
+  String get thisChat => 'دا چټ';
+
+  @override
+  String get chatDetails => 'د چټ جزئیات';
+
+  @override
+  String get contextWindow => 'د کنټیکس کړکۍ';
+
+  @override
+  String contextWindowInfo(String used, String limit) {
+    return 'په دې چټ کې تر ټولو لویه غوښتنه: $used له $limit ټوکنونو';
+  }
+
+  @override
+  String get questionsCount => 'پوښتنې';
+
+  @override
+  String get noUsageYet => 'د ټوکنونو شمېر د دې نسخې ځوابونو لپاره ښکاري.';
+
+  @override
+  String get copyQuestion => 'پوښتنه کاپي کړه';
+
+  @override
+  String get askAgain => 'بیا وپوښته';
+
+  @override
+  String get keepAliveText => 'ستاسو ځواب له سرچینو چمتو کیږي…';
+
+  @override
+  String get pdfBook => 'PDF';
+
+  @override
+  String get openPdf => 'چاپي PDF خلاص کړه';
+
+  @override
+  String get noPdf => 'دا کتاب په تراث کې PDF نه لري.';
+
+  @override
+  String get onTurath => 'په تراث کې نور';
+
+  @override
+  String get onTurathInfo =>
+      'هغه کتابونه چې په آفلاین لیست کې نه وو او په تراث کې وموندل شول';
+
+  @override
+  String get searchingTurath => 'په تراث کې لټون…';
+
+  @override
+  String get fontAmiri => 'امیري (کلاسیک نسخ)';
+
+  @override
+  String get fontScheherazade => 'شهرزاد';
+
+  @override
+  String get fontPlex => 'IBM Plex Sans Arabic';
+
+  @override
+  String get fontNotoNaskh => 'نوټو نسخ';
+
+  @override
+  String get fontVazir => 'وزیر متن';
 }

@@ -158,15 +158,22 @@ export const createApp = ({ config, pipeline, turath, catalog, gemini, logger = 
   // requestId and gets the finished answer, or rejoins the running one,
   // without spending Gemini quota again.
   const jobs = new Map();
+  // Finished steps of failed answers, so retrying resumes instead of starting over.
+  const memos = new Map();
   const JOB_TTL_MS = 20 * 60 * 1000;
   const startJob = (id, body) => {
+    const memo = (id && memos.get(id)) || new Map();
+    if (id) {
+      memos.set(id, memo);
+      setTimeout(() => memos.delete(id), JOB_TTL_MS).unref?.();
+    }
     const job = { events: [], listeners: new Set(), result: undefined, error: undefined };
     const emit = (event, data) => {
       job.events.push([event, data]);
       for (const l of job.listeners) l(event, data);
     };
     job.done = pipeline
-      .ask(body, emit)
+      .ask(body, emit, memo)
       .then((result) => {
         job.result = result;
         logger.info?.("ask", result.status, `${result.sources?.length ?? 0} sources`, result.model, `${result.elapsedMs}ms`, result.depth ?? "");
