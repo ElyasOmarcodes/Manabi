@@ -1,24 +1,34 @@
-// Probes Turath's public narrator endpoints (search and one narrator) and
-// the page-range endpoint used to save a book.
-const probes = [
-  "narrators?page=1&limit=3&q=%D8%A3%D8%A8%D8%A7%D9%86",
-  "narrators?page=1&limit=3&search=%D8%A3%D8%A8%D8%A7%D9%86",
-  "narrators?page=1&limit=3&query=%D8%A3%D8%A8%D8%A7%D9%86",
-  "narrators?page=1&limit=3&name=%D8%A3%D8%A8%D8%A7%D9%86",
-  "narrator?id=4210",
-  "narrators?id=4210",
-  "narrators/4210",
-  "man?id=4210",
-  "page?book_id=147927&pg=1&end_pg=40",
-];
-for (const p of probes) {
-  try {
-    const r = await fetch(`https://api.turath.io/${p}`, { headers: { origin: "https://app.turath.io", referer: "https://app.turath.io/" } });
-    const t = await r.text();
-    console.log("PROBE", r.status, p, t.length, t.slice(0, 500).replace(/\s+/g, " "));
-  } catch (e) {
-    console.log("PROBE ERR", p, e.message);
+// Probes how Turath maps a text page to a PDF page: the book index of a
+// sample book, and the app code around "pdf_page".
+const H = { origin: "https://app.turath.io", referer: "https://app.turath.io/" };
+const book = await (await fetch("https://api.turath.io/book?id=1681&include=indexes&ver=3", { headers: H })).json();
+const idx = book.indexes ?? {};
+console.log("KEYS", Object.keys(book), Object.keys(idx));
+console.log("META", JSON.stringify(book.meta).slice(0, 1500));
+console.log("PAGEMAP", JSON.stringify((idx.page_map ?? []).slice(0, 30)));
+for (const k of Object.keys(idx)) if (k !== "page_map" && k !== "headings") console.log("IDX", k, JSON.stringify(idx[k]).slice(0, 800));
+const page = await (await fetch("https://api.turath.io/page?book_id=1681&pg=18", { headers: H })).json();
+console.log("PAGE18", JSON.stringify(page.meta ?? page).slice(0, 800));
+const html = await (await fetch("https://app.turath.io/")).text();
+const scripts = [...html.matchAll(/src="([^"]+\.js)"/g)].map((m) => new URL(m[1], "https://app.turath.io/").href);
+console.log("SCRIPTS", scripts);
+const seen = new Set();
+const queue = [...scripts];
+while (queue.length && seen.size < 60) {
+  const url = queue.shift();
+  if (seen.has(url)) continue;
+  seen.add(url);
+  const js = await (await fetch(url)).text().catch(() => "");
+  for (const m of js.matchAll(/["'](\.?\.?\/?[\w./-]*?(?:assets|_next|static|chunks)[\w./-]*\.js)["']/g)) {
+    try { queue.push(new URL(m[1], url).href); } catch {}
+  }
+  for (const word of ["pdf_page", "pdfPage", "pdf_volume", "page_offset", "pdf_offset"]) {
+    let i = js.indexOf(word);
+    let n = 0;
+    while (i >= 0 && n < 6) {
+      console.log("CODE", word, url.split("/").pop(), js.slice(Math.max(0, i - 500), i + 500).replace(/\s+/g, " "));
+      i = js.indexOf(word, i + word.length);
+      n++;
+    }
   }
 }
-const pdf = await fetch("https://files.turath.io/pdf//bksultanya/01_54495.pdf", { method: "HEAD", headers: { origin: "https://example.com" } }).catch((e) => e);
-console.log("PDF", pdf.status, JSON.stringify(Object.fromEntries(pdf.headers ?? [])));
