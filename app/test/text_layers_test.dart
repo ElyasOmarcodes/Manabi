@@ -105,4 +105,33 @@ void main() {
     expect(rules.always, contains('()'));
     expect(agreement, greaterThan(0.95));
   });
+
+  test('rules learned from the real Gemini marking of مرقاة and مراقي الفلاح', () {
+    // Stretches as Gemini returned them (CI live run).
+    final mirqat = [
+      ('وَعَنْ طَلْحَةَ', 'فَقِيلَ مَا رُئِيَ يَوْمَ بَدْرٍ قَالَ'),
+      ('أَنَّ رَسُولَ اللَّهِ', 'مَا رُئِيَ الشَّيْطَانُ يَوْمًا'),
+      ('وَلَا أَدْحَرُ', 'وَلَا أَدْحَرُ'),
+      ('وَلَا أَحْقَرُ', 'وَلَا أَحْقَرُ'),
+      ('وَلَا أَغْيَظُ', 'وَلَا أَغْيَظُ'),
+      ('مِنْهُ فِي يَوْمِ عَرَفَةَ', 'مِنْهُ فِي يَوْمِ عَرَفَةَ'),
+      ('وَمَا ذَاكَ', 'وَمَا ذَاكَ'),
+      ('إِلَّا لِمَا يَرَى', 'إِلَّا لِمَا يَرَى'),
+      ('مِنْ تَنَزُّلِ الرَّحْمَةِ', 'مِنْ تَنَزُّلِ الرَّحْمَةِ'),
+    ];
+    final first = [('وَرَوَى مَالِكٌ', 'لَا شَرِيكَ لَهُ')];
+    final pages = [mirqat3721, mirqat3722];
+    final (rules, agreement) = learnMatnRules(pages, [aiTruth(mirqat3721, first), aiTruth(mirqat3722, mirqat)]);
+    expect(rules.block, isTrue);
+    expect([...rules.always, ...rules.verified], contains('()'));
+    expect(rules.always, isNot(contains('""')));
+    expect(agreement, greaterThan(0.8));
+
+    // Gemini left the top block of مراقي الفلاح unmarked; it still counts.
+    final maraqi = [('القيام بعده', 'القيام بعده'), ('وضع ركبتيه', 'ثم وجهه'), ('للسجود', 'للسجود'), ('تكبير السجود', 'تكبير السجود'), ('تكبير الرفع', 'تكبير الرفع'), ('كون السجود', 'كون السجود'), ('بين كفيه', 'بين كفيه'), ('تسبيحه', 'تسبيحه'), ('ثلاثا', 'ثلاثا'), ('مجافاة الرجل', 'مجافاة الرجل'), ('بطنه عن فخذيه', 'بطنه عن فخذيه')];
+    final (r2, a2) = learnMatnRules([maraqi114], [aiTruth(maraqi114, maraqi)]);
+    expect(r2.block, isTrue);
+    expect([...r2.always, ...r2.verified], contains('""'));
+    expect(a2, greaterThan(0.8));
+  });
 }

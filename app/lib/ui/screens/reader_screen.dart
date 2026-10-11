@@ -1627,7 +1627,7 @@ class _LayersPanelState extends State<LayersPanel> {
     try {
       final samples = _samples;
       final g = await backend.detectLayers(widget.title, samples);
-      final truth = [for (var i = 0; i < samples.length; i++) i < g.pages.length ? locateSpans(samples[i], g.pages[i]) : const <(int, int)>[]];
+      final truth = [for (var i = 0; i < samples.length; i++) aiTruth(samples[i], i < g.pages.length ? g.pages[i] : const [])];
       final old = r.layersOf(widget.bookId);
       final braces = g.quran.contains('{}');
       if (truth.every((t) => t.isEmpty)) {

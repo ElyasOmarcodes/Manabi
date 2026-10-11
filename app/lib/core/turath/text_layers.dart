@@ -451,10 +451,10 @@ bool bracesAreVerses(List<String> pages) {
 
 /// Finds AI-marked matn stretches (given by their first and last words) in
 /// [text], in order. A stretch right inside its delimiters takes them too.
-List<(int, int)> locateSpans(String text, List<(String, String)> spans) {
+List<(int, int)> locateSpans(String text, List<(String, String)> spans, {int from = 0}) {
   final index = _LetterIndex(text);
   final out = <(int, int)>[];
-  var cursor = 0;
+  var cursor = from;
   for (final (start, end) in spans) {
     final s = index.find(start, cursor);
     if (s == null) continue;
@@ -538,6 +538,17 @@ class _LetterIndex {
   }
 }
 
+/// The matn of a sample page as the AI marked it. The block above the ــ
+/// line counts as matn whether or not the AI marked it: that layout is how
+/// these books print their matn.
+List<(int, int)> aiTruth(String page, List<(String, String)> spans) {
+  final b = matnBlock(page);
+  if (b == null) return locateSpans(page, spans);
+  // The commentary repeats the block's words in order: look there first.
+  final found = locateSpans(page, spans, from: b.sharhStart);
+  return found.isEmpty && spans.isEmpty ? found : _merge([(0, b.blockEnd), ...found]);
+}
+
 /// How well [rules] reproduce [truth] (matn letters marked by AI) on
 /// [pages]: F1 over Arabic letters, 0…1.
 double rulesAgreement(List<String> pages, List<List<(int, int)>> truth, MatnRules rules) {
@@ -547,7 +558,9 @@ double rulesAgreement(List<String> pages, List<List<(int, int)>> truth, MatnRule
     final verses = quranRanges(text);
     final predicted = matnRanges(text, rules, context: [for (var q = p - 1; q >= 0; q--) _blockText(pages[q])].whereType<String>().toList(), verses: verses);
     final gold = truth[p];
-    for (var i = 0; i < text.length; i++) {
+    // The block above the ــ line is matn by layout; judge the commentary.
+    final from = matnBlock(text)?.sharhStart ?? 0;
+    for (var i = from; i < text.length; i++) {
       if (!_arabicLetter.hasMatch(text[i]) || _inside(i, verses)) continue;
       final a = _inside(i, predicted), b = _inside(i, gold);
       if (a && b) tp++;
@@ -566,11 +579,12 @@ String? _blockText(String text) {
 }
 
 /// The rules that best reproduce an AI annotation of sample pages, and how
-/// closely (0…1). Tries the block rule and each delimiter as never, always
-/// or verified, improving one choice at a time.
+/// closely the commentary matches (0…1). The block rule follows the layout;
+/// each delimiter is tried as never, always or verified, improving one
+/// choice at a time.
 (MatnRules, double) learnMatnRules(List<String> pages, List<List<(int, int)>> truth) {
   final hasBlock = pages.any((t) => matnBlock(t) != null);
-  var block = hasBlock;
+  final block = hasBlock;
   final mode = {for (final m in matnMarkerIds) m: 0}; // 0 never, 1 always, 2 verified
   MatnRules build() => MatnRules(
         block: block,
@@ -580,16 +594,6 @@ String? _blockText(String text) {
   var best = rulesAgreement(pages, truth, build());
   for (var round = 0; round < 2; round++) {
     var changed = false;
-    if (hasBlock) {
-      block = !block;
-      final s = rulesAgreement(pages, truth, build());
-      if (s > best + 1e-9) {
-        best = s;
-        changed = true;
-      } else {
-        block = !block;
-      }
-    }
     for (final m in matnMarkerIds) {
       final keep = mode[m]!;
       for (final option in [0, 1, if (hasBlock) 2]) {
