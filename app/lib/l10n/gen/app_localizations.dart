@@ -3035,6 +3035,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Clear read pages'**
   String get clearReadCache;
+
+  /// No description provided for @splitView.
+  ///
+  /// In en, this message translates to:
+  /// **'Split view'**
+  String get splitView;
+
+  /// No description provided for @splitPdf.
+  ///
+  /// In en, this message translates to:
+  /// **'Text and this page\'s PDF'**
+  String get splitPdf;
+
+  /// No description provided for @splitSameBook.
+  ///
+  /// In en, this message translates to:
+  /// **'This book, another page'**
+  String get splitSameBook;
+
+  /// No description provided for @splitOtherBook.
+  ///
+  /// In en, this message translates to:
+  /// **'Compare with another book'**
+  String get splitOtherBook;
+
+  /// No description provided for @splitClose.
+  ///
+  /// In en, this message translates to:
+  /// **'Close split view'**
+  String get splitClose;
 }
 
 class _AppLocalizationsDelegate

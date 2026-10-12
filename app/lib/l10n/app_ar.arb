@@ -543,5 +543,10 @@
   "librarySync": "تحديث المكتبة",
   "librarySyncSub": "الكتب الجديدة وقائمة PDF؛ يوميًا تلقائيًا",
   "readCacheInfo": "{n} صفحة مقروءة محفوظة دون اتصال",
-  "clearReadCache": "مسح الصفحات المقروءة"
+  "clearReadCache": "مسح الصفحات المقروءة",
+  "splitView": "عرض مقسوم",
+  "splitPdf": "النص وصورة الصفحة PDF",
+  "splitSameBook": "الكتاب نفسه، صفحة أخرى",
+  "splitOtherBook": "قارن بكتاب آخر",
+  "splitClose": "إغلاق العرض المقسوم"
 }

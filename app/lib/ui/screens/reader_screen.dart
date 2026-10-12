@@ -27,6 +27,7 @@ import '../widgets/common.dart';
 import '../widgets/pdf_pane.dart';
 import '../widgets/reveal_text.dart';
 import '../widgets/save_offline.dart';
+import '../widgets/scope_picker.dart' show PickKind, pickFromCatalog;
 import '../widgets/search_hit.dart';
 import '../widgets/search_suggestions.dart';
 import '../widgets/selection_menu.dart';
@@ -109,8 +110,13 @@ String pageLabel(BuildContext context, BookDetails? book, int page, {PagePassage
 /// panel with contents, bookmarks, highlights and history, in-book search,
 /// go to a volume and printed page, reading tools and highlighting.
 class ReaderScreen extends StatefulWidget {
-  const ReaderScreen({super.key, required this.bookId, required this.page, this.title, this.highlight, this.reveal, this.openSearch = false});
+  const ReaderScreen({super.key, required this.bookId, required this.page, this.title, this.highlight, this.reveal, this.openSearch = false, this.embedded = false, this.onClose});
   final String bookId;
+
+  /// The second pane of a split view: a close button instead of back, and
+  /// no keyboard focus of its own.
+  final bool embedded;
+  final VoidCallback? onClose;
   final int page;
   final String? title;
   final String? highlight;
@@ -124,6 +130,11 @@ class ReaderScreen extends StatefulWidget {
 
 class _ReaderScreenState extends State<ReaderScreen> {
   late int _page = widget.page < 1 ? 1 : widget.page;
+
+  /// Split view on large screens: the scanned page ('pdf') or a second
+  /// text pane ([_splitText]) beside the text.
+  String? _splitKind;
+  ({String bookId, int page, String title})? _splitText;
 
   /// First page of the forward list in continuous mode; pages before it
   /// grow upwards, so jumping anywhere is instant.
@@ -223,7 +234,10 @@ class _ReaderScreenState extends State<ReaderScreen> {
     }
   }
 
-  void _remember() => _reading.savePosition(widget.bookId, _title, _page, notify: false);
+  void _remember() {
+    // The second pane of a split view does not move "continue reading".
+    if (!widget.embedded) _reading.savePosition(widget.bookId, _title, _page, notify: false);
+  }
 
   void _setPage(int page) {
     if (page == _page) return;
@@ -231,6 +245,57 @@ class _ReaderScreenState extends State<ReaderScreen> {
     _barsChanged();
     _remember();
     _prefetch(page);
+    // The scanned page beside the text follows it.
+    if (_splitKind == 'pdf' && !_pdfDriving) {
+      final before = (_pdfVolume, _pdfPage);
+      _syncPdfToText();
+      if (before != (_pdfVolume, _pdfPage)) setState(() {});
+    }
+  }
+
+  /// The PDF pane is moving the text (not the other way round).
+  bool _pdfDriving = false;
+
+  bool get _canSplit => !widget.embedded && MediaQuery.sizeOf(context).width >= 1100;
+
+  Future<void> _openSplit() async {
+    final l = context.l;
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheet) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          if (_book?.pdf != null)
+            ListTile(leading: const Icon(Icons.picture_as_pdf_outlined, color: AuraHues.rose), title: Text(l.splitPdf), onTap: () => Navigator.pop(sheet, 'pdf')),
+          ListTile(leading: const Icon(Icons.auto_stories_outlined, color: AuraHues.teal), title: Text(l.splitSameBook), onTap: () => Navigator.pop(sheet, 'same')),
+          ListTile(leading: const Icon(Icons.library_books_outlined, color: AuraHues.blue), title: Text(l.splitOtherBook), onTap: () => Navigator.pop(sheet, 'other')),
+          if (_splitKind != null)
+            ListTile(leading: const Icon(Icons.close_rounded, color: AuraHues.rose), title: Text(l.splitClose), onTap: () => Navigator.pop(sheet, 'close')),
+        ]),
+      ),
+    );
+    if (!mounted || choice == null) return;
+    switch (choice) {
+      case 'pdf':
+        setState(() {
+          _syncPdfToText();
+          _splitKind = 'pdf';
+        });
+      case 'same':
+        setState(() {
+          _splitText = (bookId: widget.bookId, page: _page, title: _title);
+          _splitKind = 'text';
+        });
+      case 'other':
+        final b = await pickFromCatalog<CatalogBook>(context, PickKind.book);
+        if (b == null || !mounted) return;
+        setState(() {
+          _splitText = (bookId: b.id, page: 1, title: b.title);
+          _splitKind = 'text';
+        });
+      case 'close':
+        setState(() => _splitKind = null);
+    }
   }
 
   void _jump(int page, {String? mark, String? reveal}) {
@@ -242,7 +307,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
       _reveal = reveal ?? mark;
       _revealPage = _reveal == null ? null : target;
       _page = target;
-      if (_pdf) _syncPdfToText();
+      if (_pdf || _splitKind == 'pdf') _syncPdfToText();
       if (_modeInUse == 'pages') {
         if (_pages.hasClients) _pages.jumpToPage(target - 1);
       } else {
@@ -395,7 +460,15 @@ class _ReaderScreenState extends State<ReaderScreen> {
     final book = _book;
     if (volume == null || book == null) return;
     final internal = book.internalFor(volume, n - _reading.pdfOffsetOf(widget.bookId));
-    if (internal != null) _setPage(internal);
+    if (internal == null) return;
+    if (_splitKind == 'pdf') {
+      // Beside the text: the text pane jumps to the page shown.
+      _pdfDriving = true;
+      if (internal != _page) _jump(internal);
+      _pdfDriving = false;
+      return;
+    }
+    _setPage(internal);
   }
 
   Future<void> _setPdfOffset(int value) async {
@@ -413,7 +486,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
       onPage: _onPdfPage,
       offset: reading.pdfOffsetOf(widget.bookId),
       onOffset: _setPdfOffset,
-      onShowText: _togglePdf,
+      onShowText: _splitKind == 'pdf' && !_pdf ? () => setState(() => _splitKind = null) : _togglePdf,
       background: c.bg,
       bar: c.bar,
       text: c.text,
@@ -585,8 +658,34 @@ class _ReaderScreenState extends State<ReaderScreen> {
           child: _immersive ? const SizedBox(width: double.infinity) : ValueListenableBuilder<int>(valueListenable: _bars, builder: (context, _, _) => _bottomBar(context, c, wide)),
         ),
       ]);
+      // Large screens: the text with the scanned page or a second text beside it.
+      final split = _splitKind != null && !_pdf && !_immersive && box.maxWidth >= 1100 && !widget.embedded;
+      final Widget body = !split
+          ? reader
+          : Directionality(
+              textDirection: TextDirection.rtl,
+              child: Row(children: [
+                Expanded(child: Directionality(textDirection: Directionality.of(context), child: reader)),
+                Container(width: 1, color: context.aura.border),
+                Expanded(
+                  child: Directionality(
+                    textDirection: Directionality.of(context),
+                    child: _splitKind == 'pdf' && _book?.pdf != null
+                        ? _pdfView(c)
+                        : ReaderScreen(
+                            key: ValueKey('split:${_splitText?.bookId}:${_splitText?.page}'),
+                            bookId: _splitText?.bookId ?? widget.bookId,
+                            page: _splitText?.page ?? _page,
+                            title: _splitText?.title,
+                            embedded: true,
+                            onClose: () => setState(() => _splitKind = null),
+                          ),
+                  ),
+                ),
+              ]),
+            );
       return Focus(
-        autofocus: true,
+        autofocus: !widget.embedded,
         onKeyEvent: _onKey,
         child: Scaffold(
           key: _scaffold,
@@ -601,14 +700,14 @@ class _ReaderScreenState extends State<ReaderScreen> {
                     textDirection: TextDirection.rtl,
                     child: Row(children: [
                       Container(
-                        width: 350,
+                        width: split ? 300 : 350,
                         decoration: BoxDecoration(color: context.aura.surface, border: BorderDirectional(end: BorderSide(color: context.aura.border))),
                         child: Directionality(textDirection: Directionality.of(context), child: panel),
                       ),
-                      Expanded(child: Directionality(textDirection: Directionality.of(context), child: reader)),
+                      Expanded(child: Directionality(textDirection: Directionality.of(context), child: body)),
                     ]),
                   )
-                : reader,
+                : body,
           ),
         ),
       );
@@ -627,13 +726,16 @@ class _ReaderScreenState extends State<ReaderScreen> {
       color: c.bar,
       padding: const EdgeInsets.fromLTRB(6, 4, 6, 4),
       child: Row(children: [
-        RoundIconButton(
-          icon: Directionality.of(context) == TextDirection.rtl ? Icons.arrow_forward_rounded : Icons.arrow_back_rounded,
-          tooltip: MaterialLocalizations.of(context).backButtonTooltip,
-          filled: false,
-          color: c.text,
-          onTap: () => Navigator.of(context).maybePop(),
-        ),
+        if (widget.embedded)
+          RoundIconButton(icon: Icons.close_rounded, tooltip: l.splitClose, filled: false, color: c.text, onTap: widget.onClose)
+        else
+          RoundIconButton(
+            icon: Directionality.of(context) == TextDirection.rtl ? Icons.arrow_forward_rounded : Icons.arrow_back_rounded,
+            tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+            filled: false,
+            color: c.text,
+            onTap: () => Navigator.of(context).maybePop(),
+          ),
         const SizedBox(width: 4),
         Expanded(
           // The title opens the book's page (contents, details).
@@ -719,6 +821,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
       tool(Icons.tune_rounded, l.readerTools, _openTools),
       tool(Icons.fullscreen_rounded, l.fullScreen, _toggleImmersive),
       if (_book?.pdf != null) tool(_pdf ? Icons.picture_as_pdf_rounded : Icons.picture_as_pdf_outlined, _pdf ? l.showText : l.showPdf, _togglePdf, active: _pdf),
+      if (wide && _canSplit) tool(Icons.vertical_split_outlined, l.splitView, _openSplit, active: _splitKind != null),
     ];
     final slider = count != null && count > 1
         ? SliderTheme(

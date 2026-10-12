@@ -543,5 +543,10 @@
   "librarySync": "د کتابتون تازه کول",
   "librarySyncSub": "نوي کتابونه او د PDF لېست؛ هره ورځ پخپله",
   "readCacheInfo": "{n} لوستل شوې پاڼې آفلاین ساتل شوې",
-  "clearReadCache": "لوستل شوې پاڼې پاکول"
+  "clearReadCache": "لوستل شوې پاڼې پاکول",
+  "splitView": "دوه اړخیز لید",
+  "splitPdf": "متن او د همدې پاڼې PDF",
+  "splitSameBook": "همدا کتاب، بله پاڼه",
+  "splitOtherBook": "بل کتاب ورسره پرتله کړه",
+  "splitClose": "دوه اړخیز لید بندول"
 }

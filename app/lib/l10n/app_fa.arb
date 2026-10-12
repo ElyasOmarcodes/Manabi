@@ -543,5 +543,10 @@
   "librarySync": "به‌روزرسانی کتابخانه",
   "librarySyncSub": "کتاب‌های تازه و فهرست PDF؛ هر روز خودکار",
   "readCacheInfo": "{n} صفحه خوانده‌شده آفلاین نگه داشته شده",
-  "clearReadCache": "پاک کردن صفحه‌های خوانده‌شده"
+  "clearReadCache": "پاک کردن صفحه‌های خوانده‌شده",
+  "splitView": "نمای دوبخشی",
+  "splitPdf": "متن و PDF همین صفحه",
+  "splitSameBook": "همین کتاب، صفحه‌ای دیگر",
+  "splitOtherBook": "مقایسه با کتابی دیگر",
+  "splitClose": "بستن نمای دوبخشی"
 }

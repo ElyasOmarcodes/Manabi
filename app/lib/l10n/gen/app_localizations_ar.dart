@@ -1614,4 +1614,19 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get clearReadCache => 'مسح الصفحات المقروءة';
+
+  @override
+  String get splitView => 'عرض مقسوم';
+
+  @override
+  String get splitPdf => 'النص وصورة الصفحة PDF';
+
+  @override
+  String get splitSameBook => 'الكتاب نفسه، صفحة أخرى';
+
+  @override
+  String get splitOtherBook => 'قارن بكتاب آخر';
+
+  @override
+  String get splitClose => 'إغلاق العرض المقسوم';
 }

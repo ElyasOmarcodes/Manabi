@@ -1617,4 +1617,19 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get clearReadCache => 'پاک کردن صفحه‌های خوانده‌شده';
+
+  @override
+  String get splitView => 'نمای دوبخشی';
+
+  @override
+  String get splitPdf => 'متن و PDF همین صفحه';
+
+  @override
+  String get splitSameBook => 'همین کتاب، صفحه‌ای دیگر';
+
+  @override
+  String get splitOtherBook => 'مقایسه با کتابی دیگر';
+
+  @override
+  String get splitClose => 'بستن نمای دوبخشی';
 }

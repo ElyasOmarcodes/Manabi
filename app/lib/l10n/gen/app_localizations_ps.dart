@@ -1615,4 +1615,19 @@ class AppLocalizationsPs extends AppLocalizations {
 
   @override
   String get clearReadCache => 'لوستل شوې پاڼې پاکول';
+
+  @override
+  String get splitView => 'دوه اړخیز لید';
+
+  @override
+  String get splitPdf => 'متن او د همدې پاڼې PDF';
+
+  @override
+  String get splitSameBook => 'همدا کتاب، بله پاڼه';
+
+  @override
+  String get splitOtherBook => 'بل کتاب ورسره پرتله کړه';
+
+  @override
+  String get splitClose => 'دوه اړخیز لید بندول';
 }

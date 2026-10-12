@@ -774,5 +774,10 @@
       }
     }
   },
-  "clearReadCache": "Clear read pages"
+  "clearReadCache": "Clear read pages",
+  "splitView": "Split view",
+  "splitPdf": "Text and this page's PDF",
+  "splitSameBook": "This book, another page",
+  "splitOtherBook": "Compare with another book",
+  "splitClose": "Close split view"
 }

@@ -1622,4 +1622,19 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get clearReadCache => 'Clear read pages';
+
+  @override
+  String get splitView => 'Split view';
+
+  @override
+  String get splitPdf => 'Text and this page\'s PDF';
+
+  @override
+  String get splitSameBook => 'This book, another page';
+
+  @override
+  String get splitOtherBook => 'Compare with another book';
+
+  @override
+  String get splitClose => 'Close split view';
 }
