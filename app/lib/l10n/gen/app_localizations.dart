@@ -2963,6 +2963,78 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Up to {n} searches at once'**
   String scopeTooMany(String n);
+
+  /// No description provided for @setupTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing your library'**
+  String get setupTitle;
+
+  /// No description provided for @setupSub.
+  ///
+  /// In en, this message translates to:
+  /// **'First launch only: the book list is built on your device so searching and reading are fast and work offline.'**
+  String get setupSub;
+
+  /// No description provided for @setupStorage.
+  ///
+  /// In en, this message translates to:
+  /// **'Storage folder'**
+  String get setupStorage;
+
+  /// No description provided for @setupCatalog.
+  ///
+  /// In en, this message translates to:
+  /// **'Books, authors and categories'**
+  String get setupCatalog;
+
+  /// No description provided for @setupExtra.
+  ///
+  /// In en, this message translates to:
+  /// **'Newer Turath books'**
+  String get setupExtra;
+
+  /// No description provided for @setupPdf.
+  ///
+  /// In en, this message translates to:
+  /// **'Books with a scanned PDF'**
+  String get setupPdf;
+
+  /// No description provided for @setupOfflineNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Some parts need the internet; they complete by themselves later.'**
+  String get setupOfflineNote;
+
+  /// No description provided for @setupContinue.
+  ///
+  /// In en, this message translates to:
+  /// **'Start'**
+  String get setupContinue;
+
+  /// No description provided for @librarySync.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh the library'**
+  String get librarySync;
+
+  /// No description provided for @librarySyncSub.
+  ///
+  /// In en, this message translates to:
+  /// **'New books and the PDF list; daily by itself'**
+  String get librarySyncSub;
+
+  /// No description provided for @readCacheInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'{n} pages you read are kept offline'**
+  String readCacheInfo(String n);
+
+  /// No description provided for @clearReadCache.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear read pages'**
+  String get clearReadCache;
 }
 
 class _AppLocalizationsDelegate

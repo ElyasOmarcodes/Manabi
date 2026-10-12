@@ -7,6 +7,8 @@ import '../../core/catalog/catalog_service.dart';
 import '../../core/turath/arabic_match.dart';
 import '../../state/chat_controller.dart';
 import '../../state/reading_controller.dart';
+import '../../state/catalog_sync.dart';
+import '../../state/read_cache.dart';
 import '../../state/settings_controller.dart';
 import '../theme.dart';
 import '../widgets/brand_logo.dart';
@@ -415,6 +417,31 @@ class DataSettingsPage extends StatelessWidget {
           color: AuraHues.teal,
           title: l.dataCatalog,
           subtitle: l.catalogInfo(catalog.books.length, catalog.authors.length, catalog.scannedAt),
+        ),
+        Builder(builder: (context) {
+          final sync = context.watch<CatalogSync>();
+          return SettingsRow(
+            icon: Icons.sync_rounded,
+            color: AuraHues.blue,
+            title: l.librarySync,
+            subtitle: l.librarySyncSub,
+            trailing: sync.running ? AuraProgress(value: sync.progress, width: 56, height: 4) : null,
+            onTap: sync.running ? null : () => sync.run(),
+          );
+        }),
+        StatefulBuilder(
+          builder: (context, setRow) => SettingsRow(
+            icon: Icons.history_edu_outlined,
+            color: AuraHues.green,
+            title: l.clearReadCache,
+            subtitle: l.readCacheInfo('${ReadCache.pageCount}'),
+            onTap: ReadCache.pageCount == 0
+                ? null
+                : () async {
+                    await ReadCache.clear();
+                    setRow(() {});
+                  },
+          ),
         ),
       ]),
       SettingsGroup(children: [

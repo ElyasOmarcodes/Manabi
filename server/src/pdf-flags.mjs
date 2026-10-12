@@ -28,6 +28,8 @@ export const createPdfFlags = ({ fetch: fetcher = fetch, dataDir, timeoutMs = 12
         for (const [k, v] of Object.entries(JSON.parse(await readFile(file, "utf8")))) known.set(k, v === true);
       } catch {}
     },
+    /** Every answer known so far, { id: true|false } (for the app's first-run library). */
+    all: () => Object.fromEntries(known),
     /** { id: true|false } for the ids asked (unknown ones that fail are left out). */
     lookup: async (ids) => {
       const out = {};

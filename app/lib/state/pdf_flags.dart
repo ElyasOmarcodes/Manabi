@@ -42,6 +42,18 @@ class PdfFlags {
     return v;
   }
 
+  /// Many answers at once (the first-run library and its refreshes).
+  static Future<void> noteMany(Map<String, bool> flags) async {
+    if (flags.isEmpty) return;
+    _known.addAll(flags);
+    try {
+      await _box?.putAll(flags);
+    } catch (_) {}
+    changes.value++;
+  }
+
+  static int get knownCount => _known.length;
+
   /// A book whose details were loaded anyway (reader, book page).
   static void note(String bookId, bool hasPdf) {
     if (_known[bookId] == hasPdf) return;

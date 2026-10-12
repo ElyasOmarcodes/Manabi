@@ -1574,4 +1574,44 @@ class AppLocalizationsAr extends AppLocalizations {
   String scopeTooMany(String n) {
     return 'حتى $n عمليات بحث معًا';
   }
+
+  @override
+  String get setupTitle => 'تجهيز المكتبة';
+
+  @override
+  String get setupSub =>
+      'في المرة الأولى فقط: تُبنى قائمة الكتب على جهازك ليكون البحث والقراءة سريعين ودون اتصال.';
+
+  @override
+  String get setupStorage => 'مكان التخزين';
+
+  @override
+  String get setupCatalog => 'الكتب والمؤلفون والتصنيفات';
+
+  @override
+  String get setupExtra => 'كتب التراث الجديدة';
+
+  @override
+  String get setupPdf => 'قائمة الكتب ذات PDF';
+
+  @override
+  String get setupOfflineNote =>
+      'بقيت أجزاء دون اتصال، وستكتمل تلقائيًا لاحقًا.';
+
+  @override
+  String get setupContinue => 'ابدأ';
+
+  @override
+  String get librarySync => 'تحديث المكتبة';
+
+  @override
+  String get librarySyncSub => 'الكتب الجديدة وقائمة PDF؛ يوميًا تلقائيًا';
+
+  @override
+  String readCacheInfo(String n) {
+    return '$n صفحة مقروءة محفوظة دون اتصال';
+  }
+
+  @override
+  String get clearReadCache => 'مسح الصفحات المقروءة';
 }

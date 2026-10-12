@@ -7,9 +7,11 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 
 import 'core/catalog/catalog_service.dart';
+import 'core/storage/app_dirs.dart';
 import 'core/storage/chat_store.dart';
 import 'l10n/fallback_localizations.dart';
 import 'l10n/gen/app_localizations.dart';
+import 'state/catalog_sync.dart';
 import 'state/chat_controller.dart';
 import 'state/downloads.dart';
 import 'state/discovered_books.dart';
@@ -17,9 +19,11 @@ import 'state/layer_ai.dart';
 import 'state/pdf_flags.dart';
 import 'state/nav_controller.dart';
 import 'state/reading_controller.dart';
+import 'state/read_cache.dart';
 import 'state/search_history.dart';
 import 'state/settings_controller.dart';
 import 'ui/home_shell.dart';
+import 'ui/screens/setup_screen.dart';
 import 'ui/screens/splash_screen.dart';
 import 'ui/theme.dart';
 import 'ui/widgets/visual_arrow_keys.dart';
@@ -33,26 +37,36 @@ void main() {
 }
 
 class AppServices {
-  AppServices(this.catalog, this.settings, this.chats);
+  AppServices(this.catalog, this.settings, this.chats, {required this.sync, this.needsSetup = false});
   final CatalogService catalog;
   final SettingsController settings;
   final ChatController chats;
 
+  /// Builds and refreshes the library on the device.
+  final CatalogSync sync;
+
+  /// First launch: the library is built before the app opens.
+  final bool needsSetup;
+
   static Future<AppServices> load() async {
     final minSplash = Future<void>.delayed(const Duration(milliseconds: 3800));
+    final storagePath = await initAppStorage();
     final catalog = await CatalogService.load();
     final settings = await SettingsController.load(catalog);
-    final store = await ChatStore.open();
+    final store = await ChatStore.open(init: false);
     await DownloadController.open();
     await PageMatnAi.open();
     await SearchHistory.open();
+    await ReadCache.open();
     await DiscoveredBooks.open(catalog);
     await PdfFlags.open(() => settings.backend);
-    // The server's shared list of books found beyond the snapshot.
-    unawaited(settings.backend.discoveredBooks().then(DiscoveredBooks.noteRows).catchError((Object _) {}));
+    final sync = CatalogSync(catalog, () => settings.backend, storagePath: storagePath);
+    final needsSetup = await CatalogSync.needsSetup();
+    // Later launches refresh the shared lists (new books, PDFs) quietly.
+    if (!needsSetup) unawaited(sync.startBackground());
     final chats = ChatController(store, () => settings.backend)..modelProvider = () => settings.chatModel.isEmpty ? null : settings.chatModel;
     await minSplash;
-    return AppServices(catalog, settings, chats);
+    return AppServices(catalog, settings, chats, sync: sync, needsSetup: needsSetup);
   }
 }
 
@@ -99,15 +113,23 @@ class _ManabiAppState extends State<ManabiApp> {
               ChangeNotifierProvider(create: (_) => NavController()),
               ChangeNotifierProvider(create: (_) => ReadingController()..load()),
               ChangeNotifierProvider.value(value: DownloadController.instance ?? DownloadController.empty()),
+              ChangeNotifierProvider.value(value: services.sync),
             ],
-            child: const _App(),
+            child: _App(needsSetup: services.needsSetup),
           );
         },
       );
 }
 
-class _App extends StatelessWidget {
-  const _App();
+class _App extends StatefulWidget {
+  const _App({this.needsSetup = false});
+  final bool needsSetup;
+  @override
+  State<_App> createState() => _AppState();
+}
+
+class _AppState extends State<_App> {
+  late bool _setup = widget.needsSetup;
 
   @override
   Widget build(BuildContext context) {
@@ -138,7 +160,15 @@ class _App extends StatelessWidget {
         final phone = mq.size.shortestSide < 600;
         return MediaQuery(data: mq.copyWith(textScaler: TextScaler.linear(base * (phone ? 0.9 : 1.0) * settings.textScale)), child: VisualArrowKeys(child: child!));
       },
-      home: const HomeShell(),
+      home: _setup
+          ? SetupScreen(
+              sync: context.read<CatalogSync>(),
+              onDone: () {
+                setState(() => _setup = false);
+                context.read<CatalogSync>().startBackground();
+              },
+            )
+          : const HomeShell(),
     );
   }
 }

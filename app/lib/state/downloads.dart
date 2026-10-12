@@ -11,6 +11,7 @@ import '../core/models/library.dart';
 import '../core/models/scope.dart';
 import '../core/pipeline/answer_pipeline.dart' show AskRequest;
 import 'discovered_books.dart';
+import 'read_cache.dart';
 
 /// A book kept on the device for offline reading.
 class SavedBook {
@@ -250,8 +251,12 @@ class OfflineFirstBackend implements ManabiBackend {
       final kept = await _d?.page(bookId, page);
       if (kept != null) return kept;
     } catch (_) {}
+    // A page read before opens from the device, at once and offline.
+    final cached = await ReadCache.page(bookId, page);
+    if (cached != null) return cached;
     final p = await inner.page(bookId, page);
     DiscoveredBooks.notePassages([p]);
+    unawaited(ReadCache.putPage(p));
     return p;
   }
 
@@ -260,10 +265,11 @@ class OfflineFirstBackend implements ManabiBackend {
     try {
       final d = await inner.book(id);
       DiscoveredBooks.noteBook(d);
+      unawaited(ReadCache.putBook(d));
       return d;
     } catch (e) {
-      // Offline: the saved copy of the book's index.
-      final kept = await _d?.details(id).catchError((Object _) => null);
+      // Offline: the saved copy of the book's index, or the one read last.
+      final kept = (await _d?.details(id).catchError((Object _) => null)) ?? await ReadCache.book(id);
       if (kept != null) return kept;
       rethrow;
     }
@@ -299,4 +305,6 @@ class OfflineFirstBackend implements ManabiBackend {
   Future<Map<String, bool>> pdfFlags(List<String> ids) => inner.pdfFlags(ids);
   @override
   Future<({List<ModelInfo> models, String? auto})> models() => inner.models();
+  @override
+  Future<Map<String, bool>> pdfFlagsAll() => inner.pdfFlagsAll();
 }

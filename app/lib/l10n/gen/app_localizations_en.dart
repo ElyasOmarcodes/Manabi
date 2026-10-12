@@ -1582,4 +1582,44 @@ class AppLocalizationsEn extends AppLocalizations {
   String scopeTooMany(String n) {
     return 'Up to $n searches at once';
   }
+
+  @override
+  String get setupTitle => 'Preparing your library';
+
+  @override
+  String get setupSub =>
+      'First launch only: the book list is built on your device so searching and reading are fast and work offline.';
+
+  @override
+  String get setupStorage => 'Storage folder';
+
+  @override
+  String get setupCatalog => 'Books, authors and categories';
+
+  @override
+  String get setupExtra => 'Newer Turath books';
+
+  @override
+  String get setupPdf => 'Books with a scanned PDF';
+
+  @override
+  String get setupOfflineNote =>
+      'Some parts need the internet; they complete by themselves later.';
+
+  @override
+  String get setupContinue => 'Start';
+
+  @override
+  String get librarySync => 'Refresh the library';
+
+  @override
+  String get librarySyncSub => 'New books and the PDF list; daily by itself';
+
+  @override
+  String readCacheInfo(String n) {
+    return '$n pages you read are kept offline';
+  }
+
+  @override
+  String get clearReadCache => 'Clear read pages';
 }

@@ -755,5 +755,24 @@
         "type": "String"
       }
     }
-  }
+  },
+  "setupTitle": "Preparing your library",
+  "setupSub": "First launch only: the book list is built on your device so searching and reading are fast and work offline.",
+  "setupStorage": "Storage folder",
+  "setupCatalog": "Books, authors and categories",
+  "setupExtra": "Newer Turath books",
+  "setupPdf": "Books with a scanned PDF",
+  "setupOfflineNote": "Some parts need the internet; they complete by themselves later.",
+  "setupContinue": "Start",
+  "librarySync": "Refresh the library",
+  "librarySyncSub": "New books and the PDF list; daily by itself",
+  "readCacheInfo": "{n} pages you read are kept offline",
+  "@readCacheInfo": {
+    "placeholders": {
+      "n": {
+        "type": "String"
+      }
+    }
+  },
+  "clearReadCache": "Clear read pages"
 }

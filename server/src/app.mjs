@@ -180,6 +180,8 @@ export const createApp = ({ config, pipeline, turath: client, catalog, gemini, n
       }
       return stripRaw({ items, totalMatches: results.reduce((n, r) => n + (r.totalMatches ?? 0), 0), page });
     }],
+    // Every PDF answer the server has gathered, in one go.
+    ["GET", /^\/api\/books\/pdf\/all$/, async () => ({ pdf: pdfFlags.all?.() ?? {} })],
     // Which of these books have a scanned PDF (at most 60 ids).
     ["GET", /^\/api\/books\/pdf$/, async (_m, url) => {
       const ids = [...new Set((url.searchParams.get("ids") ?? "").split(",").map((s) => s.trim()).filter((s) => /^[1-9]\d{0,7}$/.test(s)))].slice(0, 60);

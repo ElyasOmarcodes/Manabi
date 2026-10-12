@@ -1575,4 +1575,44 @@ class AppLocalizationsPs extends AppLocalizations {
   String scopeTooMany(String n) {
     return 'تر $n لټونونو پورې یو ځل کېږي';
   }
+
+  @override
+  String get setupTitle => 'کتابتون چمتو کېږي';
+
+  @override
+  String get setupSub =>
+      'یوازې لومړی ځل: د کتابونو لېست ستاسو په وسیله کې جوړېږي چې لټون او لوستل چټک او آفلاین وي.';
+
+  @override
+  String get setupStorage => 'د ذخیرې ځای';
+
+  @override
+  String get setupCatalog => 'کتابونه، مؤلفین او ډلې';
+
+  @override
+  String get setupExtra => 'د تراث نوي کتابونه';
+
+  @override
+  String get setupPdf => 'د PDF لرونکو کتابونو لېست';
+
+  @override
+  String get setupOfflineNote =>
+      'ځینې برخې پرته له انټرنېټه پاتې شوې؛ وروسته پخپله بشپړېږي.';
+
+  @override
+  String get setupContinue => 'پیل';
+
+  @override
+  String get librarySync => 'د کتابتون تازه کول';
+
+  @override
+  String get librarySyncSub => 'نوي کتابونه او د PDF لېست؛ هره ورځ پخپله';
+
+  @override
+  String readCacheInfo(String n) {
+    return '$n لوستل شوې پاڼې آفلاین ساتل شوې';
+  }
+
+  @override
+  String get clearReadCache => 'لوستل شوې پاڼې پاکول';
 }

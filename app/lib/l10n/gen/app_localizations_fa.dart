@@ -1577,4 +1577,44 @@ class AppLocalizationsFa extends AppLocalizations {
   String scopeTooMany(String n) {
     return 'حداکثر $n جست‌وجو هم‌زمان';
   }
+
+  @override
+  String get setupTitle => 'کتابخانه آماده می‌شود';
+
+  @override
+  String get setupSub =>
+      'فقط بار نخست: فهرست کتاب‌ها روی دستگاه شما ساخته می‌شود تا جست‌وجو و خواندن سریع و آفلاین باشد.';
+
+  @override
+  String get setupStorage => 'محل ذخیره';
+
+  @override
+  String get setupCatalog => 'کتاب‌ها، مؤلفان و دسته‌ها';
+
+  @override
+  String get setupExtra => 'کتاب‌های تازه تراث';
+
+  @override
+  String get setupPdf => 'فهرست کتاب‌های دارای PDF';
+
+  @override
+  String get setupOfflineNote =>
+      'برخی بخش‌ها بدون اینترنت ماند؛ بعداً خودکار کامل می‌شود.';
+
+  @override
+  String get setupContinue => 'شروع';
+
+  @override
+  String get librarySync => 'به‌روزرسانی کتابخانه';
+
+  @override
+  String get librarySyncSub => 'کتاب‌های تازه و فهرست PDF؛ هر روز خودکار';
+
+  @override
+  String readCacheInfo(String n) {
+    return '$n صفحه خوانده‌شده آفلاین نگه داشته شده';
+  }
+
+  @override
+  String get clearReadCache => 'پاک کردن صفحه‌های خوانده‌شده';
 }

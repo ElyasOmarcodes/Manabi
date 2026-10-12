@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:hive_ce_flutter/hive_flutter.dart';
 
 import '../models/chat.dart';
+import 'app_dirs.dart';
 
 /// Persists chats as JSON strings in a Hive box (works on every platform,
 /// IndexedDB on the web).
@@ -11,8 +12,8 @@ class ChatStore {
 
   final Box<String> _box;
 
-  static Future<ChatStore> open() async {
-    await Hive.initFlutter('manabi');
+  static Future<ChatStore> open({bool init = true}) async {
+    if (init) await initAppStorage();
     return ChatStore._(await Hive.openBox<String>('chats'));
   }
 

@@ -11,6 +11,7 @@ import 'package:manabi/core/models/answer.dart';
 import 'package:manabi/core/pipeline/answer_pipeline.dart';
 import 'package:manabi/core/storage/chat_store.dart';
 import 'package:manabi/main.dart';
+import 'package:manabi/state/catalog_sync.dart';
 import 'package:manabi/state/chat_controller.dart';
 import 'package:manabi/state/settings_controller.dart';
 import 'package:manabi/ui/export/exporter.dart';
@@ -102,7 +103,7 @@ void main() {
       final catalog = CatalogService.parse(File('assets/catalog/catalog.json').readAsStringSync());
       final settings = await SettingsController.load(catalog);
       final store = await ChatStore.openAt(tmp.path);
-      return AppServices(catalog, settings, ChatController(store, () => settings.backend));
+      return AppServices(catalog, settings, ChatController(store, () => settings.backend), sync: CatalogSync(catalog, () => settings.backend));
     }
 
     testWidgets('welcome screen, unconfigured warning and navigation', (tester) async {

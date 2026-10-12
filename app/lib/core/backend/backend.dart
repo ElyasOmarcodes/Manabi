@@ -84,6 +84,9 @@ abstract class ManabiBackend {
 
   /// The text models the key can call, and the one chosen automatically.
   Future<({List<ModelInfo> models, String? auto})> models();
+
+  /// Every PDF answer the server has gathered (empty without a server).
+  Future<Map<String, bool>> pdfFlagsAll();
 }
 
 /// Several searches' pages taken in turn, without repeats; totals add up.
@@ -238,6 +241,12 @@ class ServerBackend implements ManabiBackend {
   }
 
   @override
+  Future<Map<String, bool>> pdfFlagsAll() async {
+    final j = await _get('/api/books/pdf/all');
+    return {for (final e in (j['pdf'] as Map? ?? const {}).entries) '${e.key}': e.value == true};
+  }
+
+  @override
   Future<({List<ModelInfo> models, String? auto})> models() async {
     final j = await _get('/api/models');
     return (models: [for (final m in (j['models'] as List? ?? const []).whereType<Map>()) ModelInfo.fromJson(m.cast<String, dynamic>())], auto: j['auto'] as String?);
@@ -333,6 +342,9 @@ class DirectBackend implements ManabiBackend {
   @override
   Future<List<dynamic>> discoveredBooks() async => const [];
   @override
+  Future<Map<String, bool>> pdfFlagsAll() async => const {};
+
+  @override
   Future<({List<ModelInfo> models, String? auto})> models() => _wrap(() async {
         final list = await _gemini.chatModelList();
         return (models: list, auto: await _gemini.resolveModel());
@@ -392,4 +404,6 @@ class UnconfiguredBackend implements ManabiBackend {
   Future<Map<String, bool>> pdfFlags(List<String> ids) async => const {};
   @override
   Future<({List<ModelInfo> models, String? auto})> models() async => _fail();
+  @override
+  Future<Map<String, bool>> pdfFlagsAll() async => const {};
 }
