@@ -66,7 +66,7 @@ class _AuthorScreenState extends State<AuthorScreen> {
             FutureBuilder<AuthorDetails>(
               future: _future,
               builder: (context, snap) {
-                if (snap.connectionState != ConnectionState.done) return const Padding(padding: EdgeInsets.all(28), child: Center(child: TypingDots()));
+                if (snap.connectionState != ConnectionState.done) return const Padding(padding: EdgeInsets.all(28), child: Center(child: AuraProgress()));
                 final bio = snap.data?.biography?.trim();
                 if (bio == null || bio.isEmpty) return const SizedBox(height: 8);
                 return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [

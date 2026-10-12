@@ -116,7 +116,7 @@ class _BookScreenState extends State<BookScreen> {
                   ),
                 ],
                 if (snap.connectionState != ConnectionState.done)
-                  const Padding(padding: EdgeInsets.all(40), child: Center(child: AuraOrb(size: 70)))
+                  const Padding(padding: EdgeInsets.all(40), child: Center(child: AuraProgress()))
                 else if (snap.hasError)
                   SizedBox(
                     height: 320,

@@ -70,6 +70,9 @@ class ChatController extends ChangeNotifier with WidgetsBindingObserver {
 
   set backendProvider(ManabiBackend Function() fn) => _backend = fn;
 
+  /// The model the user picked for answers, or null for automatic.
+  String? Function() modelProvider = () => null;
+
   /// Text of the "preparing your answer" notification.
   set keepAliveLabels(({String title, String text}) value) => _keepAlive.labels = value;
 
@@ -227,7 +230,8 @@ class ChatController extends ChangeNotifier with WidgetsBindingObserver {
         scope: turn.scope,
         history: history,
         depth: depth,
-        requestId: requestId);
+        requestId: requestId,
+        model: modelProvider());
     _heard[turn.id] = DateTime.now();
     _running[turn.id] = _backend().ask(request).listen(
       (event) {

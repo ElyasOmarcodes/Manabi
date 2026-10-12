@@ -362,3 +362,108 @@ class BetaBadge extends StatelessWidget {
     );
   }
 }
+
+/// The app's one loading indicator: a slim rounded track with a soft
+/// gradient sweep, or a bar that fills smoothly when [value] is known.
+class AuraProgress extends StatefulWidget {
+  const AuraProgress({super.key, this.value, this.width = 150, this.height = 5, this.color, this.label});
+
+  /// 0–1, or null while the amount is unknown.
+  final double? value;
+  final double width;
+  final double height;
+  final Color? color;
+  final String? label;
+
+  @override
+  State<AuraProgress> createState() => _AuraProgressState();
+}
+
+class _AuraProgressState extends State<AuraProgress> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 1500));
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.value == null) _c.repeat();
+  }
+
+  @override
+  void didUpdateWidget(AuraProgress old) {
+    super.didUpdateWidget(old);
+    if (widget.value == null && !_c.isAnimating) _c.repeat();
+    if (widget.value != null && _c.isAnimating) _c.stop();
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final a = context.aura;
+    final color = widget.color ?? a.accent;
+    final rtl = Directionality.of(context) == TextDirection.rtl;
+    final bar = SizedBox(
+      width: widget.width,
+      height: widget.height,
+      child: widget.value == null
+          ? AnimatedBuilder(animation: _c, builder: (context, _) => CustomPaint(painter: _ProgressPainter(color, null, _c.value, rtl)))
+          : TweenAnimationBuilder<double>(
+              tween: Tween(end: widget.value!.clamp(0.0, 1.0)),
+              duration: const Duration(milliseconds: 350),
+              curve: Curves.easeOutCubic,
+              builder: (context, v, _) => CustomPaint(painter: _ProgressPainter(color, v, 0, rtl)),
+            ),
+    );
+    return Semantics(
+      label: widget.label,
+      value: widget.value == null ? null : '${(widget.value! * 100).round()}%',
+      child: widget.label == null
+          ? bar
+          : Column(mainAxisSize: MainAxisSize.min, children: [
+              bar,
+              const SizedBox(height: 10),
+              Text(widget.label!, textAlign: TextAlign.center, style: TextStyle(fontFamily: uiFont, fontSize: 12.5, color: a.muted)),
+            ]),
+    );
+  }
+}
+
+class _ProgressPainter extends CustomPainter {
+  _ProgressPainter(this.color, this.value, this.t, this.rtl);
+  final Color color;
+  final double? value;
+  final double t;
+  final bool rtl;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final r = Radius.circular(size.height / 2);
+    final track = RRect.fromRectAndRadius(Offset.zero & size, r);
+    canvas.drawRRect(track, Paint()..color = color.withValues(alpha: 0.14));
+    canvas.save();
+    canvas.clipRRect(track);
+    Rect seg;
+    if (value != null) {
+      final w = size.width * value!;
+      seg = rtl ? Rect.fromLTWH(size.width - w, 0, w, size.height) : Rect.fromLTWH(0, 0, w, size.height);
+    } else {
+      // A segment that glides across, slower at the ends.
+      final p = Curves.easeInOutCubic.transform(t);
+      final w = size.width * 0.42;
+      final x = -w + (size.width + w) * p;
+      seg = Rect.fromLTWH(rtl ? size.width - x - w : x, 0, w, size.height);
+    }
+    if (seg.width > 0) {
+      final shader = LinearGradient(colors: [color.withValues(alpha: value == null ? 0.35 : 0.75), color, color.withValues(alpha: value == null ? 0.35 : 1)]).createShader(seg);
+      canvas.drawRRect(RRect.fromRectAndRadius(seg, r), Paint()..shader = shader);
+    }
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(_ProgressPainter old) => old.value != value || old.t != t || old.color != color || old.rtl != rtl;
+}

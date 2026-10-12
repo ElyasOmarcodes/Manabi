@@ -1469,4 +1469,97 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get logicHint =>
       '«and»: pages with every phrase. «or»: pages with any of them.';
+
+  @override
+  String get answerModel => 'Answer model';
+
+  @override
+  String get modelAuto => 'Automatic';
+
+  @override
+  String modelAutoSub(String name) {
+    return 'Best available model: $name';
+  }
+
+  @override
+  String get modelAutoInfo =>
+      'Picked for you; switches to another model when a quota runs out.';
+
+  @override
+  String get modelPickerNote =>
+      'The chosen model writes the answer; quick search steps stay on Flash-Lite. If it fails, the automatic model takes over.';
+
+  @override
+  String get costLow => 'Low cost';
+
+  @override
+  String get costMedium => 'Medium cost';
+
+  @override
+  String get costHigh => 'High cost';
+
+  @override
+  String get modelsLoadFailed => 'Could not list the models';
+
+  @override
+  String get modelsFromKey => 'Models active for your key';
+
+  @override
+  String get modelsFromServer => 'Models active for the server\'s key';
+
+  @override
+  String get fillIn => 'Put in the field';
+
+  @override
+  String get forget => 'Forget';
+
+  @override
+  String get addComment => 'Add a comment';
+
+  @override
+  String get comment => 'Comment';
+
+  @override
+  String get commentHint => 'Write your note on this passage…';
+
+  @override
+  String get commentSaved => 'Comment saved';
+
+  @override
+  String get editComment => 'Edit comment';
+
+  @override
+  String get deleteComment => 'Delete comment';
+
+  @override
+  String get reportError => 'Report a text error';
+
+  @override
+  String get reportErrorInfo =>
+      'The selected text and its place go with the report. Describe the error briefly.';
+
+  @override
+  String get selectedText => 'Selected text';
+
+  @override
+  String get errorDescription => 'What is wrong';
+
+  @override
+  String get errorDescriptionHint =>
+      'e.g. a word is misprinted; it should be «…»';
+
+  @override
+  String get sendWhatsApp => 'WhatsApp';
+
+  @override
+  String get sendEmail => 'Gmail / email';
+
+  @override
+  String get reportSubject => 'Text error — Manabi';
+
+  @override
+  String get reportLocation => 'Location';
+
+  @override
+  String get couldNotOpen => 'Could not open it';
 }

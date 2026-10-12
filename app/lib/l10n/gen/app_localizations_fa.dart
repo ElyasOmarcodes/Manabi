@@ -894,7 +894,7 @@ class AppLocalizationsFa extends AppLocalizations {
   String get highlightSaved => 'هایلایت شد';
 
   @override
-  String get removeHighlight => 'حذف هایلایت';
+  String get removeHighlight => 'حذف برجسته‌سازی';
 
   @override
   String get noHighlights => 'متنی را در کتاب انتخاب و «هایلایت» را بزنید.';
@@ -1464,4 +1464,97 @@ class AppLocalizationsFa extends AppLocalizations {
   @override
   String get logicHint =>
       '«و»: صفحه‌هایی که همه عبارت‌ها را دارند. «یا»: که یکی را دارند.';
+
+  @override
+  String get answerModel => 'مدل پاسخ';
+
+  @override
+  String get modelAuto => 'خودکار';
+
+  @override
+  String modelAutoSub(String name) {
+    return 'بهترین مدل موجود: $name';
+  }
+
+  @override
+  String get modelAutoInfo =>
+      'مدل خودکار انتخاب می‌شود؛ اگر سهمیه تمام شود به مدل دیگر می‌رود.';
+
+  @override
+  String get modelPickerNote =>
+      'مدل انتخاب‌شده پاسخ را می‌نویسد؛ گام‌های سریع جست‌وجو با Flash-Lite می‌مانند. اگر مدل کار نکند، مدل خودکار جای آن را می‌گیرد.';
+
+  @override
+  String get costLow => 'توکن کم';
+
+  @override
+  String get costMedium => 'توکن متوسط';
+
+  @override
+  String get costHigh => 'توکن زیاد';
+
+  @override
+  String get modelsLoadFailed => 'فهرست مدل‌ها دریافت نشد';
+
+  @override
+  String get modelsFromKey => 'مدل‌های فعال کلید شما';
+
+  @override
+  String get modelsFromServer => 'مدل‌های فعال کلید سرور';
+
+  @override
+  String get fillIn => 'در کادر بگذار';
+
+  @override
+  String get forget => 'فراموش کن';
+
+  @override
+  String get addComment => 'یادداشت بنویسید';
+
+  @override
+  String get comment => 'یادداشت';
+
+  @override
+  String get commentHint => 'یادداشت خود را درباره این متن بنویسید…';
+
+  @override
+  String get commentSaved => 'یادداشت ذخیره شد';
+
+  @override
+  String get editComment => 'ویرایش یادداشت';
+
+  @override
+  String get deleteComment => 'حذف یادداشت';
+
+  @override
+  String get reportError => 'گزارش خطای متن';
+
+  @override
+  String get reportErrorInfo =>
+      'متن انتخاب‌شده و جای آن همراه گزارش می‌رود. خطا را کوتاه بنویسید.';
+
+  @override
+  String get selectedText => 'متن انتخاب‌شده';
+
+  @override
+  String get errorDescription => 'شرح خطا';
+
+  @override
+  String get errorDescriptionHint =>
+      'مثلاً: کلمه‌ای اشتباه چاپ شده، درستش «…» است';
+
+  @override
+  String get sendWhatsApp => 'WhatsApp';
+
+  @override
+  String get sendEmail => 'Gmail / ایمیل';
+
+  @override
+  String get reportSubject => 'خطای متن — منابع';
+
+  @override
+  String get reportLocation => 'مکان';
+
+  @override
+  String get couldNotOpen => 'باز نشد';
 }

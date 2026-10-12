@@ -1462,4 +1462,97 @@ class AppLocalizationsPs extends AppLocalizations {
   @override
   String get logicHint =>
       '«او»: هغه مخونه چې ټول عبارتونه لري. «یا»: چې یو یې لري.';
+
+  @override
+  String get answerModel => 'د ځواب ماډل';
+
+  @override
+  String get modelAuto => 'اتومات';
+
+  @override
+  String modelAutoSub(String name) {
+    return 'تر ټولو ښه شته ماډل: $name';
+  }
+
+  @override
+  String get modelAutoInfo =>
+      'ماډل پخپله ټاکل کېږي؛ که کوټه پای ته ورسېږي بل ته اوړي.';
+
+  @override
+  String get modelPickerNote =>
+      'ټاکل شوی ماډل ځواب لیکي؛ د لټون چټک ګامونه د Flash-Lite سره پاتې کېږي. که ماډل کار ونه کړي، اتومات ماډل یې ځای نیسي.';
+
+  @override
+  String get costLow => 'لږ ټوکن';
+
+  @override
+  String get costMedium => 'منځني ټوکن';
+
+  @override
+  String get costHigh => 'ډېر ټوکن';
+
+  @override
+  String get modelsLoadFailed => 'د ماډلونو لېست رانغی';
+
+  @override
+  String get modelsFromKey => 'ستاسو د کیلي فعال ماډلونه';
+
+  @override
+  String get modelsFromServer => 'د سرور د کیلي فعال ماډلونه';
+
+  @override
+  String get fillIn => 'په بکس کې یې کېږده';
+
+  @override
+  String get forget => 'هېر یې کړه';
+
+  @override
+  String get addComment => 'تبصره ولیکئ';
+
+  @override
+  String get comment => 'تبصره';
+
+  @override
+  String get commentHint => 'د دې متن په اړه خپل یادښت ولیکئ…';
+
+  @override
+  String get commentSaved => 'تبصره خوندي شوه';
+
+  @override
+  String get editComment => 'تبصره سمول';
+
+  @override
+  String get deleteComment => 'تبصره ړنګول';
+
+  @override
+  String get reportError => 'د متن تېروتنه راپور کړئ';
+
+  @override
+  String get reportErrorInfo =>
+      'ټاکل شوی متن او ځای یې له راپور سره ځي. تېروتنه مو لنډه ولیکئ.';
+
+  @override
+  String get selectedText => 'ټاکل شوی متن';
+
+  @override
+  String get errorDescription => 'د تېروتنې شرح';
+
+  @override
+  String get errorDescriptionHint =>
+      'مثلاً: یوه کلمه غلطه چاپ شوې، سم یې «…» دی';
+
+  @override
+  String get sendWhatsApp => 'WhatsApp';
+
+  @override
+  String get sendEmail => 'Gmail / برېښنالیک';
+
+  @override
+  String get reportSubject => 'د متن تېروتنه — منابع';
+
+  @override
+  String get reportLocation => 'ځای';
+
+  @override
+  String get couldNotOpen => 'خلاصول یې ممکن نه شول';
 }

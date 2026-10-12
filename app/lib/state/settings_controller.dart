@@ -34,6 +34,9 @@ class SettingsController extends ChangeNotifier {
   String accessToken = '';
   String geminiKey = '';
   String modelOverride = '';
+
+  /// The model that writes answers ('' = chosen automatically).
+  String chatModel = '';
   int maxSources = 12;
   double arabicScale = 1.0;
 
@@ -63,6 +66,7 @@ class SettingsController extends ChangeNotifier {
     c.mode = savedMode ?? (c.serverUrl.isEmpty && c.directAvailable ? ConnectionMode.direct : ConnectionMode.server);
     if (!c.directAvailable) c.mode = ConnectionMode.server;
     c.modelOverride = prefs.getString('modelOverride') ?? '';
+    c.chatModel = prefs.getString('chatModel') ?? c.modelOverride;
     c.maxSources = prefs.getInt('maxSources') ?? 12;
     c.arabicScale = prefs.getDouble('arabicScale') ?? 1.0;
     c.researchDepth = prefs.getString('researchDepth') ?? 'standard';
@@ -86,7 +90,9 @@ class SettingsController extends ChangeNotifier {
     if (mode == ConnectionMode.direct) {
       if (!directAvailable) return const UnconfiguredBackend('DIRECT_NOT_ON_WEB');
       if (geminiKey.trim().isEmpty) return const UnconfiguredBackend('NO_API_KEY');
-      return DirectBackend(apiKey: geminiKey.trim(), catalog: _catalog, model: modelOverride.trim().isEmpty ? null : modelOverride.trim());
+      // The picked model is preferred per question (see [chatModel]), so the
+      // others still take over when it is out of quota.
+      return DirectBackend(apiKey: geminiKey.trim(), catalog: _catalog);
     }
     if (serverUrl.trim().isEmpty) return const UnconfiguredBackend('SERVER_NOT_CONFIGURED');
     return ServerBackend(serverUrl.trim(), accessToken: accessToken.trim());
@@ -142,6 +148,12 @@ class SettingsController extends ChangeNotifier {
     geminiKey = v.trim();
     await _secureWrite('geminiKey', geminiKey);
     _changed(backendChanged: true);
+  }
+
+  Future<void> setChatModel(String v) async {
+    chatModel = v.trim();
+    await _prefs.setString('chatModel', chatModel);
+    notifyListeners();
   }
 
   Future<void> setModelOverride(String v) async {
@@ -205,6 +217,7 @@ class SettingsController extends ChangeNotifier {
     accessToken = '';
     geminiKey = '';
     modelOverride = '';
+    chatModel = '';
     maxSources = 12;
     arabicScale = 1.0;
     researchDepth = 'standard';

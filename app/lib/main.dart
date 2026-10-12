@@ -15,6 +15,7 @@ import 'state/layer_ai.dart';
 import 'state/pdf_flags.dart';
 import 'state/nav_controller.dart';
 import 'state/reading_controller.dart';
+import 'state/search_history.dart';
 import 'state/settings_controller.dart';
 import 'ui/home_shell.dart';
 import 'ui/screens/splash_screen.dart';
@@ -39,11 +40,12 @@ class AppServices {
     final store = await ChatStore.open();
     await DownloadController.open();
     await PageMatnAi.open();
+    await SearchHistory.open();
     await DiscoveredBooks.open(catalog);
     await PdfFlags.open(() => settings.backend);
     // The server's shared list of books found beyond the snapshot.
     unawaited(settings.backend.discoveredBooks().then(DiscoveredBooks.noteRows).catchError((Object _) {}));
-    final chats = ChatController(store, () => settings.backend);
+    final chats = ChatController(store, () => settings.backend)..modelProvider = () => settings.chatModel.isEmpty ? null : settings.chatModel;
     await minSplash;
     return AppServices(catalog, settings, chats);
   }

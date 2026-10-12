@@ -47,6 +47,44 @@ export const rankModels = (models, tier = "main") => {
 /** Kept for compatibility: the best "main" model. */
 export const pickModel = (models) => rankModels(models, "main")[0];
 
+/** Rough token cost of a model, from its name: "high", "medium" or "low". */
+export const modelCost = (id) => {
+  if (/gemma|flash-lite|nano|-8b\b/.test(id)) return "low";
+  if (/pro|ultra|deep-?think/.test(id)) return "high";
+  return "medium";
+};
+
+const NOT_CHAT = /embed|aqa|imagen|veo|tts|image|audio|live|learnlm|robotics|computer-use|lyria|banana|gemini-diffusion/;
+const versionOf = (id) => Number(/-(\d+(?:\.\d+)?)/.exec(id)?.[1] ?? 0);
+
+/** Text models the key can call, Gemini first, newest and strongest first. */
+export const chatModels = (models) =>
+  models
+    .filter((m) => (m.supportedGenerationMethods ?? ["generateContent"]).includes("generateContent"))
+    .map((m) => ({ id: String(m.name ?? m).replace(/^models\//, ""), m }))
+    .filter(({ id }) => /^(gemini|gemma)-/.test(id) && !NOT_CHAT.test(id))
+    .map(({ id, m }) => ({ id, name: m.displayName ?? id, cost: modelCost(id), input: m.inputTokenLimit ?? 0, output: m.outputTokenLimit ?? 0 }))
+    .sort((a, b) => {
+      const fam = (x) => (x.id.startsWith("gemma") ? 1 : 0);
+      const rank = { high: 0, medium: 1, low: 2 };
+      return fam(a) - fam(b) || versionOf(b.id) - versionOf(a.id) || rank[a.cost] - rank[b.cost] || a.id.localeCompare(b.id);
+    });
+
+/** Gemma takes no system instruction or JSON schema: both go in the prompt. */
+export const isGemma = (id) => /^(?:models\/)?gemma/.test(id);
+
+/** The JSON object in a reply, also when it is wrapped in prose or fences. */
+export const parseJsonReply = (text) => {
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    const start = text.indexOf("{");
+    const end = text.lastIndexOf("}");
+    if (start >= 0 && end > start) return JSON.parse(text.slice(start, end + 1));
+    throw error;
+  }
+};
+
 /** A 429 that names a daily/plan quota (as opposed to a short burst limit). */
 const isExhausted = (message) => /quota|exceeded your current/i.test(message ?? "");
 
@@ -150,11 +188,13 @@ export const createGemini = ({ apiKey, model, fetch: fetcher = fetch, timeoutMs 
     return available;
   };
 
-  /** Candidate models for a tier, best first, without benched ones. */
-  const candidates = async (tier) => {
+  /** Candidate models for a tier, best first, without benched ones; a model
+   * the user picked (and the key can call) comes first. */
+  const candidates = async (tier, prefer) => {
     if (model) return [model];
     const listed = await listModels();
-    const unique = [...new Set([...rankModels(listed, tier), ...(listed.length ? [] : FALLBACK[tier])])];
+    const picked = prefer && chatModels(listed).some((m) => m.id === prefer) ? [prefer] : [];
+    const unique = [...new Set([...picked, ...rankModels(listed, tier), ...(listed.length ? [] : FALLBACK[tier])])];
     return unique.filter((m) => (benched.get(m)?.until ?? 0) <= now());
   };
 
@@ -189,10 +229,14 @@ export const createGemini = ({ apiKey, model, fetch: fetcher = fetch, timeoutMs 
    * while and the next model is tried at once; switching models does not use
    * up the retry budget, and the whole call has a time limit.
    */
-  const generateJson = async ({ system, prompt, schema, temperature = 0.2, tier = "main", onText }) => {
+  const generateJson = async ({ system, prompt, schema, temperature = 0.2, tier = "main", onText, prefer }) => {
     const limits = tierLimits[tier] ?? tierLimits.main;
     const deadline = now() + limits.totalMs;
     const bodyFor = (name) => {
+      if (isGemma(name)) {
+        const text = `${system}\n\n${prompt}\n\nReply with one JSON object only (no prose, no code fences) that follows this JSON schema:\n${JSON.stringify(schema)}`;
+        return { contents: [{ role: "user", parts: [{ text }] }], generationConfig: { temperature } };
+      }
       const thinkingConfig = thinkingFor(name);
       return {
         systemInstruction: { parts: [{ text: system }] },
@@ -204,7 +248,7 @@ export const createGemini = ({ apiKey, model, fetch: fetcher = fetch, timeoutMs 
     let retries = 0;
     const tried = new Set();
     for (;;) {
-      const name = (await candidates(tier)).find((m) => !tried.has(m));
+      const name = (await candidates(tier, prefer)).find((m) => !tried.has(m));
       if (!name) {
         // Nothing left: report the most telling reason (quota beats the rest).
         const stored = [...benched.values()].map((b) => b.error);
@@ -233,7 +277,7 @@ export const createGemini = ({ apiKey, model, fetch: fetcher = fetch, timeoutMs 
           usage = result.usageMetadata;
         }
         try {
-          return { data: JSON.parse(text), model: name, usage: usageOf(usage) };
+          return { data: parseJsonReply(text), model: name, usage: usageOf(usage) };
         } catch {
           throw new GeminiError("BAD_OUTPUT", "Gemini returned malformed JSON", { retryable: true });
         }
@@ -241,6 +285,11 @@ export const createGemini = ({ apiKey, model, fetch: fetcher = fetch, timeoutMs 
         // A model that does not accept the thinking setting: ask again without it.
         if (raw instanceof GeminiError && raw.status === 400 && body.generationConfig.thinkingConfig && /think/i.test(raw.message)) {
           noThinking.add(name);
+          continue;
+        }
+        // The picked model refused the request: the usual models take over.
+        if (raw instanceof GeminiError && name === prefer && raw.status === 400) {
+          tried.add(name);
           continue;
         }
         const error = raw instanceof GeminiError ? new GeminiError(raw.code, `${raw.message} [${name}]`, { status: raw.status, retryable: raw.retryable }) : raw;
@@ -266,5 +315,8 @@ export const createGemini = ({ apiKey, model, fetch: fetcher = fetch, timeoutMs 
     }
   };
 
-  return { generateJson, resolveModel };
+  /** The text models the key can call (empty when they cannot be listed). */
+  const models = async () => chatModels(await listModels());
+
+  return { generateJson, resolveModel, models };
 };

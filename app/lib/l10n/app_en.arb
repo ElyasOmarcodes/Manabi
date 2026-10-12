@@ -700,5 +700,41 @@
       }
     }
   },
-  "logicHint": "«and»: pages with every phrase. «or»: pages with any of them."
+  "logicHint": "«and»: pages with every phrase. «or»: pages with any of them.",
+  "answerModel": "Answer model",
+  "modelAuto": "Automatic",
+  "modelAutoSub": "Best available model: {name}",
+  "@modelAutoSub": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "modelAutoInfo": "Picked for you; switches to another model when a quota runs out.",
+  "modelPickerNote": "The chosen model writes the answer; quick search steps stay on Flash-Lite. If it fails, the automatic model takes over.",
+  "costLow": "Low cost",
+  "costMedium": "Medium cost",
+  "costHigh": "High cost",
+  "modelsLoadFailed": "Could not list the models",
+  "modelsFromKey": "Models active for your key",
+  "modelsFromServer": "Models active for the server's key",
+  "fillIn": "Put in the field",
+  "forget": "Forget",
+  "addComment": "Add a comment",
+  "comment": "Comment",
+  "commentHint": "Write your note on this passage…",
+  "commentSaved": "Comment saved",
+  "editComment": "Edit comment",
+  "deleteComment": "Delete comment",
+  "reportError": "Report a text error",
+  "reportErrorInfo": "The selected text and its place go with the report. Describe the error briefly.",
+  "selectedText": "Selected text",
+  "errorDescription": "What is wrong",
+  "errorDescriptionHint": "e.g. a word is misprinted; it should be «…»",
+  "sendWhatsApp": "WhatsApp",
+  "sendEmail": "Gmail / email",
+  "reportSubject": "Text error — Manabi",
+  "reportLocation": "Location",
+  "couldNotOpen": "Could not open it"
 }

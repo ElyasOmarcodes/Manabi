@@ -271,7 +271,6 @@ class _ConnectionCardState extends State<_ConnectionCard> {
   late final _url = TextEditingController(text: _s.serverUrl);
   late final _token = TextEditingController(text: _s.accessToken);
   late final _key = TextEditingController(text: _s.geminiKey);
-  late final _model = TextEditingController(text: _s.modelOverride);
   bool _testing = false;
   String? _result;
   bool _ok = false;
@@ -282,7 +281,6 @@ class _ConnectionCardState extends State<_ConnectionCard> {
     _url.dispose();
     _token.dispose();
     _key.dispose();
-    _model.dispose();
     super.dispose();
   }
 
@@ -292,7 +290,6 @@ class _ConnectionCardState extends State<_ConnectionCard> {
       await _s.setAccessToken(_token.text);
     } else {
       await _s.setGeminiKey(_key.text);
-      await _s.setModelOverride(_model.text);
     }
   }
 
@@ -378,7 +375,6 @@ class _ConnectionCardState extends State<_ConnectionCard> {
               obscure: !_showKey,
               helper: l.geminiKeyHint,
               suffix: IconButton(icon: Icon(_showKey ? Icons.visibility_off_rounded : Icons.visibility_rounded, color: a.muted), onPressed: () => setState(() => _showKey = !_showKey))),
-          _field(_model, l.modelOverride, Icons.memory_rounded, AuraHues.cyan, helper: l.modelOverrideHint),
         ],
         Row(children: [
           GradientButton(
@@ -388,7 +384,7 @@ class _ConnectionCardState extends State<_ConnectionCard> {
             height: 46,
           ),
           const SizedBox(width: 12),
-          if (_testing) const TypingDots(),
+          if (_testing) const AuraProgress(),
           if (_result != null)
             Expanded(
               child: Row(children: [

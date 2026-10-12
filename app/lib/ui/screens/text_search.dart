@@ -10,10 +10,12 @@ import '../../core/models/library.dart';
 import '../../core/models/scope.dart';
 import '../../core/turath/arabic_match.dart';
 import '../../state/downloads.dart';
+import '../../state/search_history.dart';
 import '../../state/settings_controller.dart';
 import '../theme.dart';
 import '../widgets/answer_card.dart' show QueryChip;
 import '../widgets/common.dart';
+import '../widgets/search_suggestions.dart';
 import '../widgets/scope_picker.dart';
 import '../widgets/search_hit.dart';
 import 'reader_screen.dart' show openReader;
@@ -107,8 +109,22 @@ class FullTextPage extends StatefulWidget {
   State<FullTextPage> createState() => _FullTextPageState();
 }
 
+/// The last full-text search, shown again when the page is reopened.
+class _LastSearch {
+  static String query = '';
+  static List<String> phrases = const [];
+  static List<PagePassage> items = const [];
+  static int total = 0;
+  static int page = 0;
+  static bool more = false;
+  static CatalogCategory? category;
+  static CatalogAuthor? author;
+  static CatalogBook? book;
+}
+
 class _FullTextPageState extends State<FullTextPage> {
   late final _search = TextEditingController(text: widget.initialQuery);
+  final _searchFocus = FocusNode();
   final _extra = <TextEditingController>[];
   TextSearchPrefs _prefs = TextSearchPrefs();
   CatalogCategory? _category;
@@ -135,6 +151,17 @@ class _FullTextPageState extends State<FullTextPage> {
   @override
   void initState() {
     super.initState();
+    if (widget.initialQuery.trim().isEmpty && _LastSearch.items.isNotEmpty) {
+      _search.text = _LastSearch.query;
+      _phrases = _LastSearch.phrases;
+      _items.addAll(_LastSearch.items);
+      _total = _LastSearch.total;
+      _page = _LastSearch.page;
+      _more = _LastSearch.more;
+      _category = _LastSearch.category;
+      _author = _LastSearch.author;
+      _book = _LastSearch.book;
+    }
     TextSearchPrefs.load().then((p) {
       if (!mounted) return;
       setState(() => _prefs = p);
@@ -144,7 +171,19 @@ class _FullTextPageState extends State<FullTextPage> {
 
   @override
   void dispose() {
+    if (_items.isNotEmpty) {
+      _LastSearch.query = _search.text;
+      _LastSearch.phrases = _phrases;
+      _LastSearch.items = List.of(_items);
+      _LastSearch.total = _total;
+      _LastSearch.page = _page;
+      _LastSearch.more = _more;
+      _LastSearch.category = _category;
+      _LastSearch.author = _author;
+      _LastSearch.book = _book;
+    }
     _search.dispose();
+    _searchFocus.dispose();
     for (final c in _extra) {
       c.dispose();
     }
@@ -158,6 +197,11 @@ class _FullTextPageState extends State<FullTextPage> {
     if (phrases.isEmpty || _loading) return;
     final settings = context.read<SettingsController>();
     final downloads = context.read<DownloadController>();
+    if (!more) {
+      for (final p in phrases) {
+        SearchHistory.add(p, bookId: _book?.id);
+      }
+    }
     setState(() {
       _loading = true;
       _error = null;
@@ -317,6 +361,7 @@ class _FullTextPageState extends State<FullTextPage> {
                     Expanded(
                       child: TextField(
                         controller: _search,
+                        focusNode: _searchFocus,
                         textInputAction: TextInputAction.search,
                         onSubmitted: (_) => _run(),
                         style: arabicStyle(context, size: 16),
@@ -335,6 +380,10 @@ class _FullTextPageState extends State<FullTextPage> {
                     ),
                   ]),
                 ),
+              ),
+              Directionality(
+                textDirection: TextDirection.rtl,
+                child: SearchSuggestions(controller: _search, focus: _searchFocus, bookId: _book?.id, onPick: (_) => _run()),
               ),
               FilterChipsRow(
                 category: _category,
@@ -367,7 +416,7 @@ class _FullTextPageState extends State<FullTextPage> {
     final a = context.aura;
     if (_error != null && _items.isEmpty) return ErrorPanel(code: _error, onRetry: _run);
     if (_items.isEmpty) {
-      if (_loading) return const Center(child: TypingDots());
+      if (_loading) return const Center(child: AuraProgress());
       return EmptyState(icon: Icons.manage_search_rounded, text: _phrases.isEmpty ? l.fullTextSub : l.noResults, color: AuraHues.green);
     }
     return ListView.builder(
@@ -387,7 +436,7 @@ class _FullTextPageState extends State<FullTextPage> {
               child: !_more
                   ? const SizedBox()
                   : _loading
-                      ? const TypingDots()
+                      ? const AuraProgress()
                       : SoftButton(onTap: () => _run(more: true), label: l.loadMore, icon: Icons.expand_more_rounded),
             ),
           );

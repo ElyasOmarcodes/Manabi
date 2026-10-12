@@ -83,7 +83,7 @@ class _PdfPaneState extends State<PdfPane> {
               child: Column(mainAxisSize: MainAxisSize.min, children: [
                 SizedBox(
                   width: 180,
-                  child: LinearProgressIndicator(value: total == null || total == 0 ? null : downloaded / total, minHeight: 4, borderRadius: BorderRadius.circular(4)),
+                  child: AuraProgress(value: total == null || total == 0 ? null : downloaded / total),
                 ),
                 const SizedBox(height: 10),
                 Text(l.pdfLoadingBytes(_size(downloaded)), style: TextStyle(fontFamily: uiFont, fontSize: 12.5, color: widget.muted)),

@@ -1462,4 +1462,96 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get logicHint =>
       '«و»: الصفحات التي فيها كل العبارات. «أو»: التي فيها إحداها.';
+
+  @override
+  String get answerModel => 'نموذج الإجابة';
+
+  @override
+  String get modelAuto => 'تلقائي';
+
+  @override
+  String modelAutoSub(String name) {
+    return 'أفضل نموذج متاح: $name';
+  }
+
+  @override
+  String get modelAutoInfo =>
+      'يُختار النموذج تلقائيًا، وينتقل إلى غيره إذا نفدت الحصة.';
+
+  @override
+  String get modelPickerNote =>
+      'يكتب النموذج المختار الإجابة، وتبقى خطوات البحث السريعة مع Flash-Lite. وإن تعذّر النموذج حلّ محله التلقائي.';
+
+  @override
+  String get costLow => 'رموز قليلة';
+
+  @override
+  String get costMedium => 'رموز متوسطة';
+
+  @override
+  String get costHigh => 'رموز كثيرة';
+
+  @override
+  String get modelsLoadFailed => 'تعذّر جلب قائمة النماذج';
+
+  @override
+  String get modelsFromKey => 'النماذج المتاحة لمفتاحك';
+
+  @override
+  String get modelsFromServer => 'النماذج المتاحة لمفتاح الخادم';
+
+  @override
+  String get fillIn => 'ضعها في الحقل';
+
+  @override
+  String get forget => 'احذفها';
+
+  @override
+  String get addComment => 'أضف تعليقًا';
+
+  @override
+  String get comment => 'تعليق';
+
+  @override
+  String get commentHint => 'اكتب ملاحظتك على هذا النص…';
+
+  @override
+  String get commentSaved => 'حُفظ التعليق';
+
+  @override
+  String get editComment => 'تعديل التعليق';
+
+  @override
+  String get deleteComment => 'حذف التعليق';
+
+  @override
+  String get reportError => 'الإبلاغ عن خطأ في النص';
+
+  @override
+  String get reportErrorInfo =>
+      'يُرسل النص المحدد وموضعه مع البلاغ. اكتب الخطأ باختصار.';
+
+  @override
+  String get selectedText => 'النص المحدد';
+
+  @override
+  String get errorDescription => 'وصف الخطأ';
+
+  @override
+  String get errorDescriptionHint => 'مثلًا: كلمة مطبوعة خطأً وصوابها «…»';
+
+  @override
+  String get sendWhatsApp => 'واتساب';
+
+  @override
+  String get sendEmail => 'Gmail / البريد';
+
+  @override
+  String get reportSubject => 'خطأ في النص — منابع';
+
+  @override
+  String get reportLocation => 'الموضع';
+
+  @override
+  String get couldNotOpen => 'تعذّر الفتح';
 }

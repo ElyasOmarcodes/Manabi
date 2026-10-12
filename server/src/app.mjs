@@ -121,6 +121,12 @@ export const createApp = ({ config, pipeline, turath: client, catalog, gemini, n
   };
 
   const routes = [
+    // The text models the server's key can call, for the chat's model picker.
+    ["GET", /^\/api\/models$/, async () => {
+      if (!gemini?.models) return { models: [], auto: undefined };
+      const [models, auto] = await Promise.all([gemini.models(), gemini.resolveModel().catch(() => undefined)]);
+      return { models, auto };
+    }],
     ["GET", /^\/api\/health$/, async () => ({
       ok: true,
       name: "manabi-server",

@@ -49,7 +49,7 @@ class SaveOfflineButton extends StatelessWidget {
               const SizedBox(height: 6),
               ClipRRect(
                 borderRadius: BorderRadius.circular(4),
-                child: LinearProgressIndicator(value: progress == 0 ? null : progress, minHeight: 4, color: AuraHues.teal, backgroundColor: AuraHues.teal.withValues(alpha: 0.15)),
+                child: AuraProgress(value: progress == 0 ? null : progress, width: double.infinity, height: 4, color: AuraHues.teal),
               ),
             ]),
           ),

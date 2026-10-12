@@ -129,3 +129,42 @@ test("Flash thinks briefly, and a model that rejects the setting is asked again 
   assert.deepEqual(out.data, { ok: true });
   assert.deepEqual(bodies, [{ thinkingLevel: "low" }, undefined]);
 });
+
+test("chat models: text models only, Gemini first, with a cost class", async () => {
+  const { chatModels } = await import("../src/gemini.mjs");
+  const list = chatModels([
+    { name: "models/gemma-3-27b-it", displayName: "Gemma 3 27B", supportedGenerationMethods: ["generateContent"] },
+    { name: "models/gemini-2.5-pro", displayName: "Gemini 2.5 Pro", inputTokenLimit: 1048576, supportedGenerationMethods: ["generateContent"] },
+    { name: "models/gemini-2.5-flash-lite", supportedGenerationMethods: ["generateContent"] },
+    { name: "models/text-embedding-004", supportedGenerationMethods: ["embedContent"] },
+    { name: "models/gemini-2.5-flash-preview-tts", supportedGenerationMethods: ["generateContent"] },
+    { name: "models/gemini-3-flash", supportedGenerationMethods: ["generateContent"] },
+  ]);
+  assert.deepEqual(list.map((m) => [m.id, m.cost]), [
+    ["gemini-3-flash", "medium"],
+    ["gemini-2.5-pro", "high"],
+    ["gemini-2.5-flash-lite", "low"],
+    ["gemma-3-27b-it", "low"],
+  ]);
+  assert.equal(list[1].input, 1048576);
+});
+
+test("a picked Gemma model gets the instructions in the prompt and its JSON is read from prose", async () => {
+  const { createGemini } = await import("../src/gemini.mjs");
+  const bodies = [];
+  const fetcher = async (url, init) => {
+    if (url.includes("/models?")) return new Response(JSON.stringify({ models: [{ name: "models/gemini-2.5-flash" }, { name: "models/gemma-3-27b-it" }] }), { status: 200 });
+    bodies.push({ url, body: JSON.parse(init.body) });
+    const text = url.includes("gemma") ? "```json\n{\"ok\":true}\n```" : "{\"ok\":false}";
+    return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text }] } }] }), { status: 200 });
+  };
+  const gemini = createGemini({ apiKey: "k", fetch: fetcher });
+  const out = await gemini.generateJson({ system: "SYS", prompt: "P", schema: { type: "object" }, prefer: "gemma-3-27b-it" });
+  assert.equal(out.model, "gemma-3-27b-it");
+  assert.deepEqual(out.data, { ok: true });
+  assert.equal(bodies[0].body.systemInstruction, undefined);
+  assert.match(bodies[0].body.contents[0].parts[0].text, /SYS[\s\S]*P[\s\S]*JSON schema/);
+  // An unknown pick is ignored.
+  const other = await gemini.generateJson({ system: "S", prompt: "P", schema: {}, prefer: "gemini-9-ultra" });
+  assert.equal(other.model, "gemini-2.5-flash");
+});

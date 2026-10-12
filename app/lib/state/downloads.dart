@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:hive_ce_flutter/hive_flutter.dart';
 
 import '../core/backend/backend.dart';
+import '../core/gemini/gemini_client.dart' show ModelInfo;
 import '../core/models/answer.dart';
 import '../core/models/library.dart';
 import '../core/models/scope.dart';
@@ -296,4 +297,6 @@ class OfflineFirstBackend implements ManabiBackend {
   Future<List<dynamic>> discoveredBooks() => inner.discoveredBooks();
   @override
   Future<Map<String, bool>> pdfFlags(List<String> ids) => inner.pdfFlags(ids);
+  @override
+  Future<({List<ModelInfo> models, String? auto})> models() => inner.models();
 }

@@ -239,16 +239,22 @@ class _ReferencesSheet extends StatefulWidget {
 
 class _ReferencesSheetState extends State<_ReferencesSheet> {
   final _keys = <int, GlobalKey>{};
+  late int? _focus = widget.focus;
 
   @override
   void initState() {
     super.initState();
-    if (widget.focus != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        final ctx = _keys[widget.focus]?.currentContext;
-        if (ctx != null) Scrollable.ensureVisible(ctx, duration: const Duration(milliseconds: 350), alignment: 0.05);
-      });
-    }
+    // Every card is built (no lazy list), so the cited one can be reached;
+    // the scroll waits for the sheet to finish opening.
+    if (widget.focus != null) Future<void>.delayed(const Duration(milliseconds: 280), () => _jumpTo(widget.focus!));
+  }
+
+  /// Scrolls the source numbered [n] to the top of the sheet and marks it.
+  void _jumpTo(int n) {
+    if (!mounted) return;
+    setState(() => _focus = n);
+    final ctx = _keys[n]?.currentContext;
+    if (ctx != null) Scrollable.ensureVisible(ctx, duration: const Duration(milliseconds: 450), curve: Curves.easeOutCubic, alignment: 0.03);
   }
 
   @override
@@ -275,14 +281,14 @@ class _ReferencesSheetState extends State<_ReferencesSheet> {
             ),
           ),
           Expanded(
-            child: ListView(
+            child: SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 28),
-              children: [
+              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                 for (final s in r.sources)
                   Padding(
                     key: _keys.putIfAbsent(s.n, GlobalKey.new),
                     padding: const EdgeInsets.only(bottom: 12),
-                    child: SourceCard(source: s, highlight: s.n == widget.focus),
+                    child: SourceCard(source: s, highlight: s.n == _focus),
                   ),
                 if (r.opinions.isNotEmpty) ...[
                   SectionLabel(l.opinions),
@@ -297,10 +303,8 @@ class _ReferencesSheetState extends State<_ReferencesSheet> {
                               style: const TextStyle(fontWeight: FontWeight.w700),
                             ),
                             TextSpan(text: o.view),
-                            TextSpan(
-                              text: '  ${o.sources.map((n) => '[$n]').join()}',
-                              style: TextStyle(color: a.accent, fontWeight: FontWeight.w700),
-                            ),
+                            const TextSpan(text: ' '),
+                            for (final n in o.sources) WidgetSpan(alignment: PlaceholderAlignment.middle, child: CiteChip(n: n, onTap: _jumpTo)),
                           ],
                         ),
                         style: TextStyle(fontFamily: uiFont, color: a.text, height: 1.7),
@@ -316,7 +320,7 @@ class _ReferencesSheetState extends State<_ReferencesSheet> {
                   l.disclaimer,
                   style: TextStyle(fontFamily: uiFont, fontSize: 12, color: a.faint, height: 1.6),
                 ),
-              ],
+              ]),
             ),
           ),
         ],
@@ -386,7 +390,7 @@ class SourceCard extends StatelessWidget {
       duration: const Duration(milliseconds: 400),
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
       decoration: BoxDecoration(
-        color: a.surface,
+        color: highlight ? Color.alphaBlend(a.accentTint.withValues(alpha: 0.55), a.surface) : a.surface,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: highlight ? a.accent : a.border, width: highlight ? 1.5 : 1),
       ),

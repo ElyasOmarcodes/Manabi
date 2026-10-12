@@ -63,7 +63,8 @@ class ScriptedModel implements JsonModel {
       required Map<String, dynamic> schema,
       double temperature = 0.2,
       ModelTier tier = ModelTier.main,
-      void Function(String text)? onText}) async {
+      void Function(String text)? onText,
+      String? prefer}) async {
     prompts.add(prompt);
     final next = outputs.removeAt(0);
     if (next is Exception) throw next;

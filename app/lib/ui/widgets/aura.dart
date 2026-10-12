@@ -549,8 +549,9 @@ class PageHeader extends StatelessWidget {
 
 /// Search field with a soft glassy look.
 class AuraSearchField extends StatelessWidget {
-  const AuraSearchField({super.key, required this.hint, this.onChanged, this.onSubmitted, this.rtl = false, this.autofocus = false, this.controller});
+  const AuraSearchField({super.key, required this.hint, this.onChanged, this.onSubmitted, this.rtl = false, this.autofocus = false, this.controller, this.focusNode});
   final String hint;
+  final FocusNode? focusNode;
   final ValueChanged<String>? onChanged;
   final ValueChanged<String>? onSubmitted;
   final bool rtl;
@@ -568,6 +569,7 @@ class AuraSearchField extends StatelessWidget {
       ),
       child: TextField(
         controller: controller,
+        focusNode: focusNode,
         autofocus: autofocus,
         onChanged: onChanged,
         onSubmitted: onSubmitted,

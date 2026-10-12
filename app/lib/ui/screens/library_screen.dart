@@ -583,7 +583,7 @@ class _NarratorsPageState extends State<NarratorsPage> {
       body: _error != null && _items.isEmpty
           ? ErrorPanel(code: _error, onRetry: _load)
           : _items.isEmpty
-              ? Center(child: _loading ? const TypingDots() : Text(l.noResults, style: TextStyle(fontFamily: uiFont, color: a.muted)))
+              ? Center(child: _loading ? const AuraProgress() : Text(l.noResults, style: TextStyle(fontFamily: uiFont, color: a.muted)))
               : NotificationListener<ScrollNotification>(
                   onNotification: (n) {
                     if (n.metrics.extentAfter < 600 && _items.length < _count) _load(more: true);
@@ -593,7 +593,7 @@ class _NarratorsPageState extends State<NarratorsPage> {
                     padding: const EdgeInsets.only(bottom: 32),
                     itemCount: _items.length + (_items.length < _count ? 1 : 0),
                     itemBuilder: (context, i) {
-                      if (i == _items.length) return const Padding(padding: EdgeInsets.all(16), child: Center(child: TypingDots()));
+                      if (i == _items.length) return const Padding(padding: EdgeInsets.all(16), child: Center(child: AuraProgress()));
                       final n = _items[i];
                       return ReadingWidth(maxWidth: 940, child: NarratorTile(narrator: n));
                     },
@@ -680,7 +680,7 @@ class _NarratorSheetState extends State<_NarratorSheet> {
               if (n != null && n.fullName.isNotEmpty && n.fullName != n.name) Text(n.fullName, style: arabicStyle(context, size: 14.5, color: a.muted).copyWith(height: 1.7)),
               const SizedBox(height: 10),
               if (snap.connectionState != ConnectionState.done)
-                const Padding(padding: EdgeInsets.all(24), child: Center(child: TypingDots()))
+                const Padding(padding: EdgeInsets.all(24), child: Center(child: AuraProgress()))
               else if (snap.hasError)
                 SizedBox(height: 220, child: ErrorPanel(code: mapError(snap.error!).code))
               else ...[
@@ -789,7 +789,7 @@ class _TurathBooksState extends State<_TurathBooks> {
           Icon(Icons.travel_explore_rounded, size: 16, color: a.accent),
           const SizedBox(width: 6),
           Text(l.onTurath, style: TextStyle(fontFamily: uiFont, fontSize: 12.5, fontWeight: FontWeight.w700, color: a.accent)),
-          if (_books == null) ...[const SizedBox(width: 10), const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))],
+          if (_books == null) ...[const SizedBox(width: 10), const AuraProgress(width: 44, height: 4)],
         ]),
       ),
       Padding(
@@ -1135,7 +1135,7 @@ class _BookInfoSheetState extends State<_BookInfoSheet> {
             const SizedBox(height: 8),
             SoftButton(icon: Icons.open_in_new_rounded, color: AuraHues.blue, label: l.openLink, onTap: () => openUrl('https://app.turath.io/book/${widget.bookId}')),
             if (snap.connectionState != ConnectionState.done)
-              const Padding(padding: EdgeInsets.all(24), child: Center(child: TypingDots()))
+              const Padding(padding: EdgeInsets.all(24), child: Center(child: AuraProgress()))
             else if (d?.description?.trim().isNotEmpty == true) ...[
               SectionLabel(l.description),
               SelectableText(d!.description!.trim(), textDirection: TextDirection.rtl, style: arabicStyle(context, size: 15).copyWith(height: 1.95)),

@@ -2759,6 +2759,180 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'«and»: pages with every phrase. «or»: pages with any of them.'**
   String get logicHint;
+
+  /// No description provided for @answerModel.
+  ///
+  /// In en, this message translates to:
+  /// **'Answer model'**
+  String get answerModel;
+
+  /// No description provided for @modelAuto.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic'**
+  String get modelAuto;
+
+  /// No description provided for @modelAutoSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Best available model: {name}'**
+  String modelAutoSub(String name);
+
+  /// No description provided for @modelAutoInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Picked for you; switches to another model when a quota runs out.'**
+  String get modelAutoInfo;
+
+  /// No description provided for @modelPickerNote.
+  ///
+  /// In en, this message translates to:
+  /// **'The chosen model writes the answer; quick search steps stay on Flash-Lite. If it fails, the automatic model takes over.'**
+  String get modelPickerNote;
+
+  /// No description provided for @costLow.
+  ///
+  /// In en, this message translates to:
+  /// **'Low cost'**
+  String get costLow;
+
+  /// No description provided for @costMedium.
+  ///
+  /// In en, this message translates to:
+  /// **'Medium cost'**
+  String get costMedium;
+
+  /// No description provided for @costHigh.
+  ///
+  /// In en, this message translates to:
+  /// **'High cost'**
+  String get costHigh;
+
+  /// No description provided for @modelsLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not list the models'**
+  String get modelsLoadFailed;
+
+  /// No description provided for @modelsFromKey.
+  ///
+  /// In en, this message translates to:
+  /// **'Models active for your key'**
+  String get modelsFromKey;
+
+  /// No description provided for @modelsFromServer.
+  ///
+  /// In en, this message translates to:
+  /// **'Models active for the server\'s key'**
+  String get modelsFromServer;
+
+  /// No description provided for @fillIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Put in the field'**
+  String get fillIn;
+
+  /// No description provided for @forget.
+  ///
+  /// In en, this message translates to:
+  /// **'Forget'**
+  String get forget;
+
+  /// No description provided for @addComment.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a comment'**
+  String get addComment;
+
+  /// No description provided for @comment.
+  ///
+  /// In en, this message translates to:
+  /// **'Comment'**
+  String get comment;
+
+  /// No description provided for @commentHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Write your note on this passage…'**
+  String get commentHint;
+
+  /// No description provided for @commentSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Comment saved'**
+  String get commentSaved;
+
+  /// No description provided for @editComment.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit comment'**
+  String get editComment;
+
+  /// No description provided for @deleteComment.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete comment'**
+  String get deleteComment;
+
+  /// No description provided for @reportError.
+  ///
+  /// In en, this message translates to:
+  /// **'Report a text error'**
+  String get reportError;
+
+  /// No description provided for @reportErrorInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'The selected text and its place go with the report. Describe the error briefly.'**
+  String get reportErrorInfo;
+
+  /// No description provided for @selectedText.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected text'**
+  String get selectedText;
+
+  /// No description provided for @errorDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'What is wrong'**
+  String get errorDescription;
+
+  /// No description provided for @errorDescriptionHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. a word is misprinted; it should be «…»'**
+  String get errorDescriptionHint;
+
+  /// No description provided for @sendWhatsApp.
+  ///
+  /// In en, this message translates to:
+  /// **'WhatsApp'**
+  String get sendWhatsApp;
+
+  /// No description provided for @sendEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Gmail / email'**
+  String get sendEmail;
+
+  /// No description provided for @reportSubject.
+  ///
+  /// In en, this message translates to:
+  /// **'Text error — Manabi'**
+  String get reportSubject;
+
+  /// No description provided for @reportLocation.
+  ///
+  /// In en, this message translates to:
+  /// **'Location'**
+  String get reportLocation;
+
+  /// No description provided for @couldNotOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not open it'**
+  String get couldNotOpen;
 }
 
 class _AppLocalizationsDelegate

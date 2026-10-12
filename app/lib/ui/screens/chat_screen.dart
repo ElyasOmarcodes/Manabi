@@ -17,7 +17,9 @@ import '../widgets/suggestion_pool.dart';
 import '../widgets/answer_card.dart';
 import '../widgets/brand_logo.dart';
 import '../widgets/common.dart';
+import '../../core/gemini/gemini_client.dart' show modelCost;
 import '../widgets/depth_picker.dart';
+import '../widgets/model_picker.dart';
 import '../widgets/message_sheet.dart';
 import '../widgets/research_progress.dart';
 import '../widgets/scope_picker.dart';
@@ -438,10 +440,14 @@ class _ComposerState extends State<_Composer> {
     final langLabel = settings.answerLanguage == 'auto' ? null : languageLabels(l)[settings.answerLanguage];
     final deepOrQuick = settings.researchDepth != 'standard';
     final pills = [
+      if (settings.chatModel.isNotEmpty)
+        _Pill(icon: Icons.memory_rounded, label: modelShortName(settings.chatModel), onTap: () => showModelPicker(context), onClear: () => settings.setChatModel('')),
       if (scopeLabel.isNotEmpty) _Pill(icon: Icons.filter_list_rounded, label: scopeLabel, onTap: () => showOptionsSheet(context), onClear: () => nav.setScope(SearchScope.all)),
       if (langLabel != null) _Pill(icon: Icons.translate_rounded, label: langLabel, onTap: () => showOptionsSheet(context), onClear: () => settings.setAnswerLanguage('auto')),
       if (deepOrQuick)
-        _Pill(icon: depthIcon(settings.researchDepth), label: depthLabel(l, settings.researchDepth), onTap: () => showDepthSheet(context), onClear: () => settings.setResearchDepth('standard')),
+        Builder(
+            builder: (pill) => _Pill(
+                icon: Icons.speed_rounded, label: depthLabel(l, settings.researchDepth), onTap: () => showDepthPopup(pill), onClear: () => settings.setResearchDepth('standard'))),
     ];
 
     return Padding(
@@ -499,14 +505,7 @@ class _ComposerState extends State<_Composer> {
                   ),
                 ),
               ),
-              RoundIconButton(
-                icon: depthIcon(settings.researchDepth),
-                tooltip: '${l.researchDepth}: ${depthLabel(l, settings.researchDepth)}',
-                size: 40,
-                filled: false,
-                color: deepOrQuick ? a.accent : a.muted,
-                onTap: () => showDepthSheet(context),
-              ),
+              const DepthButton(),
               const SizedBox(width: 2),
               Tooltip(
                 message: busy ? l.stop : l.send,
@@ -639,12 +638,22 @@ class _OptionsSheet extends StatelessWidget {
               clipBehavior: Clip.antiAlias,
               borderRadius: BorderRadius.circular(18),
               child: Column(children: [
+                Builder(
+                  builder: (row) => SettingsRow(
+                    icon: Icons.speed_rounded,
+                    color: AuraHues.violet,
+                    title: l.researchDepth,
+                    value: depthLabel(l, settings.researchDepth),
+                    onTap: () => showDepthPopup(row),
+                  ),
+                ),
+                Divider(height: 1, indent: 58, color: a.border),
                 SettingsRow(
-                  icon: depthIcon(settings.researchDepth),
-                  color: AuraHues.violet,
-                  title: l.researchDepth,
-                  value: depthLabel(l, settings.researchDepth),
-                  onTap: () => showDepthSheet(context),
+                  icon: Icons.memory_rounded,
+                  color: costColor(settings.chatModel.isEmpty ? 'medium' : modelCost(settings.chatModel)),
+                  title: l.answerModel,
+                  value: settings.chatModel.isEmpty ? l.modelAuto : modelShortName(settings.chatModel),
+                  onTap: () => showModelPicker(context),
                 ),
                 Divider(height: 1, indent: 58, color: a.border),
                 SettingsRow(

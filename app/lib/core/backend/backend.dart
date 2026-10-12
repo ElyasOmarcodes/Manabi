@@ -81,6 +81,9 @@ abstract class ManabiBackend {
 
   /// Which of these books have a scanned PDF (for the badge in lists).
   Future<Map<String, bool>> pdfFlags(List<String> ids);
+
+  /// The text models the key can call, and the one chosen automatically.
+  Future<({List<ModelInfo> models, String? auto})> models();
 }
 
 List<String> _layerSamples(List<String> pages) => [for (final p in pages.where((p) => p.trim().isNotEmpty).take(4)) p.length > 5000 ? p.substring(0, 5000) : p];
@@ -222,6 +225,12 @@ class ServerBackend implements ManabiBackend {
   }
 
   @override
+  Future<({List<ModelInfo> models, String? auto})> models() async {
+    final j = await _get('/api/models');
+    return (models: [for (final m in (j['models'] as List? ?? const []).whereType<Map>()) ModelInfo.fromJson(m.cast<String, dynamic>())], auto: j['auto'] as String?);
+  }
+
+  @override
   Future<LayersGuess> detectLayers(String title, List<String> pages) async {
     http.Response res;
     try {
@@ -298,6 +307,12 @@ class DirectBackend implements ManabiBackend {
   @override
   Future<List<dynamic>> discoveredBooks() async => const [];
   @override
+  Future<({List<ModelInfo> models, String? auto})> models() => _wrap(() async {
+        final list = await _gemini.chatModelList();
+        return (models: list, auto: await _gemini.resolveModel());
+      });
+
+  @override
   Future<Map<String, bool>> pdfFlags(List<String> ids) => _wrap(() async {
         final out = <String, bool>{};
         await Future.wait([
@@ -349,4 +364,6 @@ class UnconfiguredBackend implements ManabiBackend {
   Future<List<dynamic>> discoveredBooks() async => const [];
   @override
   Future<Map<String, bool>> pdfFlags(List<String> ids) async => const {};
+  @override
+  Future<({List<ModelInfo> models, String? auto})> models() async => _fail();
 }

@@ -20,6 +20,7 @@ import '../../state/downloads.dart';
 import '../../state/layer_ai.dart';
 import '../../state/nav_controller.dart';
 import '../../state/reading_controller.dart';
+import '../../state/search_history.dart';
 import '../../state/settings_controller.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
@@ -27,6 +28,8 @@ import '../widgets/pdf_pane.dart';
 import '../widgets/reveal_text.dart';
 import '../widgets/save_offline.dart';
 import '../widgets/search_hit.dart';
+import '../widgets/search_suggestions.dart';
+import '../widgets/selection_menu.dart';
 import 'book_screen.dart' show openBook;
 import 'library_screen.dart' show showNarrator;
 import 'settings_pages.dart' show ReaderDisplaySettingsPage, ReadingSettingsPage;
@@ -473,10 +476,31 @@ class _ReaderScreenState extends State<ReaderScreen> {
     }
   }
 
-  Future<void> _highlight(int page, String text) async {
+  Future<void> _highlight(int page, String text, int color) async {
     final reading = context.read<ReadingController>();
-    await reading.addHighlight(Highlight(bookId: widget.bookId, bookTitle: _title, page: page, text: text.trim(), color: reading.highlightColor, savedAt: DateTime.now()));
-    if (mounted) toast(context, context.l.highlightSaved);
+    // A new colour replaces the marks already on this passage.
+    final f = SearchHistory.fold(text);
+    for (final h in reading.highlightsOf(widget.bookId, page)) {
+      if (h.note == null && (SearchHistory.fold(h.text).contains(f) || f.contains(SearchHistory.fold(h.text)))) await reading.removeHighlight(h);
+    }
+    await reading.addHighlight(Highlight(bookId: widget.bookId, bookTitle: _title, page: page, text: text.trim(), color: color, savedAt: DateTime.now()));
+    await reading.setHighlightColor(color);
+  }
+
+  Future<void> _comment(int page, String text, Highlight? existing) async {
+    final note = await askComment(context, initial: existing?.note ?? '');
+    if (note == null || !mounted) return;
+    final reading = context.read<ReadingController>();
+    if (existing != null) await reading.removeHighlight(existing);
+    if (note.isEmpty) return;
+    await reading.addHighlight(Highlight(
+        bookId: widget.bookId, bookTitle: _title, page: page, text: existing?.text ?? text.trim(), color: existing?.color ?? reading.highlightColor, note: note, savedAt: DateTime.now()));
+    if (mounted) toast(context, context.l.commentSaved);
+  }
+
+  void _report(int page, String text) {
+    final p = _loaded[page];
+    showReportSheet(context, text: text, location: '${p == null ? _title : _citation(p)} · ${widget.bookId}/$page');
   }
 
   Future<void> _copyQuote(int page, String text) async {
@@ -806,8 +830,10 @@ class _ReaderScreenState extends State<ReaderScreen> {
         book: _book,
         onRetry: () => setState(() => _cache.remove(page)),
         onAction: (a) => _pageAction(a, page),
-        onHighlight: (t) => _highlight(page, t),
+        onHighlight: (t, c) => _highlight(page, t, c),
         onCopyQuote: (t) => _copyQuote(page, t),
+        onComment: (t, h) => _comment(page, t, h),
+        onReport: (t) => _report(page, t),
         matnContext: () => _matnContext(page),
       );
 
@@ -908,6 +934,8 @@ class _PageBlock extends StatelessWidget {
     required this.onAction,
     required this.onHighlight,
     required this.onCopyQuote,
+    required this.onComment,
+    required this.onReport,
     this.matnContext,
     this.reveal,
   });
@@ -931,8 +959,12 @@ class _PageBlock extends StatelessWidget {
   final BookDetails? book;
   final VoidCallback onRetry;
   final ValueChanged<String> onAction;
-  final ValueChanged<String> onHighlight;
+  final void Function(String text, int color) onHighlight;
   final ValueChanged<String> onCopyQuote;
+
+  /// Comment on the selection, or edit the comment already on it.
+  final void Function(String text, Highlight? existing) onComment;
+  final ValueChanged<String> onReport;
 
   @override
   Widget build(BuildContext context) {
@@ -945,7 +977,7 @@ class _PageBlock extends StatelessWidget {
       builder: (context, snap) {
         if (!snap.hasData) {
           if (snap.hasError) return SizedBox(height: 320, child: ErrorPanel(code: mapError(snap.error!).code, onRetry: onRetry));
-          return SizedBox(height: continuous ? estimate : MediaQuery.sizeOf(context).height * 0.6, child: const Center(child: TypingDots()));
+          return SizedBox(height: continuous ? estimate : MediaQuery.sizeOf(context).height * 0.6, child: const Center(child: AuraProgress()));
         }
         final p = snap.data!;
         final split = RegExp(r'\n?_{5,}\n?').firstMatch(p.text);
@@ -980,7 +1012,7 @@ class _PageBlock extends StatelessWidget {
               // Arabic (right-to-left) selection in reading order.
               SelectionArea(
                 onSelectionChanged: (c) => selection.text = c?.plainText ?? '',
-                contextMenuBuilder: (context, state) => _menu(context, state, selection.text),
+                contextMenuBuilder: (context, state) => _menu(context, state, selection.text, marks),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                   if (title != null)
                     Padding(
@@ -1083,23 +1115,46 @@ class _PageBlock extends StatelessWidget {
     ];
   }
 
-  /// Text selection menu: highlight and copy with citation come first.
-  Widget _menu(BuildContext context, SelectableRegionState state, String selected) {
-    final l = context.l;
-    final items = [
-      if (selected.trim().isNotEmpty) ...[
-        ContextMenuButtonItem(label: l.highlight, onPressed: () {
-          state.hideToolbar();
-          onHighlight(selected);
-        }),
-        ContextMenuButtonItem(label: l.copyWithCitation, onPressed: () {
-          state.hideToolbar();
-          onCopyQuote(selected);
-        }),
-      ],
-      ...state.contextMenuButtonItems,
+  void _showComment(BuildContext context, Highlight h) {
+    final reading = context.read<ReadingController>();
+    showCommentSheet(context, h, onEdit: () => onComment(h.text, h), onDelete: () => reading.removeHighlight(h));
+  }
+
+  /// The selection menu (icons only): highlight colours, copy, copy with
+  /// the source, comment, report an error, and removing marks under it.
+  Widget _menu(BuildContext context, SelectableRegionState state, String selected, List<Highlight> marks) {
+    final text = selected.trim();
+    if (text.isEmpty) return AdaptiveTextSelectionToolbar.buttonItems(anchors: state.contextMenuAnchors, buttonItems: state.contextMenuButtonItems);
+    final reading = context.read<ReadingController>();
+    final f = SearchHistory.fold(text);
+    final under = [
+      for (final h in marks)
+        if (SearchHistory.fold(h.text).contains(f) || f.contains(SearchHistory.fold(h.text))) h,
     ];
-    return AdaptiveTextSelectionToolbar.buttonItems(anchors: state.contextMenuAnchors, buttonItems: items);
+    void done(VoidCallback fn) {
+      state.hideToolbar();
+      fn();
+    }
+
+    return SelectionToolbar(
+      anchors: state.contextMenuAnchors,
+      marked: under,
+      onColor: (c) => done(() => onHighlight(text, c)),
+      onCopy: () => done(() => copyText(context, text)),
+      onCopyCite: () => done(() => onCopyQuote(text)),
+      onComment: () => done(() => onComment(text, under.where((h) => h.note != null).firstOrNull)),
+      onReport: () => done(() => onReport(text)),
+      onRemove: () => done(() {
+        for (final h in under.where((h) => h.note == null)) {
+          reading.removeHighlight(h);
+        }
+      }),
+      onDeleteComment: () => done(() {
+        for (final h in under.where((h) => h.note != null)) {
+          reading.removeHighlight(h);
+        }
+      }),
+    );
   }
 
   TextSpan _marked(BuildContext context, String text, String? query, List<Highlight> highlights, TextStyle style,
@@ -1117,6 +1172,12 @@ class _PageBlock extends StatelessWidget {
       taps.add((at, at + name.length, TapGestureRecognizer()..onTap = () => showNarrator(context, n.id, n.name)));
       from = at + name.length;
     }
+    for (final h in highlights) {
+      if (h.note == null) continue;
+      for (final (s, e) in arabicMatches(text, h.text)) {
+        taps.add((s, e, TapGestureRecognizer()..onTap = () => _showComment(context, h)));
+      }
+    }
     final linkStyle = TextStyle(
       decoration: TextDecoration.underline,
       decorationStyle: TextDecorationStyle.dotted,
@@ -1128,7 +1189,17 @@ class _PageBlock extends StatelessWidget {
       for (final (s, e, _) in taps) (s, e, linkStyle),
       for (final h in highlights)
         for (final (s, e) in arabicMatches(text, h.text))
-          (s, e, TextStyle(backgroundColor: highlightColors[h.color.clamp(0, highlightColors.length - 1)].withValues(alpha: dark ? 0.38 : 0.45))),
+          if (h.note == null)
+            (s, e, TextStyle(backgroundColor: highlightColors[h.color.clamp(0, highlightColors.length - 1)].withValues(alpha: dark ? 0.38 : 0.45)))
+          else
+            // A comment: its own colour and a dashed underline; a tap shows it.
+            (s, e, TextStyle(
+              backgroundColor: commentColor.withValues(alpha: dark ? 0.3 : 0.26),
+              decoration: TextDecoration.underline,
+              decorationStyle: TextDecorationStyle.dashed,
+              decorationColor: commentColor,
+              decorationThickness: 1.6,
+            )),
       for (final (s, e) in arabicMatches(text, query))
         (s, e, TextStyle(color: dark ? const Color(0xFFFF8A80) : const Color(0xFFC62828), backgroundColor: AuraHues.rose.withValues(alpha: dark ? 0.12 : 0.08))),
     ];
@@ -1280,7 +1351,7 @@ class _BookPanelState extends State<_BookPanel> {
   Widget _contents(BuildContext context) {
     final a = context.aura;
     final book = widget.book;
-    if (book == null) return const Center(child: TypingDots());
+    if (book == null) return const Center(child: AuraProgress());
     if (book.toc.isEmpty) return EmptyState(icon: Icons.toc_rounded, text: context.l.tableOfContents);
     _expandCurrent(book);
     final here = book.headingFor(widget.current);
@@ -1441,7 +1512,7 @@ class HighlightTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final a = context.aura;
     final h = highlight;
-    final color = highlightColors[h.color.clamp(0, highlightColors.length - 1)];
+    final color = h.note != null ? commentColor : highlightColors[h.color.clamp(0, highlightColors.length - 1)];
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Material(
@@ -1460,6 +1531,15 @@ class HighlightTile extends StatelessWidget {
                     textDirection: TextDirection.rtl,
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Text(h.text, maxLines: 4, overflow: TextOverflow.ellipsis, style: arabicStyle(context, size: 15).copyWith(height: 1.8)),
+                      if (h.note != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            const Icon(Icons.mode_comment_outlined, size: 14, color: commentColor),
+                            const SizedBox(width: 6),
+                            Expanded(child: Text(h.note!, maxLines: 3, overflow: TextOverflow.ellipsis, style: TextStyle(fontFamily: uiFont, fontSize: 13, height: 1.6, color: a.text))),
+                          ]),
+                        ),
                       const SizedBox(height: 4),
                       Row(children: [
                         Expanded(
@@ -2163,6 +2243,7 @@ class _BookSearchSheet extends StatefulWidget {
 
 class _BookSearchSheetState extends State<_BookSearchSheet> {
   late final _field = TextEditingController(text: widget.memory.query);
+  final _focus = FocusNode();
   late final _items = widget.memory.items;
   late String _q = widget.memory.query;
   late int _total = widget.memory.total;
@@ -2177,12 +2258,14 @@ class _BookSearchSheetState extends State<_BookSearchSheet> {
       ..total = _total
       ..page = _page;
     _field.dispose();
+    _focus.dispose();
     super.dispose();
   }
 
   Future<void> _search({bool more = false}) async {
     final q = more ? _q : _field.text.trim();
     if (q.isEmpty || _loading) return;
+    if (!more) SearchHistory.add(q, bookId: widget.bookId);
     setState(() {
       _loading = true;
       _error = null;
@@ -2219,7 +2302,13 @@ class _BookSearchSheetState extends State<_BookSearchSheet> {
         child: Column(children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-            child: AuraSearchField(controller: _field, hint: l.searchInBookHint, rtl: true, autofocus: _items.isEmpty, onSubmitted: (_) => _search()),
+            child: Column(children: [
+              AuraSearchField(controller: _field, focusNode: _focus, hint: l.searchInBookHint, rtl: true, autofocus: _items.isEmpty, onSubmitted: (_) => _search()),
+              Directionality(
+                textDirection: TextDirection.rtl,
+                child: SearchSuggestions(controller: _field, focus: _focus, bookId: widget.bookId, onPick: (_) => _search()),
+              ),
+            ]),
           ),
           if (_items.isNotEmpty)
             Padding(
@@ -2230,7 +2319,7 @@ class _BookSearchSheetState extends State<_BookSearchSheet> {
             child: _error != null && _items.isEmpty
                 ? ErrorPanel(code: _error, onRetry: _search)
                 : _items.isEmpty
-                    ? Center(child: _loading ? const TypingDots() : (_q.isEmpty ? const SizedBox() : Text(l.noMatchesInBook, style: TextStyle(fontFamily: uiFont, color: a.muted))))
+                    ? Center(child: _loading ? const AuraProgress() : (_q.isEmpty ? const SizedBox() : Text(l.noMatchesInBook, style: TextStyle(fontFamily: uiFont, color: a.muted))))
                     : ListView.separated(
                         controller: scroll,
                         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
@@ -2242,7 +2331,7 @@ class _BookSearchSheetState extends State<_BookSearchSheet> {
                               child: _items.length >= _total
                                   ? const SizedBox()
                                   : _loading
-                                      ? const TypingDots()
+                                      ? const AuraProgress()
                                       : SoftButton(onTap: () => _search(more: true), label: l.loadMore, icon: Icons.expand_more_rounded),
                             );
                           }

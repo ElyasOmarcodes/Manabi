@@ -386,7 +386,9 @@ export const createPipeline = ({ gemini, turath: client, catalog }) => {
         act("resumed", { step: key });
         return memo.get(key);
       }
-      const result = await gemini.generateJson(request);
+      // The user's model writes the answer; the quick steps keep the fast tier.
+      const prefer = typeof input?.model === "string" && request.tier !== "fast" ? input.model : undefined;
+      const result = await gemini.generateJson(prefer ? { ...request, prefer } : request);
       usage.input += result.usage?.input ?? 0;
       usage.output += result.usage?.output ?? 0;
       usage.thoughts += result.usage?.thoughts ?? 0;

@@ -106,7 +106,8 @@ abstract interface class JsonModel {
       required Map<String, dynamic> schema,
       double temperature = 0.2,
       ModelTier tier = ModelTier.main,
-      void Function(String text)? onText});
+      void Function(String text)? onText,
+      String? prefer});
 }
 
 class SearchHits {
@@ -141,6 +142,7 @@ class AskRequest {
     this.maxSources,
     this.depth = 'standard',
     this.requestId,
+    this.model,
   });
   final String question;
   final String language;
@@ -157,6 +159,9 @@ class AskRequest {
   /// Lets the server hand back an answer whose stream was interrupted.
   final String? requestId;
 
+  /// The model the user picked for writing the answer; null = automatic.
+  final String? model;
+
   Map<String, dynamic> toJson() => {
         'question': question,
         'language': language,
@@ -168,6 +173,7 @@ class AskRequest {
         'maxSources': ?maxSources,
         'depth': depth,
         'requestId': ?requestId,
+        'model': ?model,
       };
 }
 
@@ -559,7 +565,9 @@ class AnswerPipeline {
         act('resumed', {'step': key});
         return kept;
       }
-      final reply = await model.generateJson(system: system, prompt: prompt, schema: schema, temperature: temperature, tier: tier, onText: onText);
+      // The user's model writes the answer; the quick steps keep the fast tier.
+      final prefer = tier == ModelTier.main ? request.model : null;
+      final reply = await model.generateJson(system: system, prompt: prompt, schema: schema, temperature: temperature, tier: tier, onText: onText, prefer: prefer);
       usage = usage + reply.usage;
       emit(AskUsageEvent(usage));
       memo[key] = reply;

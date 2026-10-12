@@ -75,6 +75,72 @@ String? pickModel(List<Map<String, dynamic>> models) {
   return ranked.isEmpty ? null : ranked.first;
 }
 
+/// A text model the key can call, with a rough token-cost class.
+class ModelInfo {
+  const ModelInfo(this.id, this.name, {this.cost = 'medium', this.input = 0, this.output = 0});
+  final String id;
+  final String name;
+
+  /// 'high', 'medium' or 'low'.
+  final String cost;
+  final int input;
+  final int output;
+
+  factory ModelInfo.fromJson(Map<String, dynamic> m) {
+    final id = '${m['id'] ?? ''}';
+    int n(Object? v) => v is num ? v.toInt() : 0;
+    return ModelInfo(id, '${m['name'] ?? id}', cost: m['cost'] is String ? m['cost'] as String : modelCost(id), input: n(m['input']), output: n(m['output']));
+  }
+  Map<String, dynamic> toJson() => {'id': id, 'name': name, 'cost': cost, 'input': input, 'output': output};
+}
+
+/// Rough token cost of a model, from its name.
+String modelCost(String id) {
+  if (RegExp(r'gemma|flash-lite|nano|-8b\b').hasMatch(id)) return 'low';
+  if (RegExp(r'pro|ultra|deep-?think').hasMatch(id)) return 'high';
+  return 'medium';
+}
+
+/// Gemma takes no system instruction or JSON schema: both go in the prompt.
+bool isGemma(String id) => RegExp(r'^(?:models/)?gemma').hasMatch(id);
+
+final _notChat = RegExp(r'embed|aqa|imagen|veo|tts|image|audio|live|learnlm|robotics|computer-use|lyria|banana|gemini-diffusion');
+
+/// Text models from a model listing, Gemini first, newest and strongest first.
+List<ModelInfo> chatModels(List<Map<String, dynamic>> models) {
+  double version(String id) => double.tryParse(RegExp(r'-(\d+(?:\.\d+)?)').firstMatch(id)?.group(1) ?? '') ?? 0;
+  const rank = {'high': 0, 'medium': 1, 'low': 2};
+  final out = <ModelInfo>[];
+  for (final m in models) {
+    final methods = (m['supportedGenerationMethods'] as List?)?.cast<String>() ?? const ['generateContent'];
+    final id = '${m['name'] ?? ''}'.replaceFirst('models/', '');
+    if (!methods.contains('generateContent') || !RegExp(r'^(gemini|gemma)-').hasMatch(id) || _notChat.hasMatch(id)) continue;
+    int n(Object? v) => v is num ? v.toInt() : 0;
+    out.add(ModelInfo(id, '${m['displayName'] ?? id}', cost: modelCost(id), input: n(m['inputTokenLimit']), output: n(m['outputTokenLimit'])));
+  }
+  int fam(ModelInfo x) => x.id.startsWith('gemma') ? 1 : 0;
+  out.sort((a, b) {
+    if (fam(a) != fam(b)) return fam(a) - fam(b);
+    final v = version(b.id).compareTo(version(a.id));
+    if (v != 0) return v;
+    final c = rank[a.cost]! - rank[b.cost]!;
+    return c != 0 ? c : a.id.compareTo(b.id);
+  });
+  return out;
+}
+
+/// The JSON object in a reply, also when it is wrapped in prose or fences.
+Map<String, dynamic> parseJsonReply(String text) {
+  try {
+    return (jsonDecode(text) as Map).cast<String, dynamic>();
+  } catch (_) {
+    final start = text.indexOf('{');
+    final end = text.lastIndexOf('}');
+    if (start >= 0 && end > start) return (jsonDecode(text.substring(start, end + 1)) as Map).cast<String, dynamic>();
+    rethrow;
+  }
+}
+
 /// A 429 that names a daily/plan quota (as opposed to a short burst limit).
 bool _isExhausted(String message) => RegExp('quota|exceeded your current', caseSensitive: false).hasMatch(message);
 
@@ -229,10 +295,12 @@ class GeminiClient implements JsonModel {
   }
 
   /// Candidate models for a tier, best first, without benched ones.
-  Future<List<String>> _candidates(ModelTier tier) async {
+  Future<List<String>> _candidates(ModelTier tier, [String? prefer]) async {
     if (_pinned) return [model!];
     final listed = await _listModels();
-    final unique = {...rankModels(listed, tier), if (listed.isEmpty) ..._fallback[tier]!}.toList();
+    // A model the user picked (and the key can call) comes first.
+    final picked = prefer != null && chatModels(listed).any((m) => m.id == prefer);
+    final unique = {if (picked) prefer, ...rankModels(listed, tier), if (listed.isEmpty) ..._fallback[tier]!}.toList();
     final now = DateTime.now();
     return unique.where((m) => !(_benched[m]?.until.isAfter(now) ?? false)).toList();
   }
@@ -241,6 +309,9 @@ class GeminiClient implements JsonModel {
     final c = await _candidates(tier);
     return c.isNotEmpty ? c.first : _fallback[tier]!.first;
   }
+
+  /// The text models the key can call (empty when they cannot be listed).
+  Future<List<ModelInfo>> chatModelList() async => chatModels(await _listModels());
 
   /// Validates the key with a cheap call (lists models).
   Future<String> check() async {
@@ -269,10 +340,25 @@ class GeminiClient implements JsonModel {
     double temperature = 0.2,
     ModelTier tier = ModelTier.main,
     void Function(String text)? onText,
+    String? prefer,
   }) async {
     final budget = limits[tier] ?? TierLimits.defaults[tier]!;
     final deadline = DateTime.now().add(budget.total);
     Map<String, dynamic> bodyFor(String name) {
+      if (isGemma(name)) {
+        final text = '$system\n\n$prompt\n\nReply with one JSON object only (no prose, no code fences) that follows this JSON schema:\n${jsonEncode(schema)}';
+        return {
+          'contents': [
+            {
+              'role': 'user',
+              'parts': [
+                {'text': text}
+              ]
+            }
+          ],
+          'generationConfig': {'temperature': temperature},
+        };
+      }
       final thinking = _thinkingFor(name);
       return {
         'systemInstruction': {
@@ -301,7 +387,7 @@ class GeminiClient implements JsonModel {
     final tried = <String>{};
     var retries = 0;
     while (true) {
-      final name = (await _candidates(tier)).where((m) => !tried.contains(m)).firstOrNull;
+      final name = (await _candidates(tier, prefer)).where((m) => !tried.contains(m)).firstOrNull;
       if (name == null) {
         // Nothing left: report the most telling reason (quota beats the rest).
         final stored = [for (final b in _benched.values) b.error];
@@ -328,7 +414,7 @@ class GeminiClient implements JsonModel {
           usage = out.usage;
         }
         try {
-          return (data: (jsonDecode(text) as Map).cast<String, dynamic>(), model: name, usage: _usage(usage));
+          return (data: parseJsonReply(text), model: name, usage: _usage(usage));
         } catch (_) {
           throw const GeminiException('BAD_OUTPUT', 'Gemini returned malformed JSON', retryable: true);
         }
@@ -337,6 +423,11 @@ class GeminiClient implements JsonModel {
         final config = body['generationConfig'] as Map;
         if (raw.status == 400 && config.containsKey('thinkingConfig') && raw.message.toLowerCase().contains('think')) {
           _noThinking.add(name);
+          continue;
+        }
+        // The picked model refused the request: the usual models take over.
+        if (name == prefer && raw.status == 400) {
+          tried.add(name);
           continue;
         }
         // Keep the model name with the error so the UI can show what failed.
