@@ -530,7 +530,7 @@ class AppLocalizationsFa extends AppLocalizations {
   String get openSettings => 'باز کردن تنظیمات';
 
   @override
-  String get allCategories => 'همهٔ دسته‌ها';
+  String get allCategories => 'همه دسته‌ها';
 
   @override
   String get stageReading => 'خواندن و گزینش صفحه‌ها';
@@ -570,7 +570,7 @@ class AppLocalizationsFa extends AppLocalizations {
   String get fullTextSub => 'جست‌وجو در متن همهٔ کتاب‌ها';
 
   @override
-  String get allBooks => 'همهٔ کتاب‌ها';
+  String get allBooks => 'همه کتاب‌ها';
 
   @override
   String get settingsApp => 'برنامه';
@@ -1557,4 +1557,24 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get couldNotOpen => 'باز نشد';
+
+  @override
+  String get allAuthors => 'همه مؤلفان';
+
+  @override
+  String get pickMany => 'چند مورد انتخاب کنید';
+
+  @override
+  String doneCount(String n) {
+    return 'تأیید ($n)';
+  }
+
+  @override
+  String get scopeHow =>
+      'هر کتاب انتخاب‌شده، و کتاب‌های هر مؤلف انتخاب‌شده در دسته‌های انتخاب‌شده جست‌وجو می‌شود.';
+
+  @override
+  String scopeTooMany(String n) {
+    return 'حداکثر $n جست‌وجو هم‌زمان';
+  }
 }

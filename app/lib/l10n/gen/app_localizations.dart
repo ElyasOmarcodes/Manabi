@@ -2933,6 +2933,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Could not open it'**
   String get couldNotOpen;
+
+  /// No description provided for @allAuthors.
+  ///
+  /// In en, this message translates to:
+  /// **'All authors'**
+  String get allAuthors;
+
+  /// No description provided for @pickMany.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick one or more'**
+  String get pickMany;
+
+  /// No description provided for @doneCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Done ({n})'**
+  String doneCount(String n);
+
+  /// No description provided for @scopeHow.
+  ///
+  /// In en, this message translates to:
+  /// **'Each chosen book is searched, and each chosen author\'s books within the chosen categories.'**
+  String get scopeHow;
+
+  /// No description provided for @scopeTooMany.
+  ///
+  /// In en, this message translates to:
+  /// **'Up to {n} searches at once'**
+  String scopeTooMany(String n);
 }
 
 class _AppLocalizationsDelegate

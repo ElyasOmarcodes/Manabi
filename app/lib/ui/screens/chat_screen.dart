@@ -2,9 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
-import '../../core/catalog/catalog_service.dart';
 import '../../core/models/chat.dart';
-import '../../core/models/library.dart';
 import '../../core/models/scope.dart';
 import '../../l10n/gen/app_localizations.dart';
 import '../../state/chat_controller.dart';
@@ -325,7 +323,7 @@ class _UserBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final a = context.aura;
     final scope = turn.scope;
-    final label = [?scope.bookTitle, ?scope.authorName, ?scope.categoryTitle].join(' · ');
+    final label = scope.label();
     return Align(
       alignment: AlignmentDirectional.centerEnd,
       child: ConstrainedBox(
@@ -436,7 +434,7 @@ class _ComposerState extends State<_Composer> {
     final busy = widget.pending != null;
     final canSend = _controller.text.trim().isNotEmpty && !busy;
     final scope = nav.scope;
-    final scopeLabel = [?scope.bookTitle, ?scope.authorName, ?scope.categoryTitle].join(' · ');
+    final scopeLabel = scope.label();
     final langLabel = settings.answerLanguage == 'auto' ? null : languageLabels(l)[settings.answerLanguage];
     final deepOrQuick = settings.researchDepth != 'standard';
     final pills = [
@@ -571,24 +569,25 @@ class _OptionsSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final nav = context.watch<NavController>();
     final settings = context.watch<SettingsController>();
-    final catalog = context.read<CatalogService>();
     final l = context.l;
     final a = context.aura;
     final scope = nav.scope;
     final labels = languageLabels(l);
+    String? names(List<ScopeRef> r) => r.isEmpty ? null : (r.length == 1 ? r.first.name : '${r.first.name} +${r.length - 1}');
     final tiles = [
       (Icons.all_inclusive_rounded, l.scopeAll, null as String?, AuraHues.violet, scope.isAll, () => nav.setScope(SearchScope.all)),
-      (Icons.category_outlined, l.scopeCategory, scope.categoryTitle, AuraHues.blue, scope.categoryTitle != null, () async {
-        final c = await pickFromCatalog<CatalogCategory>(context, PickKind.category);
-        if (c != null) nav.setScope(scope.withCategory(c.id, c.title));
+      (Icons.category_outlined, l.scopeCategory, names(scope.categories), AuraHues.blue, scope.categories.isNotEmpty, () async {
+        final r = await pickManyFromCatalog(context, PickKind.category, selected: scope.categories);
+        if (r != null) nav.setScope(nav.scope.copyWith(categories: r));
       }),
-      (Icons.person_outline_rounded, l.scopeAuthor, scope.authorName, AuraHues.amber, scope.authorName != null, () async {
-        final x = await pickFromCatalog<CatalogAuthor>(context, PickKind.author);
-        if (x != null) nav.setScope(scope.withAuthor(x.id, x.name));
+      (Icons.person_outline_rounded, l.scopeAuthor, names(scope.authors), AuraHues.amber, scope.authors.isNotEmpty, () async {
+        final r = await pickManyFromCatalog(context, PickKind.author, selected: scope.authors);
+        if (r != null) nav.setScope(nav.scope.copyWith(authors: r));
       }),
-      (Icons.menu_book_outlined, l.scopeBook, scope.bookTitle, AuraHues.teal, scope.bookTitle != null, () async {
-        final b = await pickFromCatalog<CatalogBook>(context, PickKind.book, authorId: scope.authorId, categoryId: scope.categoryId);
-        if (b != null) nav.setScope(scope.withBook(b.id, b.title).withAuthor(b.authorId, catalog.author(b.authorId)?.name));
+      (Icons.menu_book_outlined, l.scopeBook, names(scope.books), AuraHues.teal, scope.books.isNotEmpty, () async {
+        final r = await pickManyFromCatalog(context, PickKind.book,
+            selected: scope.books, authorIds: [for (final x in scope.authors) x.id], categoryIds: [for (final x in scope.categories) x.id]);
+        if (r != null) nav.setScope(nav.scope.copyWith(books: r));
       }),
     ];
     return SafeArea(

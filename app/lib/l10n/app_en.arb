@@ -736,5 +736,24 @@
   "sendEmail": "Gmail / email",
   "reportSubject": "Text error — Manabi",
   "reportLocation": "Location",
-  "couldNotOpen": "Could not open it"
+  "couldNotOpen": "Could not open it",
+  "allAuthors": "All authors",
+  "pickMany": "Pick one or more",
+  "doneCount": "Done ({n})",
+  "@doneCount": {
+    "placeholders": {
+      "n": {
+        "type": "String"
+      }
+    }
+  },
+  "scopeHow": "Each chosen book is searched, and each chosen author's books within the chosen categories.",
+  "scopeTooMany": "Up to {n} searches at once",
+  "@scopeTooMany": {
+    "placeholders": {
+      "n": {
+        "type": "String"
+      }
+    }
+  }
 }

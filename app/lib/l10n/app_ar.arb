@@ -526,5 +526,10 @@
   "sendEmail": "Gmail / البريد",
   "reportSubject": "خطأ في النص — منابع",
   "reportLocation": "الموضع",
-  "couldNotOpen": "تعذّر الفتح"
+  "couldNotOpen": "تعذّر الفتح",
+  "allAuthors": "كل المؤلفين",
+  "pickMany": "اختر واحدًا أو أكثر",
+  "doneCount": "تم ({n})",
+  "scopeHow": "يُبحث في كل كتاب مختار، وفي كتب كل مؤلف مختار داخل التصنيفات المختارة.",
+  "scopeTooMany": "حتى {n} عمليات بحث معًا"
 }

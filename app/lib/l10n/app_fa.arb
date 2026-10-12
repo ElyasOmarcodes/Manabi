@@ -213,7 +213,7 @@
   "generatedBy": "ساخته‌شده توسط منابع از منابع تراث",
   "notConfiguredTitle": "اتصال را تنظیم کنید",
   "openSettings": "باز کردن تنظیمات",
-  "allCategories": "همهٔ دسته‌ها",
+  "allCategories": "همه دسته‌ها",
   "stageReading": "خواندن و گزینش صفحه‌ها",
   "welcomeQuestion": "امروز دربارهٔ چه می‌خواهید پژوهش کنید؟",
   "options": "گزینه‌های جست‌وجو",
@@ -226,7 +226,7 @@
   "browseCategories": "مرور دسته‌ها",
   "browseCategoriesSub": "علوم و کتاب‌هایشان",
   "fullTextSub": "جست‌وجو در متن همهٔ کتاب‌ها",
-  "allBooks": "همهٔ کتاب‌ها",
+  "allBooks": "همه کتاب‌ها",
   "settingsApp": "برنامه",
   "settingsAnswersGroup": "پاسخ‌ها و پژوهش",
   "settingsInfo": "اطلاعات و راهنما",
@@ -526,5 +526,10 @@
   "sendEmail": "Gmail / ایمیل",
   "reportSubject": "خطای متن — منابع",
   "reportLocation": "مکان",
-  "couldNotOpen": "باز نشد"
+  "couldNotOpen": "باز نشد",
+  "allAuthors": "همه مؤلفان",
+  "pickMany": "چند مورد انتخاب کنید",
+  "doneCount": "تأیید ({n})",
+  "scopeHow": "هر کتاب انتخاب‌شده، و کتاب‌های هر مؤلف انتخاب‌شده در دسته‌های انتخاب‌شده جست‌وجو می‌شود.",
+  "scopeTooMany": "حداکثر {n} جست‌وجو هم‌زمان"
 }

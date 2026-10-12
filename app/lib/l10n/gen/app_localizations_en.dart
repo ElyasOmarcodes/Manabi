@@ -1562,4 +1562,24 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get couldNotOpen => 'Could not open it';
+
+  @override
+  String get allAuthors => 'All authors';
+
+  @override
+  String get pickMany => 'Pick one or more';
+
+  @override
+  String doneCount(String n) {
+    return 'Done ($n)';
+  }
+
+  @override
+  String get scopeHow =>
+      'Each chosen book is searched, and each chosen author\'s books within the chosen categories.';
+
+  @override
+  String scopeTooMany(String n) {
+    return 'Up to $n searches at once';
+  }
 }

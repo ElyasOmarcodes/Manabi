@@ -86,6 +86,19 @@ abstract class ManabiBackend {
   Future<({List<ModelInfo> models, String? auto})> models();
 }
 
+/// Several searches' pages taken in turn, without repeats; totals add up.
+SearchResultPage mergeSearchPages(List<SearchResultPage> pages, int page) {
+  final seen = <String>{};
+  final items = <PagePassage>[];
+  final longest = pages.fold(0, (m, r) => r.items.length > m ? r.items.length : m);
+  for (var i = 0; i < longest; i++) {
+    for (final r in pages) {
+      if (i < r.items.length && seen.add('${r.items[i].bookId}:${r.items[i].internalPage}')) items.add(r.items[i]);
+    }
+  }
+  return SearchResultPage(items: items, totalMatches: pages.fold(0, (n, r) => n + r.totalMatches), page: page);
+}
+
 List<String> _layerSamples(List<String> pages) => [for (final p in pages.where((p) => p.trim().isNotEmpty).take(4)) p.length > 5000 ? p.substring(0, 5000) : p];
 
 class ServerBackend implements ManabiBackend {
@@ -281,8 +294,21 @@ class DirectBackend implements ManabiBackend {
   }
 
   @override
-  Future<SearchResultPage> search(String query, {int page = 1, SearchScope scope = SearchScope.all, TextSearchOptions options = TextSearchOptions.standard}) => _wrap(() =>
-      _turath.search(query, page: page, bookId: scope.bookId, authorId: scope.authorId, categoryId: scope.categoryId, options: options));
+  Future<SearchResultPage> search(String query, {int page = 1, SearchScope scope = SearchScope.all, TextSearchOptions options = TextSearchOptions.standard}) => _wrap(() async {
+        // One search per scope target (Turath filters one id of each kind).
+        final targets = scope.targets;
+        if (targets.length == 1) {
+          final t = targets.first;
+          return _turath.search(query, page: page, bookId: t.bookId, authorId: t.authorId, categoryId: t.categoryId, options: options);
+        }
+        final pages = await Future.wait([
+          for (final t in targets)
+            _turath
+                .search(query, page: page, bookId: t.bookId, authorId: t.authorId, categoryId: t.categoryId, options: options)
+                .catchError((Object _) => SearchResultPage(items: const [], totalMatches: 0, page: page)),
+        ]);
+        return mergeSearchPages(pages, page);
+      });
 
   @override
   Future<BookDetails> book(String id) => _wrap(() => _turath.getBook(id));

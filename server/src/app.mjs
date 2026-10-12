@@ -4,6 +4,7 @@ import { NususError } from "nusus";
 import { LAYERS_SCHEMA, LAYERS_SYSTEM, layersPrompt } from "./prompts.mjs";
 import { createNarrators } from "./narrators.mjs";
 import { createPdfFlags } from "./pdf-flags.mjs";
+import { scopeTargets } from "./pipeline.mjs";
 import { createAdvancedSearch, hasAdvancedOptions } from "./search.mjs";
 import { decodingTurath } from "./text.mjs";
 
@@ -147,18 +148,37 @@ export const createApp = ({ config, pipeline, turath: client, catalog, gemini, n
         nonAuthor: url.searchParams.get("notes") === "0" ? false : undefined,
         toc: url.searchParams.get("toc") === "1" ? true : undefined,
       };
-      if (hasAdvancedOptions(advanced)) {
-        const found = await advancedSearch(q, { page: Number(option("page") ?? 1), bookId: option("bookId"), authorId: option("authorId"), categoryId: option("categoryId"), ...advanced });
-        for (const item of found.items) discovered?.note({ id: item.book?.id, title: item.book?.title, authorId: item.author?.id, authorName: item.author?.name, categoryId: item.category?.id });
-        return stripRaw(found);
-      }
-      const result = await turath.search(q, {
-        page: Number(option("page") ?? 1),
-        bookIds: option("bookId") ? [option("bookId")] : undefined,
-        authorIds: option("authorId") ? [option("authorId")] : undefined,
-        categoryIds: option("categoryId") ? [option("categoryId")] : undefined,
+      const page = Number(option("page") ?? 1);
+      // One search per scope target (Turath filters one id of each kind),
+      // merged in turn; the totals add up.
+      const targets = scopeTargets({
+        ...(url.searchParams.has("bookIds") || url.searchParams.has("authorIds") || url.searchParams.has("categoryIds")
+          ? { bookIds: url.searchParams.get("bookIds") ?? "", authorIds: url.searchParams.get("authorIds") ?? "", categoryIds: url.searchParams.get("categoryIds") ?? "" }
+          : { bookId: option("bookId"), authorId: option("authorId"), categoryId: option("categoryId") }),
       });
-      return stripRaw(result);
+      const one = async (t = {}) => {
+        if (hasAdvancedOptions(advanced)) {
+          const found = await advancedSearch(q, { page, bookId: t.bookIds?.[0], authorId: t.authorIds?.[0], categoryId: t.categoryIds?.[0], ...advanced });
+          for (const item of found.items) discovered?.note({ id: item.book?.id, title: item.book?.title, authorId: item.author?.id, authorName: item.author?.name, categoryId: item.category?.id });
+          return found;
+        }
+        return turath.search(q, { page, ...t });
+      };
+      if (targets.length <= 1) return stripRaw(await one(targets[0]));
+      const results = await Promise.all(targets.map((t) => one(t).catch(() => ({ items: [], totalMatches: 0 }))));
+      const items = [];
+      const seen = new Set();
+      for (let i = 0; results.some((r) => i < r.items.length); i += 1) {
+        for (const r of results) {
+          const item = r.items[i];
+          const key = item && `${item.book?.id ?? item.bookId}:${item.location?.internalPage ?? item.internalPage}`;
+          if (item && !seen.has(key)) {
+            seen.add(key);
+            items.push(item);
+          }
+        }
+      }
+      return stripRaw({ items, totalMatches: results.reduce((n, r) => n + (r.totalMatches ?? 0), 0), page });
     }],
     // Which of these books have a scanned PDF (at most 60 ids).
     ["GET", /^\/api\/books\/pdf$/, async (_m, url) => {

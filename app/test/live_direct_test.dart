@@ -48,7 +48,7 @@ void main() {
         question: 'د حنفي فقهې او فتاوی له نظره میت یعني مړي ته د غسل پر وخت د اوبو په وسیله استنجاء څه حکم لري، او د لوټې(مَدَر) پر وسیله څه حکم لري؟',
         language: 'ps',
         depth: 'quick',
-        scope: SearchScope(categoryId: '14', categoryTitle: 'الفقه الحنفي'),
+        scope: SearchScope(categories: [(id: '14', name: 'الفقه الحنفي')]),
       ))) {
         events.add(e);
         if (e is AskStageEvent) print('stage ${e.stage.name} +${watch.elapsedMilliseconds}ms');

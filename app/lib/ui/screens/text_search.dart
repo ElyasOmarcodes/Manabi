@@ -5,7 +5,6 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/backend/backend.dart' show mapError;
-import '../../core/catalog/catalog_service.dart';
 import '../../core/models/library.dart';
 import '../../core/models/scope.dart';
 import '../../core/turath/arabic_match.dart';
@@ -117,9 +116,7 @@ class _LastSearch {
   static int total = 0;
   static int page = 0;
   static bool more = false;
-  static CatalogCategory? category;
-  static CatalogAuthor? author;
-  static CatalogBook? book;
+  static SearchScope scope = SearchScope.all;
 }
 
 class _FullTextPageState extends State<FullTextPage> {
@@ -127,9 +124,7 @@ class _FullTextPageState extends State<FullTextPage> {
   final _searchFocus = FocusNode();
   final _extra = <TextEditingController>[];
   TextSearchPrefs _prefs = TextSearchPrefs();
-  CatalogCategory? _category;
-  CatalogAuthor? _author;
-  CatalogBook? _book;
+  SearchScope _scope = SearchScope.all;
 
   final _items = <PagePassage>[];
   List<String> _phrases = const [];
@@ -138,15 +133,6 @@ class _FullTextPageState extends State<FullTextPage> {
   bool _loading = false;
   bool _more = false;
   String? _error;
-
-  SearchScope get _scope => SearchScope(
-        bookId: _book?.id,
-        bookTitle: _book?.title,
-        authorId: _author?.id,
-        authorName: _author?.name,
-        categoryId: _category?.id,
-        categoryTitle: _category?.title,
-      );
 
   @override
   void initState() {
@@ -158,9 +144,7 @@ class _FullTextPageState extends State<FullTextPage> {
       _total = _LastSearch.total;
       _page = _LastSearch.page;
       _more = _LastSearch.more;
-      _category = _LastSearch.category;
-      _author = _LastSearch.author;
-      _book = _LastSearch.book;
+      _scope = _LastSearch.scope;
     }
     TextSearchPrefs.load().then((p) {
       if (!mounted) return;
@@ -178,9 +162,7 @@ class _FullTextPageState extends State<FullTextPage> {
       _LastSearch.total = _total;
       _LastSearch.page = _page;
       _LastSearch.more = _more;
-      _LastSearch.category = _category;
-      _LastSearch.author = _author;
-      _LastSearch.book = _book;
+      _LastSearch.scope = _scope;
     }
     _search.dispose();
     _searchFocus.dispose();
@@ -199,7 +181,7 @@ class _FullTextPageState extends State<FullTextPage> {
     final downloads = context.read<DownloadController>();
     if (!more) {
       for (final p in phrases) {
-        SearchHistory.add(p, bookId: _book?.id);
+        SearchHistory.add(p, bookId: _scope.bookId);
       }
     }
     setState(() {
@@ -220,11 +202,12 @@ class _FullTextPageState extends State<FullTextPage> {
         final found = await downloads.searchSaved((t) {
           final hits = phrases.where((p) => phraseIn(t, p, o.precision));
           return _prefs.orMode ? hits.isNotEmpty : hits.length == phrases.length;
-        }, bookIds: scope.bookId == null ? null : {scope.bookId!});
-        final filtered = [
-          for (final p in found)
-            if ((scope.authorId == null || p.authorId == scope.authorId) && (scope.categoryId == null || p.categoryId == scope.categoryId)) p,
-        ];
+        }, bookIds: scope.authors.isEmpty && scope.categories.isEmpty && scope.books.isNotEmpty ? {for (final b in scope.books) b.id} : null);
+        bool inScope(PagePassage p) =>
+            scope.isAll ||
+            scope.targets.any((t) =>
+                (t.bookId == null || t.bookId == p.bookId) && (t.authorId == null || t.authorId == p.authorId) && (t.categoryId == null || t.categoryId == p.categoryId));
+        final filtered = [for (final p in found) if (inScope(p)) p];
         setState(() {
           _items.addAll(filtered);
           _total = filtered.length;
@@ -304,11 +287,8 @@ class _FullTextPageState extends State<FullTextPage> {
     );
     if (!mounted) return;
     if (choice is SearchPreset) {
-      final catalog = context.read<CatalogService>();
       setState(() {
-        _book = choice.scope.bookId == null ? null : catalog.book(choice.scope.bookId) ?? CatalogBook(choice.scope.bookId!, choice.scope.bookTitle ?? '', '', '');
-        _author = choice.scope.authorId == null ? null : catalog.author(choice.scope.authorId) ?? CatalogAuthor(choice.scope.authorId!, choice.scope.authorName ?? '', 0);
-        _category = choice.scope.categoryId == null ? null : catalog.category(choice.scope.categoryId) ?? CatalogCategory(choice.scope.categoryId!, choice.scope.categoryTitle ?? '', 0);
+        _scope = choice.scope;
       });
       _setPrefs(() => _prefs.options = choice.options);
       _run();
@@ -321,7 +301,7 @@ class _FullTextPageState extends State<FullTextPage> {
   }
 
   Future<String?> _askName(String label) {
-    final c = TextEditingController(text: [?_book?.title, ?_author?.name, ?_category?.title].join(' · '));
+    final c = TextEditingController(text: _scope.label(show: 3));
     return showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -383,16 +363,14 @@ class _FullTextPageState extends State<FullTextPage> {
               ),
               Directionality(
                 textDirection: TextDirection.rtl,
-                child: SearchSuggestions(controller: _search, focus: _searchFocus, bookId: _book?.id, onPick: (_) => _run()),
+                child: SearchSuggestions(controller: _search, focus: _searchFocus, bookId: _scope.bookId, onPick: (_) => _run()),
               ),
-              FilterChipsRow(
-                category: _category,
-                author: _author,
-                book: _book,
-                onCategory: (c) => setState(() => _category = c),
-                onAuthor: (x) => setState(() => _author = x),
-                onBook: (b) => setState(() => _book = b),
-                onChanged: _run,
+              ScopeChipsRow(
+                scope: _scope,
+                onChanged: (v) {
+                  setState(() => _scope = v);
+                  _run();
+                },
               ),
               if (_prefs.savedOnly || o.toc || _extra.isNotEmpty)
                 Padding(
@@ -635,7 +613,7 @@ class _PresetsSheetState extends State<_PresetsSheet> {
           ListTile(
             leading: Icon(Icons.bookmark_rounded, color: a.accent),
             title: Text(p.name, style: TextStyle(fontFamily: uiFont, color: a.text)),
-            subtitle: Text([?p.scope.bookTitle, ?p.scope.authorName, ?p.scope.categoryTitle].join(' · '),
+            subtitle: Text(p.scope.label(show: 3),
                 maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontFamily: uiFont, fontSize: 12, color: a.muted)),
             onTap: () => Navigator.pop(context, p),
             trailing: IconButton(
@@ -659,74 +637,3 @@ class _PresetsSheetState extends State<_PresetsSheet> {
 }
 
 /// Category, author and book filters for the text search.
-class FilterChipsRow extends StatelessWidget {
-  const FilterChipsRow({super.key, required this.category, required this.author, required this.book, required this.onCategory, required this.onAuthor, required this.onBook, required this.onChanged});
-  final CatalogCategory? category;
-  final CatalogAuthor? author;
-  final CatalogBook? book;
-  final ValueChanged<CatalogCategory?> onCategory;
-  final ValueChanged<CatalogAuthor?> onAuthor;
-  final ValueChanged<CatalogBook?> onBook;
-  final VoidCallback onChanged;
-  @override
-  Widget build(BuildContext context) {
-    final l = context.l;
-    final a = context.aura;
-    Widget chip(String label, IconData icon, bool active, Future<void> Function() pick, VoidCallback clear) => Padding(
-          padding: const EdgeInsetsDirectional.only(end: 6),
-          child: Pressable(
-            onTap: () async {
-              await pick();
-              onChanged();
-            },
-            child: Container(
-              padding: const EdgeInsetsDirectional.fromSTEB(10, 6, 8, 6),
-              decoration: BoxDecoration(
-                color: active ? a.accentTint : a.surface,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: active ? a.accent.withValues(alpha: 0.5) : a.border),
-              ),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(icon, size: 15, color: active ? a.accent : a.muted),
-                const SizedBox(width: 5),
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 160),
-                  child: Text(label, overflow: TextOverflow.ellipsis, style: TextStyle(fontFamily: uiFont, fontSize: 12.5, fontWeight: FontWeight.w600, color: active ? a.accent : a.text)),
-                ),
-                const SizedBox(width: 2),
-                if (active)
-                  GestureDetector(
-                    onTap: () {
-                      clear();
-                      onChanged();
-                    },
-                    child: Icon(Icons.close_rounded, size: 15, color: a.accent),
-                  )
-                else
-                  Icon(Icons.expand_more_rounded, size: 16, color: a.muted),
-              ]),
-            ),
-          ),
-        );
-    return Padding(
-      padding: const EdgeInsets.only(top: 10),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(children: [
-          chip(category?.title ?? l.anyCategory, Icons.category_outlined, category != null, () async {
-            final c = await pickFromCatalog<CatalogCategory>(context, PickKind.category);
-            if (c != null) onCategory(c);
-          }, () => onCategory(null)),
-          chip(author?.name ?? l.anyAuthor, Icons.person_outline_rounded, author != null, () async {
-            final x = await pickFromCatalog<CatalogAuthor>(context, PickKind.author);
-            if (x != null) onAuthor(x);
-          }, () => onAuthor(null)),
-          chip(book?.title ?? l.anyBook, Icons.menu_book_outlined, book != null, () async {
-            final b = await pickFromCatalog<CatalogBook>(context, PickKind.book, authorId: author?.id, categoryId: category?.id);
-            if (b != null) onBook(b);
-          }, () => onBook(null)),
-        ]),
-      ),
-    );
-  }
-}

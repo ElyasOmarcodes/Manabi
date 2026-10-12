@@ -1555,4 +1555,24 @@ class AppLocalizationsPs extends AppLocalizations {
 
   @override
   String get couldNotOpen => 'خلاصول یې ممکن نه شول';
+
+  @override
+  String get allAuthors => 'ټول مؤلفین';
+
+  @override
+  String get pickMany => 'څو یې وټاکئ';
+
+  @override
+  String doneCount(String n) {
+    return 'بس ($n)';
+  }
+
+  @override
+  String get scopeHow =>
+      'هر ټاکل شوی کتاب، او د هر ټاکل شوي مؤلف کتابونه په ټاکل شویو ډلو کې لټول کېږي.';
+
+  @override
+  String scopeTooMany(String n) {
+    return 'تر $n لټونونو پورې یو ځل کېږي';
+  }
 }

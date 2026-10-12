@@ -2276,7 +2276,7 @@ class _BookSearchSheetState extends State<_BookSearchSheet> {
       }
     });
     try {
-      final r = await widget.backend.search(q, page: _page + 1, scope: SearchScope(bookId: widget.bookId));
+      final r = await widget.backend.search(q, page: _page + 1, scope: SearchScope.single(bookId: widget.bookId));
       setState(() {
         _items.addAll(r.items);
         _total = r.totalMatches;

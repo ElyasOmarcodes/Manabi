@@ -2,6 +2,7 @@
 //   plan → search (general, per book, per school) → read & rank (+1 follow-up
 //   round) → compose with inline quotes → verify every quote.
 import 'dart:async';
+import 'dart:math';
 
 import '../catalog/catalog_service.dart';
 import '../models/answer.dart';
@@ -247,10 +248,15 @@ List<PlannedSearch> searchPlan({
   Limits limits = Limits.standard,
 }) {
   final userScoped = !scope.isAll;
+  // Several scope targets: every target gets the first query before any
+  // gets the second, and the hits are shared out between them.
+  final targets = scope.targets;
+  final take = targets.length > 1 ? max(3, (limits.hitsPerGeneral / min(targets.length, 3)).ceil()) : limits.hitsPerGeneral;
   final plan = <PlannedSearch>[
     for (final q in queries.take(limits.generalQueries))
-      PlannedSearch(q, limits.hitsPerGeneral, 'general', bookId: scope.bookId, authorId: scope.authorId, categoryId: scope.categoryId),
+      for (final t in targets) PlannedSearch(q, take, 'general', bookId: t.bookId, authorId: t.authorId, categoryId: t.categoryId),
   ];
+  if (targets.length > 1) return plan.take(max(limits.maxSearches, min(targets.length * 2, 16))).toList();
   if (!userScoped) {
     for (final id in requestedBookIds.take(limits.requestedBooks)) {
       for (final q in queries.take(limits.queriesPerRequested)) {
@@ -450,11 +456,14 @@ class AnswerPipeline {
   final PassageSearch turath;
   final CatalogService catalog;
 
-  String _scopeLabel(SearchScope scope) => [
-        if (scope.bookId != null) 'book "${catalog.book(scope.bookId)?.title ?? scope.bookTitle ?? scope.bookId}"',
-        if (scope.authorId != null) 'author "${catalog.author(scope.authorId)?.name ?? scope.authorName ?? scope.authorId}"',
-        if (scope.categoryId != null) 'category "${catalog.category(scope.categoryId)?.title ?? scope.categoryTitle ?? scope.categoryId}"',
-      ].join(', ');
+  String _scopeLabel(SearchScope scope) {
+    String names(List<ScopeRef> refs, String? Function(String id) look) => refs.map((r) => '"${look(r.id) ?? (r.name.isEmpty ? r.id : r.name)}"').join(', ');
+    return [
+      if (scope.books.isNotEmpty) '${scope.books.length > 1 ? 'books' : 'book'} ${names(scope.books, (id) => catalog.book(id)?.title)}',
+      if (scope.authors.isNotEmpty) '${scope.authors.length > 1 ? 'authors' : 'author'} ${names(scope.authors, (id) => catalog.author(id)?.name)}',
+      if (scope.categories.isNotEmpty) '${scope.categories.length > 1 ? 'categories' : 'category'} ${names(scope.categories, (id) => catalog.category(id)?.title)}',
+    ].join('; ');
+  }
 
   /// Runs searches (bounded concurrency 6) and merges hits into a de-duplicated pool.
   Future<({List<PipelineSource> candidates, int total, bool failed})> _collect(List<PlannedSearch> plan,

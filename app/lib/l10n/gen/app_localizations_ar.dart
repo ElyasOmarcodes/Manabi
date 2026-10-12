@@ -1554,4 +1554,24 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get couldNotOpen => 'تعذّر الفتح';
+
+  @override
+  String get allAuthors => 'كل المؤلفين';
+
+  @override
+  String get pickMany => 'اختر واحدًا أو أكثر';
+
+  @override
+  String doneCount(String n) {
+    return 'تم ($n)';
+  }
+
+  @override
+  String get scopeHow =>
+      'يُبحث في كل كتاب مختار، وفي كتب كل مؤلف مختار داخل التصنيفات المختارة.';
+
+  @override
+  String scopeTooMany(String n) {
+    return 'حتى $n عمليات بحث معًا';
+  }
 }

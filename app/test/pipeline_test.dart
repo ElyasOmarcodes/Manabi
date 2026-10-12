@@ -301,7 +301,7 @@ void main() {
         {'selected': [], 'coverage': 'none', 'followUpQueries': [], 'followUpBooks': []},
       ]);
       final pipeline = AnswerPipeline(model: model, turath: TurathClient(client: turathMock(log: log)), catalog: catalog);
-      await pipeline.ask(const AskRequest(question: 'q', scope: SearchScope(bookId: '12836'))).toList();
+      await pipeline.ask(const AskRequest(question: 'q', scope: SearchScope(books: [(id: '12836', name: '')]))).toList();
       final searches = log.where((u) => u.path == '/search');
       expect(searches, isNotEmpty);
       expect(searches.every((u) => u.queryParameters['book'] == '12836'), isTrue);

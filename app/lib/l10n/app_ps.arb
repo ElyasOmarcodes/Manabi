@@ -526,5 +526,10 @@
   "sendEmail": "Gmail / برېښنالیک",
   "reportSubject": "د متن تېروتنه — منابع",
   "reportLocation": "ځای",
-  "couldNotOpen": "خلاصول یې ممکن نه شول"
+  "couldNotOpen": "خلاصول یې ممکن نه شول",
+  "allAuthors": "ټول مؤلفین",
+  "pickMany": "څو یې وټاکئ",
+  "doneCount": "بس ({n})",
+  "scopeHow": "هر ټاکل شوی کتاب، او د هر ټاکل شوي مؤلف کتابونه په ټاکل شویو ډلو کې لټول کېږي.",
+  "scopeTooMany": "تر {n} لټونونو پورې یو ځل کېږي"
 }

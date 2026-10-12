@@ -220,3 +220,18 @@ test("progress: activity log, token usage, a streamed draft, and a retry resumes
   assert.equal(result.usage.calls, 1);
   assert.ok(events.some(([e, d]) => e === "draft" && d.text === "ځواب په"));
 });
+
+test("scope targets: each book, and each author within each category", async () => {
+  const { scopeTargets, searchPlan } = await import("../src/pipeline.mjs");
+  assert.deepEqual(scopeTargets({ bookId: "5", authorId: "9" }), [{ bookIds: ["5"], authorIds: ["9"] }]);
+  assert.deepEqual(scopeTargets({ bookIds: "5,6", authorIds: [], categoryIds: [] }), [{ bookIds: ["5"] }, { bookIds: ["6"] }]);
+  assert.deepEqual(scopeTargets({ bookIds: "5", authorIds: "9", categoryIds: "" }), [{ bookIds: ["5"] }]);
+  assert.deepEqual(scopeTargets({ bookIds: ["5"], authorIds: "1,2", categoryIds: "30" }), [
+    { bookIds: ["5"] },
+    { authorIds: ["1"], categoryIds: ["30"] },
+    { authorIds: ["2"], categoryIds: ["30"] },
+  ]);
+  assert.deepEqual(scopeTargets({ bookIds: "x,0", authorIds: "" }), []);
+  const plan = searchPlan({ queries: ["a", "b"], scope: [{ bookIds: ["5"] }, { bookIds: ["6"] }], userScoped: true });
+  assert.deepEqual(plan.map((s) => [s.query, s.scope.bookIds[0]]), [["a", "5"], ["a", "6"], ["b", "5"], ["b", "6"]]);
+});

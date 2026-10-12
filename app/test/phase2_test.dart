@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:manabi/core/gemini/gemini_client.dart';
+import 'package:manabi/core/models/scope.dart';
 import 'package:manabi/state/search_history.dart';
 
 void main() {
@@ -52,6 +53,29 @@ void main() {
       expect(parseJsonReply('Here:\n```json\n{"a":{"b":2}}\n```'), {
         'a': {'b': 2}
       });
+    });
+  });
+
+  group('scopes', () {
+    test('each book, and each author within each category, is one search', () {
+      const s = SearchScope(books: [(id: '5', name: 'A'), (id: '6', name: 'B')], authors: [(id: '1', name: 'X'), (id: '2', name: 'Y')], categories: [(id: '30', name: 'C')]);
+      expect(s.targets, [
+        (bookId: '5', authorId: null, categoryId: null),
+        (bookId: '6', authorId: null, categoryId: null),
+        (bookId: null, authorId: '1', categoryId: '30'),
+        (bookId: null, authorId: '2', categoryId: '30'),
+      ]);
+      expect(s.label(), 'A · B +3');
+      expect(s.toRequest()['bookIds'], '5,6');
+    });
+
+    test('one book with its author is just the book; old saved scopes still load', () {
+      final s = SearchScope.all.withBook('5', 'A').withAuthor('9', 'X');
+      expect(s.targets, [(bookId: '5', authorId: null, categoryId: null)]);
+      final old = SearchScope.fromJson({'bookId': '5', 'bookTitle': 'A'});
+      expect(old.bookId, '5');
+      expect(SearchScope.fromJson(s.toJson()), s);
+      expect(SearchScope.all.targets.single, (bookId: null, authorId: null, categoryId: null));
     });
   });
 }

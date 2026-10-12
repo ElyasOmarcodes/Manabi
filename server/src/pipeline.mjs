@@ -137,21 +137,55 @@ const settleAll = async (tasks, concurrency = 6) => {
   return results;
 };
 
+const scopeIds = (v) =>
+  [...new Set((Array.isArray(v) ? v : typeof v === "string" ? v.split(",") : v != null ? [v] : []).map((x) => String(x).trim()).filter((x) => /^[1-9]\d{0,9}$/.test(x)))];
+
+/**
+ * The searches a scope stands for. Turath filters one book, author and
+ * category per search, so several picks become several searches: every
+ * chosen book, plus every chosen author within every chosen category.
+ * (The older single bookId/authorId/categoryId form is one search.)
+ */
+export const scopeTargets = (scope = {}, max = 12) => {
+  if (!scope || typeof scope !== "object") return [];
+  const lists = scope.bookIds !== undefined || scope.authorIds !== undefined || scope.categoryIds !== undefined;
+  if (!lists) {
+    const one = {};
+    if (scopeIds(scope.bookId)[0]) one.bookIds = [scopeIds(scope.bookId)[0]];
+    if (scopeIds(scope.authorId)[0]) one.authorIds = [scopeIds(scope.authorId)[0]];
+    if (scopeIds(scope.categoryId)[0]) one.categoryIds = [scopeIds(scope.categoryId)[0]];
+    return Object.keys(one).length ? [one] : [];
+  }
+  const books = scopeIds(scope.bookIds);
+  const authors = scopeIds(scope.authorIds);
+  const categories = scopeIds(scope.categoryIds);
+  const out = books.map((id) => ({ bookIds: [id] }));
+  // One book with its own author or category: the book alone.
+  const singleBook = books.length === 1 && authors.length <= 1 && categories.length <= 1;
+  if (!singleBook && (authors.length || categories.length)) {
+    for (const a of authors.length ? authors : [undefined]) {
+      for (const c of categories.length ? categories : [undefined]) out.push({ ...(a && { authorIds: [a] }), ...(c && { categoryIds: [c] }) });
+    }
+  }
+  return out.slice(0, max);
+};
+
 const scopeToNusus = (scope = {}) => {
-  const out = {};
-  if (scope.bookId) out.bookIds = [String(scope.bookId)];
-  if (scope.authorId) out.authorIds = [String(scope.authorId)];
-  if (scope.categoryId) out.categoryIds = [String(scope.categoryId)];
-  return Object.keys(out).length ? out : undefined;
+  const targets = scopeTargets(scope);
+  return targets.length ? targets : undefined;
 };
 
 export const scopeLabel = (scope, catalog) => {
-  if (!scope) return "";
+  const targets = scopeTargets(scope ?? {});
+  if (!targets.length) return "";
+  const books = [...new Set(targets.flatMap((t) => t.bookIds ?? []))];
+  const authors = [...new Set(targets.flatMap((t) => t.authorIds ?? []))];
+  const categories = [...new Set(targets.flatMap((t) => t.categoryIds ?? []))];
   const parts = [];
-  if (scope.bookId) parts.push(`book "${catalog.book(scope.bookId)?.title ?? scope.bookId}"`);
-  if (scope.authorId) parts.push(`author "${catalog.authorName(scope.authorId) ?? scope.authorId}"`);
-  if (scope.categoryId) parts.push(`category "${catalog.categoryTitle(scope.categoryId) ?? scope.categoryId}"`);
-  return parts.join(", ");
+  if (books.length) parts.push(`${books.length > 1 ? "books" : "book"} ${books.map((id) => `"${catalog.book(id)?.title ?? id}"`).join(", ")}`);
+  if (authors.length) parts.push(`${authors.length > 1 ? "authors" : "author"} ${authors.map((id) => `"${catalog.authorName(id) ?? id}"`).join(", ")}`);
+  if (categories.length) parts.push(`${categories.length > 1 ? "categories" : "category"} ${categories.map((id) => `"${catalog.categoryTitle(id) ?? id}"`).join(", ")}`);
+  return parts.join("; ");
 };
 
 // Works derived from another book (supplements, abridgements, indexes …)
@@ -218,7 +252,12 @@ const toCandidate = (passage, catalog) => {
 /** Builds the list of searches for one retrieval round. */
 export const searchPlan = ({ queries, scope, madhhabs = [], requestedBookIds = [], referenceBookIds = [], userScoped, limits: L = LIMITS }) => {
   const plan = [];
-  for (const q of queries.slice(0, L.generalQueries)) plan.push({ query: q, scope, take: L.hitsPerGeneral, kind: "general" });
+  // Several scope targets: every target gets the first query before any
+  // gets the second, and the hits are shared out between them.
+  const targets = Array.isArray(scope) ? scope : [scope];
+  const take = targets.length > 1 ? Math.max(3, Math.ceil(L.hitsPerGeneral / Math.min(targets.length, 3))) : L.hitsPerGeneral;
+  for (const q of queries.slice(0, L.generalQueries)) for (const t of targets) plan.push({ query: q, scope: t, take, kind: "general" });
+  if (targets.length > 1) return plan.slice(0, Math.max(L.maxSearches, Math.min(targets.length * 2, 16)));
   if (!userScoped) {
     for (const id of requestedBookIds.slice(0, L.requestedBooks)) {
       for (const q of queries.slice(0, L.queriesPerRequested)) plan.push({ query: q, scope: { bookIds: [id] }, take: L.hitsPerRequested, kind: "requested" });
