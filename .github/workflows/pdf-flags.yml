@@ -4,6 +4,11 @@ name: PDF list
 # server so the PDF badge is right from the first launch. Monthly, or by hand.
 on:
   workflow_dispatch:
+    inputs:
+      full:
+        description: Ask again about every book (not only the unknown ones)
+        required: false
+        default: "false"
   schedule:
     - cron: "17 3 1 * *"
 
@@ -16,15 +21,17 @@ concurrency:
 jobs:
   crawl:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 85
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
       - name: Ask Turath which books have a PDF
-        run: node tool/pdf-flags/crawl.mjs
+        # Saves as it goes and stops after 70 minutes; the next run goes on.
+        run: node tool/pdf-flags/crawl.mjs ${{ (github.event_name == 'schedule' || github.event.inputs.full == 'true') && '--full' || '' }}
       - name: Commit the list when it changed
+        if: always()
         run: |
           if git diff --quiet -- app/assets/catalog/pdf_flags.json server/src/data/pdf-flags.json && [ -z "$(git status --porcelain -- app/assets/catalog/pdf_flags.json server/src/data/pdf-flags.json)" ]; then
             echo "unchanged"; exit 0
@@ -33,4 +40,5 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add app/assets/catalog/pdf_flags.json server/src/data/pdf-flags.json
           git commit -m "Update the bundled PDF list"
-          git push
+          git pull --rebase origin "${GITHUB_REF_NAME}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
