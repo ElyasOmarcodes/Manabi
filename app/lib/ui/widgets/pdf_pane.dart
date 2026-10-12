@@ -4,6 +4,16 @@ import 'package:pdfrx/pdfrx.dart';
 import '../theme.dart';
 import 'common.dart';
 
+/// Where the viewer reads a Turath PDF from. On the web a browser may not
+/// read Turath's range answers from another origin, so the Manabi server
+/// relays them (only the ranges asked for); apps read Turath directly.
+String pdfViewUrl(String turathUrl, {required bool web, String? serverUrl}) {
+  const prefix = 'https://files.turath.io/pdf/';
+  final server = serverUrl?.trim().replaceAll(RegExp(r'/+$'), '') ?? '';
+  if (!web || server.isEmpty || !turathUrl.startsWith(prefix)) return turathUrl;
+  return '$server/api/pdf/${turathUrl.substring(prefix.length)}';
+}
+
 /// The printed (scanned) edition of a volume, shown inside the reader.
 ///
 /// [page] is the PDF page the reader wants; the viewer moves there whenever
@@ -23,8 +33,12 @@ class PdfPane extends StatefulWidget {
     required this.text,
     required this.muted,
     required this.digits,
+    this.headers,
   });
   final String url;
+
+  /// Sent with every request (the server's access token, for its relay).
+  final Map<String, String>? headers;
   final int page;
   final ValueChanged<int> onPage;
 
@@ -61,8 +75,13 @@ class _PdfPaneState extends State<PdfPane> {
     final l = context.l;
     return Stack(children: [
       Positioned.fill(
+        // Only the parts of the volume the shown pages need are fetched (HTTP
+        // byte ranges), not the whole file; on phones and computers they are
+        // kept on disk, so a page seen once opens again without the network.
         child: PdfViewer.uri(
           Uri.parse(widget.url),
+          preferRangeAccess: true,
+          headers: widget.headers,
           controller: _controller,
           initialPageNumber: widget.page,
           params: PdfViewerParams(

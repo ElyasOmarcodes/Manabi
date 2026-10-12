@@ -40,7 +40,7 @@ class Bookmark {
 
 /// A passage the reader highlighted on a page.
 class Highlight {
-  const Highlight({required this.bookId, required this.bookTitle, required this.page, required this.text, this.color = 0, this.note, required this.savedAt});
+  const Highlight({required this.bookId, required this.bookTitle, required this.page, required this.text, this.color = 0, this.note, required this.savedAt, this.part, this.start});
   final String bookId;
   final String bookTitle;
   final int page;
@@ -51,6 +51,15 @@ class Highlight {
   final String? note;
   final DateTime savedAt;
 
+  /// Where on the page: 'title', 'body' or 'notes', and the offset of the
+  /// text there counted without diacritics (see highlight_anchor.dart).
+  /// Older highlights have neither.
+  final String? part;
+  final int? start;
+
+  /// The same mark (same page, text and place).
+  bool sameAs(Highlight o) => o.bookId == bookId && o.page == page && o.text == text && o.part == part && o.start == start;
+
   Map<String, dynamic> toJson() => {
         'bookId': bookId,
         'bookTitle': bookTitle,
@@ -59,6 +68,8 @@ class Highlight {
         'color': color,
         if (note != null) 'note': note,
         'savedAt': savedAt.toIso8601String(),
+        if (part != null) 'part': part,
+        if (start != null) 'start': start,
       };
 
   factory Highlight.fromJson(Map<String, dynamic> j) => Highlight(
@@ -69,6 +80,8 @@ class Highlight {
         color: (j['color'] as num?)?.toInt() ?? 0,
         note: j['note'] as String?,
         savedAt: DateTime.tryParse(j['savedAt'] as String? ?? '') ?? DateTime.now(),
+        part: j['part'] as String?,
+        start: (j['start'] as num?)?.toInt(),
       );
 }
 
@@ -370,13 +383,22 @@ class ReadingController extends ChangeNotifier {
       [for (final h in highlights) if (h.bookId == bookId && (page == null || h.page == page)) h];
 
   Future<void> addHighlight(Highlight h) async {
-    highlights.removeWhere((x) => x.bookId == h.bookId && x.page == h.page && x.text == h.text);
+    highlights.removeWhere(h.sameAs);
     highlights.insert(0, h);
     await _saveHighlights();
   }
 
   Future<void> removeHighlight(Highlight h) async {
-    highlights.removeWhere((x) => x.bookId == h.bookId && x.page == h.page && x.text == h.text);
+    highlights.removeWhere(h.sameAs);
+    await _saveHighlights();
+  }
+
+  /// Removes several marks and adds several, saved once.
+  Future<void> replaceHighlights({List<Highlight> remove = const [], List<Highlight> add = const []}) async {
+    for (final h in [...remove, ...add]) {
+      highlights.removeWhere(h.sameAs);
+    }
+    highlights.insertAll(0, add);
     await _saveHighlights();
   }
 

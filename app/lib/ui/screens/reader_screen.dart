@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/gestures.dart' show GestureRecognizer, PointerDeviceKind, TapGestureRecognizer;
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart' show ScrollCacheExtent;
+import 'package:flutter/rendering.dart' show ScrollCacheExtent, SelectionStatus;
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -20,6 +20,7 @@ import '../../state/downloads.dart';
 import '../../state/layer_ai.dart';
 import '../../state/nav_controller.dart';
 import '../../state/reading_controller.dart';
+import '../../state/highlight_anchor.dart';
 import '../../state/search_history.dart';
 import '../../state/settings_controller.dart';
 import '../theme.dart';
@@ -478,10 +479,14 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
   Widget _pdfView(ReaderColors c) {
     final reading = context.read<ReadingController>();
-    final url = _book!.pdf!.url(_pdfVolume);
+    final settings = context.read<SettingsController>();
+    final viaServer = kIsWeb && settings.mode == ConnectionMode.server;
+    final url = pdfViewUrl(_book!.pdf!.url(_pdfVolume), web: kIsWeb, serverUrl: viaServer ? settings.serverUrl : null);
+    final token = settings.accessToken.trim();
     return PdfPane(
       key: ValueKey(url),
       url: url,
+      headers: viaServer && token.isNotEmpty ? {'authorization': 'Bearer $token'} : null,
       page: _pdfPage,
       onPage: _onPdfPage,
       offset: reading.pdfOffsetOf(widget.bookId),
@@ -549,26 +554,36 @@ class _ReaderScreenState extends State<ReaderScreen> {
     }
   }
 
-  Future<void> _highlight(int page, String text, int color) async {
+  Future<void> _highlight(int page, List<({String part, String text, int start})> marks, int color, List<Highlight> replace) async {
+    if (marks.isEmpty) return;
     final reading = context.read<ReadingController>();
-    // A new colour replaces the marks already on this passage.
-    final f = SearchHistory.fold(text);
-    for (final h in reading.highlightsOf(widget.bookId, page)) {
-      if (h.note == null && (SearchHistory.fold(h.text).contains(f) || f.contains(SearchHistory.fold(h.text)))) await reading.removeHighlight(h);
-    }
-    await reading.addHighlight(Highlight(bookId: widget.bookId, bookTitle: _title, page: page, text: text.trim(), color: color, savedAt: DateTime.now()));
+    final now = DateTime.now();
+    await reading.replaceHighlights(remove: replace, add: [
+      for (final m in marks) Highlight(bookId: widget.bookId, bookTitle: _title, page: page, text: m.text, color: color, savedAt: now, part: m.part, start: m.start),
+    ]);
     await reading.setHighlightColor(color);
   }
 
-  Future<void> _comment(int page, String text, Highlight? existing) async {
+  Future<void> _comment(int page, ({String part, String text, int start})? mark, Highlight? existing) async {
+    if (mark == null && existing == null) return;
     final note = await askComment(context, initial: existing?.note ?? '');
     if (note == null || !mounted) return;
     final reading = context.read<ReadingController>();
-    if (existing != null) await reading.removeHighlight(existing);
-    if (note.isEmpty) return;
-    await reading.addHighlight(Highlight(
-        bookId: widget.bookId, bookTitle: _title, page: page, text: existing?.text ?? text.trim(), color: existing?.color ?? reading.highlightColor, note: note, savedAt: DateTime.now()));
-    if (mounted) toast(context, context.l.commentSaved);
+    await reading.replaceHighlights(remove: [?existing], add: [
+      if (note.isNotEmpty)
+        Highlight(
+          bookId: widget.bookId,
+          bookTitle: _title,
+          page: page,
+          text: existing?.text ?? mark!.text,
+          color: existing?.color ?? reading.highlightColor,
+          note: note,
+          savedAt: DateTime.now(),
+          part: existing != null ? existing.part : mark!.part,
+          start: existing != null ? existing.start : mark!.start,
+        ),
+    ]);
+    if (mounted && note.isNotEmpty) toast(context, context.l.commentSaved);
   }
 
   void _report(int page, String text) {
@@ -933,9 +948,9 @@ class _ReaderScreenState extends State<ReaderScreen> {
         book: _book,
         onRetry: () => setState(() => _cache.remove(page)),
         onAction: (a) => _pageAction(a, page),
-        onHighlight: (t, c) => _highlight(page, t, c),
+        onHighlight: (m, c, replace) => _highlight(page, m, c, replace),
         onCopyQuote: (t) => _copyQuote(page, t),
-        onComment: (t, h) => _comment(page, t, h),
+        onComment: (m, h) => _comment(page, m, h),
         onReport: (t) => _report(page, t),
         matnContext: () => _matnContext(page),
       );
@@ -1062,11 +1077,12 @@ class _PageBlock extends StatelessWidget {
   final BookDetails? book;
   final VoidCallback onRetry;
   final ValueChanged<String> onAction;
-  final void Function(String text, int color) onHighlight;
+  /// New marks for the selection in a colour, replacing the marks under it.
+  final void Function(List<({String part, String text, int start})> marks, int color, List<Highlight> replace) onHighlight;
   final ValueChanged<String> onCopyQuote;
 
   /// Comment on the selection, or edit the comment already on it.
-  final void Function(String text, Highlight? existing) onComment;
+  final void Function(({String part, String text, int start})? mark, Highlight? existing) onComment;
   final ValueChanged<String> onReport;
 
   @override
@@ -1100,9 +1116,12 @@ class _PageBlock extends StatelessWidget {
             body = nl < 0 ? '' : body.substring(nl + 1).trim();
           }
         }
-        final marks = reading.highlightsOf(p.bookId, page);
+        final showNotes = notes.isNotEmpty && reading.showFootnotes;
+        final spaces = {'title': ?title, 'body': body, if (showNotes) 'notes': notes};
+        // Each mark at one place (the matn and its commentary repeat words).
+        final placed = placeHighlights(spaces, reading.highlightsOf(p.bookId, page));
         final bookmarked = reading.isBookmarked(p.bookId, page);
-        final selection = _Selection();
+        final selection = _Selection(spaces);
         final style = bookTextStyle(context, reading, color: colors.text);
         final align = reading.justify ? TextAlign.justify : TextAlign.start;
         return Container(
@@ -1115,22 +1134,35 @@ class _PageBlock extends StatelessWidget {
               // Arabic (right-to-left) selection in reading order.
               SelectionArea(
                 onSelectionChanged: (c) => selection.text = c?.plainText ?? '',
-                contextMenuBuilder: (context, state) => _menu(context, state, selection.text, marks),
+                contextMenuBuilder: (context, state) => _menu(context, state, selection, placed),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                   if (title != null)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 8),
-                      child: Text(title, textDirection: TextDirection.rtl, style: bookTextStyle(context, reading, size: 17, weight: FontWeight.w700, color: a.accent).copyWith(height: 1.7)),
+                      child: selection.listen(
+                        Text.rich(
+                          _marked(context, title, mark, _localMarks(placed, 'title', 0, title.length),
+                              bookTextStyle(context, reading, size: 17, weight: FontWeight.w700, color: a.accent).copyWith(height: 1.7)),
+                          textDirection: TextDirection.rtl,
+                        ),
+                        'title',
+                        0,
+                      ),
                     ),
-                  ..._bodyParts(context, p, body, marks, style, align),
-                  if (notes.isNotEmpty && reading.showFootnotes) ...[
+                  ..._bodyParts(context, p, body, placed, selection, style, align),
+                  if (showNotes) ...[
                     const SizedBox(height: 14),
                     Align(alignment: AlignmentDirectional.centerStart, child: SizedBox(width: 90, child: Divider(color: colors.muted.withValues(alpha: 0.5)))),
                     const SizedBox(height: 4),
-                    Text.rich(
-                      _marked(context, notes, mark, marks, bookTextStyle(context, reading, size: 15.5, color: colors.muted).copyWith(height: reading.lineHeight * 0.88)),
-                      textDirection: TextDirection.rtl,
-                      textAlign: align,
+                    selection.listen(
+                      Text.rich(
+                        _marked(context, notes, mark, _localMarks(placed, 'notes', 0, notes.length),
+                            bookTextStyle(context, reading, size: 15.5, color: colors.muted).copyWith(height: reading.lineHeight * 0.88)),
+                        textDirection: TextDirection.rtl,
+                        textAlign: align,
+                      ),
+                      'notes',
+                      0,
                     ),
                   ],
                 ]),
@@ -1172,7 +1204,7 @@ class _PageBlock extends StatelessWidget {
 
   /// The page text: the matn printed on top (before the ــ line), a short
   /// rule, then the commentary.
-  List<Widget> _bodyParts(BuildContext context, PagePassage p, String body, List<Highlight> marks, TextStyle style, TextAlign align) {
+  List<Widget> _bodyParts(BuildContext context, PagePassage p, String body, List<PlacedHighlight> marks, _Selection selection, TextStyle style, TextAlign align) {
     final reading = context.read<ReadingController>();
     final layers = reading.layersOf(p.bookId);
     List<(String, String)>? ai;
@@ -1185,23 +1217,30 @@ class _PageBlock extends StatelessWidget {
             future: PageMatnAi.fetch(backend, p.bookId, page, p.bookTitle, p.text),
             builder: (context, snap) => Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: _parts(context, p, body, marks, style, align, layers, snap.data),
+              children: _parts(context, p, body, marks, selection, style, align, layers, snap.data),
             ),
           ),
         ];
       }
     }
-    return _parts(context, p, body, marks, style, align, layers, ai);
+    return _parts(context, p, body, marks, selection, style, align, layers, ai);
   }
 
-  List<Widget> _parts(BuildContext context, PagePassage p, String body, List<Highlight> marks, TextStyle style, TextAlign align, BookLayers layers, List<(String, String)>? ai) {
+  List<Widget> _parts(BuildContext context, PagePassage p, String body, List<PlacedHighlight> marks, _Selection selection, TextStyle style, TextAlign align, BookLayers layers,
+      List<(String, String)>? ai) {
     final block = matnBlock(body);
     final earlier = matnContext?.call() ?? const <String>[];
     // The AI's stretches are found on the whole page, in reading order, and
     // then split between the matn on top and the commentary.
     final aiRanges = ai == null ? null : aiMatnRanges(body, ai, context: earlier);
     if (block == null) {
-      return [RevealText(_marked(context, body, mark, marks, style, narrators: p.narrators, earlier: earlier, aiRanges: aiRanges), reveal: reveal, textDirection: TextDirection.rtl, textAlign: align)];
+      return [
+        selection.listen(
+            RevealText(_marked(context, body, mark, _localMarks(marks, 'body', 0, body.length), style, narrators: p.narrators, earlier: earlier, aiRanges: aiRanges),
+                reveal: reveal, textDirection: TextDirection.rtl, textAlign: align),
+            'body',
+            0),
+      ];
     }
     final top = body.substring(0, block.blockEnd);
     final sharh = body.substring(block.sharhStart);
@@ -1209,31 +1248,39 @@ class _PageBlock extends StatelessWidget {
     final sharhAi = aiRanges == null ? null : [for (final (s, e) in aiRanges) if (s >= block.sharhStart) (s - block.sharhStart, e - block.sharhStart)];
     final revealTop = reveal != null && arabicMatches(top, reveal).isNotEmpty;
     return [
-      RevealText(_marked(context, top, mark, marks, style, narrators: p.narrators, top: true, aiRanges: topAi), reveal: revealTop ? reveal : null, textDirection: TextDirection.rtl, textAlign: align),
+      selection.listen(
+          RevealText(_marked(context, top, mark, _localMarks(marks, 'body', 0, block.blockEnd), style, narrators: p.narrators, top: true, aiRanges: topAi),
+              reveal: revealTop ? reveal : null, textDirection: TextDirection.rtl, textAlign: align),
+          'body',
+          0),
       Padding(
         padding: const EdgeInsets.symmetric(vertical: 12),
         child: Center(child: Container(width: 72, height: 1.5, decoration: BoxDecoration(color: colors.muted.withValues(alpha: 0.45), borderRadius: BorderRadius.circular(2)))),
       ),
-      RevealText(_marked(context, sharh, mark, marks, style, narrators: p.narrators, earlier: [top, ...earlier], aiRanges: sharhAi), reveal: revealTop ? null : reveal, textDirection: TextDirection.rtl, textAlign: align),
+      selection.listen(
+          RevealText(_marked(context, sharh, mark, _localMarks(marks, 'body', block.sharhStart, body.length), style, narrators: p.narrators, earlier: [top, ...earlier], aiRanges: sharhAi),
+              reveal: revealTop ? null : reveal, textDirection: TextDirection.rtl, textAlign: align),
+          'body',
+          block.sharhStart),
     ];
   }
 
   void _showComment(BuildContext context, Highlight h) {
     final reading = context.read<ReadingController>();
-    showCommentSheet(context, h, onEdit: () => onComment(h.text, h), onDelete: () => reading.removeHighlight(h));
+    showCommentSheet(context, h, onEdit: () => onComment(null, h), onDelete: () => reading.removeHighlight(h));
   }
 
   /// The selection menu (icons only): highlight colours, copy, copy with
   /// the source, comment, report an error, and removing marks under it.
-  Widget _menu(BuildContext context, SelectableRegionState state, String selected, List<Highlight> marks) {
-    final text = selected.trim();
+  Widget _menu(BuildContext context, SelectableRegionState state, _Selection selection, List<PlacedHighlight> placed) {
+    final text = selection.text.trim();
     if (text.isEmpty) return AdaptiveTextSelectionToolbar.buttonItems(anchors: state.contextMenuAnchors, buttonItems: state.contextMenuButtonItems);
     final reading = context.read<ReadingController>();
-    final f = SearchHistory.fold(text);
-    final under = [
-      for (final h in marks)
-        if (SearchHistory.fold(h.text).contains(f) || f.contains(SearchHistory.fold(h.text))) h,
-    ];
+    final spans = selection.spans();
+    // Only the marks the selection actually touches, at their own place.
+    final under = spans.isEmpty
+        ? [for (final p in placed) if (SearchHistory.fold(p.highlight.text) == SearchHistory.fold(text)) p.highlight]
+        : highlightsUnder(placed, spans);
     void done(VoidCallback fn) {
       state.hideToolbar();
       fn();
@@ -1242,25 +1289,17 @@ class _PageBlock extends StatelessWidget {
     return SelectionToolbar(
       anchors: state.contextMenuAnchors,
       marked: under,
-      onColor: (c) => done(() => onHighlight(text, c)),
+      onColor: (c) => done(() => onHighlight(selection.anchors(spans), c, [for (final h in under) if (h.note == null) h])),
       onCopy: () => done(() => copyText(context, text)),
       onCopyCite: () => done(() => onCopyQuote(text)),
-      onComment: () => done(() => onComment(text, under.where((h) => h.note != null).firstOrNull)),
+      onComment: () => done(() => onComment(selection.anchors(spans).firstOrNull, under.where((h) => h.note != null).firstOrNull)),
       onReport: () => done(() => onReport(text)),
-      onRemove: () => done(() {
-        for (final h in under.where((h) => h.note == null)) {
-          reading.removeHighlight(h);
-        }
-      }),
-      onDeleteComment: () => done(() {
-        for (final h in under.where((h) => h.note != null)) {
-          reading.removeHighlight(h);
-        }
-      }),
+      onRemove: () => done(() => reading.replaceHighlights(remove: [for (final h in under) if (h.note == null) h])),
+      onDeleteComment: () => done(() => reading.replaceHighlights(remove: [for (final h in under) if (h.note != null) h])),
     );
   }
 
-  TextSpan _marked(BuildContext context, String text, String? query, List<Highlight> highlights, TextStyle style,
+  TextSpan _marked(BuildContext context, String text, String? query, List<(int, int, Highlight)> highlights, TextStyle style,
       {List<({String id, String name})> narrators = const [], bool top = false, List<String> earlier = const [], List<(int, int)>? aiRanges}) {
     final dark = context.aura.dark;
     final reading = context.read<ReadingController>();
@@ -1275,11 +1314,8 @@ class _PageBlock extends StatelessWidget {
       taps.add((at, at + name.length, TapGestureRecognizer()..onTap = () => showNarrator(context, n.id, n.name)));
       from = at + name.length;
     }
-    for (final h in highlights) {
-      if (h.note == null) continue;
-      for (final (s, e) in arabicMatches(text, h.text)) {
-        taps.add((s, e, TapGestureRecognizer()..onTap = () => _showComment(context, h)));
-      }
+    for (final (s, e, h) in highlights) {
+      if (h.note != null) taps.add((s, e, TapGestureRecognizer()..onTap = () => _showComment(context, h)));
     }
     final linkStyle = TextStyle(
       decoration: TextDecoration.underline,
@@ -1290,8 +1326,7 @@ class _PageBlock extends StatelessWidget {
       // Lowest first: verses and matn, then highlights, then search matches.
       ...textLayerRanges(reading, reading.layersOf(book?.id ?? ''), text, dark: dark, top: top, context: earlier, aiRanges: aiRanges),
       for (final (s, e, _) in taps) (s, e, linkStyle),
-      for (final h in highlights)
-        for (final (s, e) in arabicMatches(text, h.text))
+      for (final (s, e, h) in highlights)
           if (h.note == null)
             (s, e, TextStyle(backgroundColor: highlightColors[h.color.clamp(0, highlightColors.length - 1)].withValues(alpha: dark ? 0.38 : 0.45)))
           else
@@ -1379,8 +1414,65 @@ TextSpan layeredSpan(String text, TextStyle base, List<(int, int, TextStyle)> ra
 
 /// The text currently selected on a page (for the selection menu).
 class _Selection {
+  _Selection(this.spaces);
+
+  /// The page's text spaces as shown ('title', 'body', 'notes').
+  final Map<String, String> spaces;
   String text = '';
+  final _parts = <(SelectionListenerNotifier, String, int)>[];
+
+  /// Wraps one shown part of [space] that starts at [base] in it, so the
+  /// selection's exact place is known.
+  Widget listen(Widget child, String space, int base) {
+    final n = SelectionListenerNotifier();
+    _parts.add((n, space, base));
+    return SelectionListener(selectionNotifier: n, child: child);
+  }
+
+  /// The selected stretches, each within one space.
+  List<SelectedSpan> spans() {
+    final out = <SelectedSpan>[];
+    for (final (n, space, base) in _parts) {
+      if (!n.registered) continue;
+      final d = n.selection;
+      final r = d.range;
+      if (d.status == SelectionStatus.none || r == null || r.startOffset == r.endOffset) continue;
+      final text = spaces[space] ?? '';
+      final a = (base + (r.startOffset < r.endOffset ? r.startOffset : r.endOffset)).clamp(0, text.length);
+      final b = (base + (r.startOffset < r.endOffset ? r.endOffset : r.startOffset)).clamp(a, text.length);
+      out.add((space: space, start: a, end: b, text: text.substring(a, b)));
+    }
+    return out;
+  }
+
+  /// New marks for the selection: one per stretch, trimmed and anchored.
+  List<({String part, String text, int start})> anchors(List<SelectedSpan> spans) {
+    final out = <({String part, String text, int start})>[];
+    for (final sp in spans) {
+      final a = anchorFor(spaces[sp.space] ?? '', sp.start, sp.end);
+      if (a != null) out.add((part: sp.space, text: a.text, start: a.start));
+    }
+    if (out.isEmpty && text.trim().isNotEmpty) {
+      // Fallback: the first exact place of the selected text.
+      for (final space in highlightSpaces) {
+        final t = spaces[space];
+        if (t == null) continue;
+        final m = exactMatches(t, text);
+        if (m.isEmpty) continue;
+        final a = anchorFor(t, m.first.$1, m.first.$2);
+        if (a != null) out.add((part: space, text: a.text, start: a.start));
+        break;
+      }
+    }
+    return out;
+  }
 }
+
+/// The placed highlights inside [from, to) of [space], shifted to start at [from].
+List<(int, int, Highlight)> _localMarks(List<PlacedHighlight> placed, String space, int from, int to) => [
+      for (final p in placed)
+        if (p.space == space && p.start < to && p.end > from) ((p.start - from).clamp(0, to - from), (p.end - from).clamp(0, to - from), p.highlight),
+    ];
 
 /// The book side panel: contents, bookmarks, highlights and visited pages.
 class _BookPanel extends StatefulWidget {

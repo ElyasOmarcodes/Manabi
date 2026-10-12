@@ -255,3 +255,32 @@ test("PDF flags for book lists are looked up once per book", async () => {
     server.close();
   }
 });
+
+test("the PDF relay passes byte ranges through and lets the web app read them", async () => {
+  const asked = [];
+  const fetchFile = async (url, init) => {
+    asked.push({ url, range: init.headers.range, method: init.method });
+    const body = new Uint8Array(10).fill(7);
+    return new Response(init.method === "HEAD" ? null : body, { status: init.headers.range ? 206 : 200, headers: { "content-length": "10", "content-range": "bytes 0-9/11067552", "accept-ranges": "bytes" } });
+  };
+  const app = createApp({ config: { allowedOrigins: ["*"], askLimit: 10, askWindowMs: 60_000, readLimit: 100, trustProxy: false }, pipeline: {}, turath: fixtureTurath(), catalog, logger: { info() {}, error() {} }, fetchFile });
+  const server = await app.listen(0, "127.0.0.1");
+  try {
+    const base = `http://127.0.0.1:${server.address().port}/api/pdf`;
+    const res = await fetch(`${base}/shamela/roohm_04.pdf`, { headers: { range: "bytes=0-9", origin: "http://localhost:8080" } });
+    assert.equal(res.status, 206);
+    assert.equal(res.headers.get("content-range"), "bytes 0-9/11067552");
+    assert.match(res.headers.get("access-control-expose-headers"), /content-range/);
+    assert.equal((await res.arrayBuffer()).byteLength, 10);
+    assert.deepEqual(asked[0], { url: "https://files.turath.io/pdf/shamela/roohm_04.pdf", range: "bytes=0-9", method: "GET" });
+    const head = await fetch(`${base}/bksultanya/01_54495.pdf`, { method: "HEAD" });
+    assert.equal(head.status, 200);
+    for (const bad of ["../etc/passwd.pdf", "shamela/x.txt", "a/..%2fb.pdf"]) {
+      assert.equal((await fetch(`${base}/${bad}`)).status, 404, bad);
+    }
+    assert.equal((await fetch(`${base}/shamela/roohm_04.pdf`, { headers: { range: "bytes=0-1,5-9" } })).status, 416);
+    assert.equal(asked.length, 2, "bad requests never reach Turath");
+  } finally {
+    server.close();
+  }
+});

@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:hive_ce_flutter/hive_flutter.dart';
 
 import '../core/backend/backend.dart';
@@ -22,6 +24,18 @@ class PdfFlags {
 
   static Future<void> open(ManabiBackend Function() backend) async {
     _backend = backend;
+    // The list bundled with the app (built monthly from Turath): every
+    // catalog book is known from the first launch.
+    try {
+      final j = jsonDecode(await rootBundle.loadString('assets/catalog/pdf_flags.json')) as Map;
+      for (final id in j['with'] as List? ?? const []) {
+        _known['$id'] = true;
+      }
+      for (final id in j['without'] as List? ?? const []) {
+        _known['$id'] = false;
+      }
+      bundledDate = j['scannedAt'] as String?;
+    } catch (_) {}
     try {
       _box = await Hive.openBox<bool>('pdf_flags');
       for (final k in _box!.keys) {
@@ -53,6 +67,9 @@ class PdfFlags {
   }
 
   static int get knownCount => _known.length;
+
+  /// When the bundled list was built (null without one).
+  static String? bundledDate;
 
   /// A book whose details were loaded anyway (reader, book page).
   static void note(String bookId, bool hasPdf) {

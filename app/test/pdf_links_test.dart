@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:manabi/core/models/library.dart';
+import 'package:manabi/ui/widgets/pdf_pane.dart';
 
 void main() {
   // Turath's file list for صحيح البخاري (ط السلطانية).
@@ -31,5 +32,12 @@ void main() {
     expect(tail.url('4'), 'https://files.turath.io/pdf/shamela/roohm_04.pdf');
     expect(tail.url('15'), 'https://files.turath.io/pdf/shamela/roohm_15.pdf');
     expect(tail.url(), 'https://files.turath.io/pdf/shamela/roohm_01.pdf');
+  });
+
+  test('the web reads PDF ranges through the server; apps read Turath directly', () {
+    const turath = 'https://files.turath.io/pdf/shamela/roohm_04.pdf';
+    expect(pdfViewUrl(turath, web: false, serverUrl: 'https://m.example'), turath);
+    expect(pdfViewUrl(turath, web: true, serverUrl: 'https://m.example/'), 'https://m.example/api/pdf/shamela/roohm_04.pdf');
+    expect(pdfViewUrl(turath, web: true), turath);
   });
 }

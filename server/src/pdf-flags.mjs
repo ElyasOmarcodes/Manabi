@@ -4,7 +4,10 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-export const createPdfFlags = ({ fetch: fetcher = fetch, dataDir, timeoutMs = 12_000, concurrency = 6 } = {}) => {
+// The list built monthly from Turath (tool/pdf-flags/crawl.mjs), when present.
+const SEED = new URL("./data/pdf-flags.json", import.meta.url);
+
+export const createPdfFlags = ({ fetch: fetcher = fetch, dataDir, timeoutMs = 12_000, concurrency = 6, seed = SEED } = {}) => {
   const known = new Map();
   const file = dataDir ? join(dataDir, "pdf-flags.json") : undefined;
   let timer;
@@ -23,6 +26,13 @@ export const createPdfFlags = ({ fetch: fetcher = fetch, dataDir, timeoutMs = 12
   };
   return {
     load: async () => {
+      if (seed) {
+        try {
+          const j = JSON.parse(await readFile(seed, "utf8"));
+          for (const id of j.with ?? []) known.set(String(id), true);
+          for (const id of j.without ?? []) known.set(String(id), false);
+        } catch {}
+      }
       if (!file) return;
       try {
         for (const [k, v] of Object.entries(JSON.parse(await readFile(file, "utf8")))) known.set(k, v === true);

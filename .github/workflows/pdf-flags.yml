@@ -1,0 +1,36 @@
+name: PDF list
+
+# Which catalog books have Turath's scanned PDF, bundled with the app and the
+# server so the PDF badge is right from the first launch. Monthly, or by hand.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 3 1 * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pdf-flags-${{ github.ref }}
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Ask Turath which books have a PDF
+        run: node tool/pdf-flags/crawl.mjs
+      - name: Commit the list when it changed
+        run: |
+          if git diff --quiet -- app/assets/catalog/pdf_flags.json server/src/data/pdf-flags.json && [ -z "$(git status --porcelain -- app/assets/catalog/pdf_flags.json server/src/data/pdf-flags.json)" ]; then
+            echo "unchanged"; exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/assets/catalog/pdf_flags.json server/src/data/pdf-flags.json
+          git commit -m "Update the bundled PDF list"
+          git push

@@ -93,7 +93,7 @@ const stripRaw = (value) => {
 
 const positive = (value) => (value && /^[1-9]\d*$/.test(value) ? value : undefined);
 
-export const createApp = ({ config, pipeline, turath: client, catalog, gemini, narrators = createNarrators(), advancedSearch = createAdvancedSearch(), pdfFlags = createPdfFlags(), discovered, logger = console }) => {
+export const createApp = ({ config, pipeline, turath: client, catalog, gemini, narrators = createNarrators(), advancedSearch = createAdvancedSearch(), pdfFlags = createPdfFlags(), discovered, logger = console, fetchFile = fetch }) => {
   const turath = decodingTurath(client);
   const askLimiter = createRateLimiter({ limit: config.askLimit, windowMs: config.askWindowMs });
   const readLimiter = createRateLimiter({ limit: config.readLimit, windowMs: 60_000 });
@@ -114,7 +114,9 @@ export const createApp = ({ config, pipeline, turath: client, catalog, gemini, n
       ? {
           "access-control-allow-origin": allow,
           "access-control-allow-methods": "GET, POST, OPTIONS",
-          "access-control-allow-headers": "content-type, authorization, accept",
+          "access-control-allow-headers": "content-type, authorization, accept, range",
+          // The PDF relay's range answers must be readable by the web app.
+          "access-control-expose-headers": "content-range, accept-ranges, content-length, etag",
           "access-control-max-age": "86400",
           vary: "origin",
         }
@@ -308,6 +310,34 @@ export const createApp = ({ config, pipeline, turath: client, catalog, gemini, n
     }
   };
 
+  // Turath's scanned PDFs, relayed byte range by byte range for the web app:
+  // a browser cannot read Turath's Content-Range header from another origin,
+  // so without this it would have to download a whole volume to show a page.
+  // Nothing is stored; only the ranges the viewer asks for pass through.
+  const handlePdf = async (req, res, url, cors) => {
+    const path = decodeURIComponent(url.pathname.slice("/api/pdf/".length));
+    if (!/^[A-Za-z0-9_\-]+(\/[A-Za-z0-9_\-.]+)*\.pdf$/i.test(path) || path.includes("..")) {
+      return json(res, 404, { error: { code: "NOT_FOUND", message: "Not found" } }, cors);
+    }
+    const range = req.headers.range;
+    if (range && !/^bytes=\d*-\d*$/.test(range)) return json(res, 416, { error: { code: "RANGE", message: "Unsupported range" } }, cors);
+    const abort = new AbortController();
+    req.on("close", () => abort.abort());
+    const upstream = await fetchFile(`https://files.turath.io/pdf/${path}`, { method: req.method, headers: range ? { range } : {}, signal: abort.signal });
+    const headers = { ...cors, "content-type": "application/pdf", "cache-control": "public, max-age=86400" };
+    for (const h of ["content-length", "content-range", "accept-ranges", "etag", "last-modified"]) {
+      const v = upstream.headers.get(h);
+      if (v) headers[h] = v;
+    }
+    if (!headers["accept-ranges"]) headers["accept-ranges"] = "bytes";
+    res.writeHead(upstream.status, headers);
+    if (req.method === "HEAD" || !upstream.body) return res.end();
+    try {
+      for await (const chunk of upstream.body) res.write(chunk);
+    } catch {}
+    res.end();
+  };
+
   // Which delimiters hold a commentary's base text (matn) and its verses,
   // judged by the model from a few sample pages.
   const handleLayers = async (req, res, cors) => {
@@ -342,6 +372,7 @@ export const createApp = ({ config, pipeline, turath: client, catalog, gemini, n
           return json(res, 401, { error: { code: "UNAUTHORIZED", message: "Missing or invalid access token" } }, cors);
         }
       }
+      if ((req.method === "GET" || req.method === "HEAD") && url.pathname.startsWith("/api/pdf/")) return await handlePdf(req, res, url, cors);
       if (req.method === "POST" && url.pathname === "/api/ask") return await handleAsk(req, res, cors);
       if (req.method === "POST" && url.pathname === "/api/layers") return await handleLayers(req, res, cors);
       for (const [method, pattern, fn] of routes) {
