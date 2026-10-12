@@ -390,7 +390,7 @@ class SourceCard extends StatelessWidget {
       duration: const Duration(milliseconds: 400),
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
       decoration: BoxDecoration(
-        color: highlight ? Color.alphaBlend(a.accentTint.withValues(alpha: 0.55), a.surface) : a.surface,
+        color: highlight ? Color.alphaBlend(a.accent.withValues(alpha: a.dark ? 0.12 : 0.06), a.surface) : a.surface,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: highlight ? a.accent : a.border, width: highlight ? 1.5 : 1),
       ),

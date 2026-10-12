@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../l10n/gen/app_localizations.dart';
 import '../theme.dart';
 import 'aura.dart';
 
@@ -208,7 +209,11 @@ class CiteChip extends StatelessWidget {
     final a = context.aura;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 2),
-      child: Pressable(
+      child: Semantics(
+        button: onTap != null,
+        label: '${AppLocalizations.of(context).sources} $n',
+        excludeSemantics: true,
+        child: Pressable(
         onTap: onTap == null ? null : () => onTap!(n),
         scale: 0.85,
         child: Container(
@@ -217,6 +222,7 @@ class CiteChip extends StatelessWidget {
           decoration: BoxDecoration(color: a.accentTint, borderRadius: BorderRadius.circular(8)),
           child: Text('$n', textAlign: TextAlign.center, style: TextStyle(fontFamily: uiFont, fontSize: 11.5, fontWeight: FontWeight.w700, color: a.accent, height: 1.6)),
         ),
+      ),
       ),
     );
   }

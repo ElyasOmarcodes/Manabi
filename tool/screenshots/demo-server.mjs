@@ -3,6 +3,7 @@
 // cites real pages (quotes are still verified against the recorded text).
 //   node tool/screenshots/demo-server.mjs [port]
 import { createApp } from "../../server/src/app.mjs";
+import { chatModels } from "../../server/src/gemini.mjs";
 import { catalog } from "../../server/src/catalog.mjs";
 import { createPipeline } from "../../server/src/pipeline.mjs";
 import { fixtureTurath } from "../../server/test/helpers.mjs";
@@ -50,8 +51,16 @@ const scripted = {
   },
 };
 
+// A typical model listing, for the model picker.
+const listed = ["gemini-3-pro", "gemini-3-flash", "gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.5-flash-lite", "gemma-3-27b-it", "gemma-3-12b-it", "gemma-3n-e4b-it"].map((id) => ({
+  name: `models/${id}`,
+  displayName: id.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+  inputTokenLimit: id.startsWith("gemma") ? 131072 : 1048576,
+}));
+
 const gemini = {
-  resolveModel: async () => "demo-model",
+  resolveModel: async () => "gemini-3-flash",
+  models: async () => chatModels(listed),
   generateJson: async (request) => {
     await sleep(900);
     const reply = await scripted.generateJson(request);

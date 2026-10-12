@@ -1,6 +1,8 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show BrowserContextMenu;
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 
@@ -24,6 +26,9 @@ import 'ui/widgets/visual_arrow_keys.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  // On the web a right click opens the app's own menus (the reader's
+  // selection menu) instead of the browser's.
+  if (kIsWeb) BrowserContextMenu.disableContextMenu();
   runApp(const ManabiApp());
 }
 
