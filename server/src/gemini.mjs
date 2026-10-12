@@ -10,7 +10,8 @@ const API = "https://generativelanguage.googleapis.com/v1beta";
 const FALLBACK = { main: ["gemini-flash-latest", "gemini-flash-lite-latest"], fast: ["gemini-flash-lite-latest", "gemini-flash-latest"] };
 
 /** Per-call time limits and the overall budget of one generation, per tier. */
-const TIER_LIMITS = { fast: { callMs: 45_000, totalMs: 100_000 }, main: { callMs: 70_000, totalMs: 200_000 } };
+// idleMs: longest silence (no bytes) before a call counts as stalled.
+const TIER_LIMITS = { fast: { callMs: 40_000, totalMs: 90_000, idleMs: 20_000 }, main: { callMs: 60_000, totalMs: 150_000, idleMs: 35_000 } };
 
 /** How long a model is skipped after it fails in a way another model can avoid. */
 const COOLDOWN_MS = { QUOTA: 60 * 60_000, MODEL_NOT_FOUND: 24 * 60 * 60_000, OVERLOADED: 3 * 60_000, TIMEOUT: 5 * 60_000 };
@@ -72,28 +73,36 @@ export const createGemini = ({ apiKey, model, fetch: fetcher = fetch, timeoutMs 
   };
 
   /** One HTTP call with a time limit; [consume] reads a successful response. */
-  const call = async (url, init = {}, limitMs = timeoutMs, consume = async (response) => parseBody(await response.text())) => {
+  const call = async (url, init = {}, limitMs = timeoutMs, consume = async (response) => parseBody(await response.text()), idleMs = limitMs) => {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), limitMs);
+    // A stalled connection (no bytes for idleMs) is dropped early.
+    let idle = setTimeout(() => controller.abort(), idleMs);
+    const touch = () => {
+      clearTimeout(idle);
+      idle = setTimeout(() => controller.abort(), idleMs);
+    };
     try {
       const response = await fetcher(url, {
         ...init,
         headers: { "content-type": "application/json", "x-goog-api-key": apiKey, ...init.headers },
         signal: controller.signal,
       });
+      touch();
       if (!response.ok) throw failFor(response.status, parseBody(await response.text()));
-      return await consume(response);
+      return await consume(response, touch);
     } catch (error) {
       if (error instanceof GeminiError) throw error;
       if (error?.name === "AbortError") throw new GeminiError("TIMEOUT", "Gemini request timed out", { retryable: true });
       throw new GeminiError("NETWORK", "Could not reach Gemini", { retryable: true });
     } finally {
       clearTimeout(timer);
+      clearTimeout(idle);
     }
   };
 
   /** Reads a streamed (alt=sse) response, reporting the text as it grows. */
-  const readStream = (onText) => async (response) => {
+  const readStream = (onText) => async (response, touch = () => {}) => {
     const out = { text: "", usage: undefined, blockReason: undefined, finished: false };
     const handle = (line) => {
       if (!line.startsWith("data:")) return;
@@ -114,6 +123,7 @@ export const createGemini = ({ apiKey, model, fetch: fetcher = fetch, timeoutMs 
       const decoder = new TextDecoder();
       let buffer = "";
       for await (const bytes of body) {
+        touch();
         buffer += typeof bytes === "string" ? bytes : decoder.decode(bytes, { stream: true });
         let nl;
         while ((nl = buffer.indexOf("\n")) >= 0) {
@@ -208,7 +218,7 @@ export const createGemini = ({ apiKey, model, fetch: fetcher = fetch, timeoutMs 
         let text;
         let usage;
         if (onText) {
-          const out = await call(`${API}/models/${model_}:streamGenerateContent?alt=sse`, { method: "POST", body: JSON.stringify(body) }, limit, readStream(onText));
+          const out = await call(`${API}/models/${model_}:streamGenerateContent?alt=sse`, { method: "POST", body: JSON.stringify(body) }, limit, readStream(onText), limits.idleMs ?? limit);
           if (!out.finished) throw new GeminiError("BLOCKED", out.blockReason ? `Gemini blocked the request: ${out.blockReason}` : "Gemini returned no answer");
           text = out.text;
           usage = out.usage;

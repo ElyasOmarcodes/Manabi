@@ -134,4 +134,23 @@ void main() {
     expect([...r2.always, ...r2.verified], contains('""'));
     expect(a2, greaterThan(0.8));
   });
+
+  test('quotes inside parentheses (" لَا تَزَالُ ") do not turn the commentary into matn', () {
+    final rules = detectMatnRules([mirqat6285, mirqat3722, mirqat3721]);
+    final t = mirqat6285;
+    final found = pieces(t, matnRanges(t, rules, verses: quranRanges(t)));
+    expect(found, containsAll(['(" مِنْ أُمَّتِي ")', '(" قَائِمَةٌ بِأَمْرِ اللَّهِ ")', '(" مَنْ خَذَلَهُمْ ")']));
+    for (final f in found.skip(1)) {
+      expect(f.contains('أَيْ:'), isFalse, reason: 'commentary marked as matn: $f');
+    }
+    // The AI's stretches, found on the whole page: the block stays in the
+    // block, and a stretch matching the commentary's own words is dropped.
+    final ai = aiMatnRanges(t, [('وَعَنْ مُعَاوِيَةَ', 'كِتَابِ الْقِصَاصِ'), ('لَا تَزَالُ', 'لَا تَزَالُ'), ('مِنْ أُمَّتِي', 'وَهُمْ عَلَى ذَلِكَ')]);
+    final b = matnBlock(t)!;
+    expect(ai.first.$2, lessThanOrEqualTo(b.blockEnd));
+    expect(ai.first.$2 - ai.first.$1, greaterThan(b.blockEnd * 0.9));
+    for (final (s, e) in ai.skip(1)) {
+      expect(e - s, lessThan(200));
+    }
+  });
 }

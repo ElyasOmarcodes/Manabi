@@ -397,13 +397,7 @@ class _ComposerState extends State<_Composer> {
   void initState() {
     super.initState();
     _controller.addListener(() => setState(() {}));
-    // The composer takes focus only when tapped (or filled from a starter
-    // question): coming back to the chat must not raise the keyboard.
-    _focus.canRequestFocus = false;
-    _focus.addListener(() {
-      if (!_focus.hasFocus) _focus.canRequestFocus = false;
-      setState(() {});
-    });
+    _focus.addListener(() => setState(() {}));
   }
 
   @override
@@ -431,7 +425,6 @@ class _ComposerState extends State<_Composer> {
         final d = nav.takeDraft();
         if (d != null) {
           _controller.text = d;
-          _focus.canRequestFocus = true;
           _focus.requestFocus();
         }
       });
@@ -464,7 +457,12 @@ class _ComposerState extends State<_Composer> {
             boxShadow: [BoxShadow(color: a.shadow, blurRadius: 18, offset: const Offset(0, 6), spreadRadius: -10)],
           ),
           padding: const EdgeInsets.all(6),
-          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          // Lines added or removed (and the pills above) resize the box smoothly.
+          child: AnimatedSize(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOutCubic,
+            alignment: Alignment.bottomCenter,
+            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             if (pills.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.fromLTRB(6, 4, 6, 2),
@@ -473,9 +471,7 @@ class _ComposerState extends State<_Composer> {
             Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
               RoundIconButton(icon: Icons.add_rounded, tooltip: l.options, size: 40, filled: false, onTap: () => showOptionsSheet(context)),
               Expanded(
-                child: Listener(
-                  onPointerDown: (_) => _focus.canRequestFocus = true,
-                  child: CallbackShortcuts(
+                child: CallbackShortcuts(
                   // Enter starts a new line; Ctrl/⌘+Enter sends.
                   bindings: {
                     const SingleActivator(LogicalKeyboardKey.enter, control: true): _send,
@@ -501,7 +497,6 @@ class _ComposerState extends State<_Composer> {
                       contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
                     ),
                   ),
-                ),
                 ),
               ),
               RoundIconButton(
@@ -529,6 +524,7 @@ class _ComposerState extends State<_Composer> {
               ),
             ]),
           ]),
+          ),
         ),
       ),
     );

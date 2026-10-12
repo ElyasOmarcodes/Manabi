@@ -457,14 +457,14 @@ class ReadingController extends ChangeNotifier {
 
   Future<void> setFontScale(double v) async {
     fontScale = v;
-    await _prefs?.setDouble('readerFontScale', v);
     notifyListeners();
+    await _prefs?.setDouble('readerFontScale', v);
   }
 
   Future<void> setLineHeight(double v) async {
     lineHeight = v;
-    await _prefs?.setDouble('readerLineHeight', v);
     notifyListeners();
+    await _prefs?.setDouble('readerLineHeight', v);
   }
 
   Future<void> setPaper(String v) async {

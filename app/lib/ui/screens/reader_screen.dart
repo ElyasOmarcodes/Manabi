@@ -24,6 +24,7 @@ import '../../state/settings_controller.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import '../widgets/pdf_pane.dart';
+import '../widgets/reveal_text.dart';
 import '../widgets/save_offline.dart';
 import '../widgets/search_hit.dart';
 import 'book_screen.dart' show openBook;
@@ -32,8 +33,8 @@ import 'settings_pages.dart' show ReaderDisplaySettingsPage, ReadingSettingsPage
 
 /// Opens a book at an internal page. [highlight] marks a quote or search
 /// term on that page; [search] opens the in-book search right away.
-void openReader(BuildContext context, String bookId, int page, {String? title, String? highlight, bool search = false}) {
-  Navigator.of(context).push(MaterialPageRoute(builder: (_) => ReaderScreen(bookId: bookId, page: page, title: title, highlight: highlight, openSearch: search)));
+void openReader(BuildContext context, String bookId, int page, {String? title, String? highlight, String? reveal, bool search = false}) {
+  Navigator.of(context).push(MaterialPageRoute(builder: (_) => ReaderScreen(bookId: bookId, page: page, title: title, highlight: highlight, reveal: reveal, openSearch: search)));
 }
 
 typedef ReaderColors = ({Color bg, Color text, Color muted, Color bar});
@@ -105,11 +106,14 @@ String pageLabel(BuildContext context, BookDetails? book, int page, {PagePassage
 /// panel with contents, bookmarks, highlights and history, in-book search,
 /// go to a volume and printed page, reading tools and highlighting.
 class ReaderScreen extends StatefulWidget {
-  const ReaderScreen({super.key, required this.bookId, required this.page, this.title, this.highlight, this.openSearch = false});
+  const ReaderScreen({super.key, required this.bookId, required this.page, this.title, this.highlight, this.reveal, this.openSearch = false});
   final String bookId;
   final int page;
   final String? title;
   final String? highlight;
+
+  /// Text to scroll to on the page (a heading from the contents), unmarked.
+  final String? reveal;
   final bool openSearch;
   @override
   State<ReaderScreen> createState() => _ReaderScreenState();
@@ -133,6 +137,10 @@ class _ReaderScreenState extends State<ReaderScreen> {
   BookDetails? _book;
   String? _mark;
   int? _markPage;
+
+  /// Where on [_revealPage] to scroll after a jump (a search hit or heading).
+  String? _reveal;
+  int? _revealPage;
   bool _immersive = false;
   bool _panel = true;
 
@@ -159,6 +167,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
   void initState() {
     super.initState();
     _mark = widget.highlight;
+    _reveal = widget.reveal ?? widget.highlight;
+    _revealPage = _page;
     _markPage = widget.highlight == null ? null : _page;
     _backend.book(widget.bookId).then((b) {
       if (mounted) setState(() => _book = b);
@@ -220,12 +230,14 @@ class _ReaderScreenState extends State<ReaderScreen> {
     _prefetch(page);
   }
 
-  void _jump(int page, {String? mark}) {
+  void _jump(int page, {String? mark, String? reveal}) {
     final count = _book?.pageCount;
     final target = count == null ? (page < 1 ? 1 : page) : page.clamp(1, count);
     setState(() {
       _mark = mark;
       _markPage = mark == null ? null : target;
+      _reveal = reveal ?? mark;
+      _revealPage = _reveal == null ? null : target;
       _page = target;
       if (_pdf) _syncPdfToText();
       if (_modeInUse == 'pages') {
@@ -290,11 +302,14 @@ class _ReaderScreenState extends State<ReaderScreen> {
     });
   }
 
+  /// The last search in this book: reopening the search shows it again.
+  final _searchMemory = BookSearchMemory();
+
   Future<void> _openSearch() async {
     final hit = await showModalBottomSheet<(int, String)>(
       context: context,
       isScrollControlled: true,
-      builder: (_) => _BookSearchSheet(bookId: widget.bookId, backend: _backend),
+      builder: (_) => _BookSearchSheet(bookId: widget.bookId, backend: _backend, memory: _searchMemory),
     );
     if (hit != null) _jump(hit.$1, mark: hit.$2);
   }
@@ -324,6 +339,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
           samples: _layerSamples(),
           pdfShown: _pdf,
           onPdf: _togglePdf,
+          current: _page,
+          onGo: _jump,
         ),
       );
 
@@ -505,9 +522,9 @@ class _ReaderScreenState extends State<ReaderScreen> {
           book: _book,
           current: _page,
           digits: reading.digits,
-          onJump: (page, {mark}) {
+          onJump: (page, {mark, reveal}) {
             if (!wide) Navigator.of(context).maybePop();
-            _jump(page, mark: mark);
+            _jump(page, mark: mark, reveal: reveal);
           },
         ),
       );
@@ -785,6 +802,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
         colors: c,
         continuous: continuous,
         mark: _markPage == page ? _mark : null,
+        reveal: _revealPage == page ? _reveal : null,
         book: _book,
         onRetry: () => setState(() => _cache.remove(page)),
         onAction: (a) => _pageAction(a, page),
@@ -891,8 +909,12 @@ class _PageBlock extends StatelessWidget {
     required this.onHighlight,
     required this.onCopyQuote,
     this.matnContext,
+    this.reveal,
   });
   final int page;
+
+  /// Text on this page to scroll to once it is shown.
+  final String? reveal;
   final Future<PagePassage> future;
 
   /// Matn blocks of the pages before this one (most recent first), to tell
@@ -1040,18 +1062,24 @@ class _PageBlock extends StatelessWidget {
   List<Widget> _parts(BuildContext context, PagePassage p, String body, List<Highlight> marks, TextStyle style, TextAlign align, BookLayers layers, List<(String, String)>? ai) {
     final block = matnBlock(body);
     final earlier = matnContext?.call() ?? const <String>[];
+    // The AI's stretches are found on the whole page, in reading order, and
+    // then split between the matn on top and the commentary.
+    final aiRanges = ai == null ? null : aiMatnRanges(body, ai, context: earlier);
     if (block == null) {
-      return [Text.rich(_marked(context, body, mark, marks, style, narrators: p.narrators, earlier: earlier, ai: ai), textDirection: TextDirection.rtl, textAlign: align)];
+      return [RevealText(_marked(context, body, mark, marks, style, narrators: p.narrators, earlier: earlier, aiRanges: aiRanges), reveal: reveal, textDirection: TextDirection.rtl, textAlign: align)];
     }
     final top = body.substring(0, block.blockEnd);
     final sharh = body.substring(block.sharhStart);
+    final topAi = aiRanges == null ? null : [for (final (s, e) in aiRanges) if (s < block.blockEnd) (s, e)];
+    final sharhAi = aiRanges == null ? null : [for (final (s, e) in aiRanges) if (s >= block.sharhStart) (s - block.sharhStart, e - block.sharhStart)];
+    final revealTop = reveal != null && arabicMatches(top, reveal).isNotEmpty;
     return [
-      Text.rich(_marked(context, top, mark, marks, style, narrators: p.narrators, top: true, ai: ai), textDirection: TextDirection.rtl, textAlign: align),
+      RevealText(_marked(context, top, mark, marks, style, narrators: p.narrators, top: true, aiRanges: topAi), reveal: revealTop ? reveal : null, textDirection: TextDirection.rtl, textAlign: align),
       Padding(
         padding: const EdgeInsets.symmetric(vertical: 12),
         child: Center(child: Container(width: 72, height: 1.5, decoration: BoxDecoration(color: colors.muted.withValues(alpha: 0.45), borderRadius: BorderRadius.circular(2)))),
       ),
-      Text.rich(_marked(context, sharh, mark, marks, style, narrators: p.narrators, earlier: [top, ...earlier], ai: ai), textDirection: TextDirection.rtl, textAlign: align),
+      RevealText(_marked(context, sharh, mark, marks, style, narrators: p.narrators, earlier: [top, ...earlier], aiRanges: sharhAi), reveal: revealTop ? null : reveal, textDirection: TextDirection.rtl, textAlign: align),
     ];
   }
 
@@ -1075,7 +1103,7 @@ class _PageBlock extends StatelessWidget {
   }
 
   TextSpan _marked(BuildContext context, String text, String? query, List<Highlight> highlights, TextStyle style,
-      {List<({String id, String name})> narrators = const [], bool top = false, List<String> earlier = const [], List<(String, String)>? ai}) {
+      {List<({String id, String name})> narrators = const [], bool top = false, List<String> earlier = const [], List<(int, int)>? aiRanges}) {
     final dark = context.aura.dark;
     final reading = context.read<ReadingController>();
     // Narrator names (linked by Turath) open their record when tapped.
@@ -1096,7 +1124,7 @@ class _PageBlock extends StatelessWidget {
     );
     final ranges = <(int, int, TextStyle)>[
       // Lowest first: verses and matn, then highlights, then search matches.
-      ...textLayerRanges(reading, reading.layersOf(book?.id ?? ''), text, dark: dark, top: top, context: earlier, ai: ai),
+      ...textLayerRanges(reading, reading.layersOf(book?.id ?? ''), text, dark: dark, top: top, context: earlier, aiRanges: aiRanges),
       for (final (s, e, _) in taps) (s, e, linkStyle),
       for (final h in highlights)
         for (final (s, e) in arabicMatches(text, h.text))
@@ -1111,19 +1139,19 @@ class _PageBlock extends StatelessWidget {
 /// Verse and matn styles for a page text, from the reading settings and the
 /// book's layers. [top] is the matn block printed above the ــ line;
 /// [context] holds matn printed earlier (to verify quotes); [ai] the AI's
-/// marking of this page, when the book is read in the precise mode.
+/// marking of this page (located), when the book is read in the precise mode.
 List<(int, int, TextStyle)> textLayerRanges(ReadingController r, BookLayers layers, String text,
-    {required bool dark, bool top = false, List<String> context = const [], List<(String, String)>? ai}) {
+    {required bool dark, bool top = false, List<String> context = const [], List<(int, int)>? aiRanges}) {
   final out = <(int, int, TextStyle)>[];
   final verses = r.styleQuran ? quranRanges(text, extra: layers.bracesAreVerses ? const ['{}'] : const []) : const <(int, int)>[];
   if (layers.enabled) {
     final c = matnColors[r.matnColor.clamp(0, matnColors.length - 1)];
     final style = TextStyle(color: dark ? c.$2 : c.$1, fontWeight: r.matnBold ? FontWeight.w700 : null);
     final List<(int, int)> matn;
-    if (top && (layers.block || (ai != null && ai.isNotEmpty))) {
+    if (top && (layers.block || (aiRanges != null && aiRanges.isNotEmpty))) {
       matn = [(0, text.length)];
-    } else if (ai != null) {
-      matn = locateSpans(text, ai);
+    } else if (aiRanges != null) {
+      matn = aiRanges;
     } else {
       final rules = layers.rules;
       matn = matnRanges(
@@ -1188,7 +1216,7 @@ class _BookPanel extends StatefulWidget {
   final BookDetails? book;
   final int current;
   final String digits;
-  final void Function(int page, {String? mark}) onJump;
+  final void Function(int page, {String? mark, String? reveal}) onJump;
   @override
   State<_BookPanel> createState() => _BookPanelState();
 }
@@ -1322,7 +1350,7 @@ class _BookPanelState extends State<_BookPanel> {
     final indent = flat ? 0.0 : (e.level - 1).clamp(0, 5) * 14.0;
     return InkWell(
       key: selected ? _selectedKey : null,
-      onTap: e.page == null ? null : () => widget.onJump(e.page!),
+      onTap: e.page == null ? null : () => widget.onJump(e.page!, reveal: e.title),
       child: Container(
         color: selected ? a.accentTint : null,
         padding: EdgeInsetsDirectional.fromSTEB(10 + indent, 7, 6, 7),
@@ -1462,8 +1490,19 @@ class HighlightTile extends StatelessWidget {
 /// the printed PDF and saving for offline. Page colours and fonts live in
 /// the reading settings. Smaller on phones.
 class _ToolsSheet extends StatelessWidget {
-  const _ToolsSheet({required this.book, required this.bookId, required this.title, required this.samples, required this.pdfShown, required this.onPdf});
+  const _ToolsSheet({
+    required this.book,
+    required this.bookId,
+    required this.title,
+    required this.samples,
+    required this.pdfShown,
+    required this.onPdf,
+    required this.current,
+    required this.onGo,
+  });
   final BookDetails? book;
+  final int current;
+  final ValueChanged<int> onGo;
   final String bookId;
   final String title;
   final List<String> samples;
@@ -1504,6 +1543,8 @@ class _ToolsSheet extends StatelessWidget {
                 },
               ),
             ]),
+            _GoToRow(book: book, current: current, onGo: onGo, dense: phone),
+            SizedBox(height: phone ? 8 : 10),
             ReaderTextControls(reading: r, dense: phone),
             SizedBox(height: phone ? 8 : 10),
             ModePicker(reading: r),
@@ -1520,7 +1561,10 @@ class _ToolsSheet extends StatelessWidget {
               dense: true,
               contentPadding: const EdgeInsets.symmetric(horizontal: 4),
               leading: Icon(Icons.format_quote_rounded, size: 20, color: layers.enabled ? a.accent : a.muted),
-              title: Text(l.matnSection, style: TextStyle(fontFamily: uiFont, fontSize: phone ? 13.5 : 14.5, color: a.text)),
+              title: Row(children: [
+                Flexible(child: Text(l.matnSection, style: TextStyle(fontFamily: uiFont, fontSize: phone ? 13.5 : 14.5, color: a.text))),
+                const BetaBadge(),
+              ]),
               subtitle: Text(layers.enabled ? l.matnSeparate : l.noMatnRules,
                   maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontFamily: uiFont, fontSize: 11.5, color: a.muted)),
               trailing: Icon(Icons.chevron_left_rounded, color: a.muted),
@@ -1663,7 +1707,10 @@ class _LayersPanelState extends State<LayersPanel> {
       if (layers.aiPages) rule(Icons.auto_awesome_rounded, l.aiPagesLabel),
     ];
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      Text(l.matnSection, style: TextStyle(fontFamily: uiFont, fontSize: 14, fontWeight: FontWeight.w800, color: a.text)),
+      Row(children: [
+        Text(l.matnSection, style: TextStyle(fontFamily: uiFont, fontSize: 14, fontWeight: FontWeight.w800, color: a.text)),
+        const BetaBadge(),
+      ]),
       SwitchListTile.adaptive(
         dense: true,
         contentPadding: const EdgeInsets.symmetric(horizontal: 4),
@@ -1808,25 +1855,207 @@ class ReaderTextControls extends StatelessWidget {
   Widget build(BuildContext context) {
     final l = context.l;
     final a = context.aura;
-    Widget stepper(String label, String value, VoidCallback? minus, VoidCallback? plus, IconData lo, IconData hi) => Container(
-          padding: EdgeInsets.symmetric(horizontal: 6, vertical: dense ? 0 : 4),
-          decoration: BoxDecoration(color: a.surfaceAlt, borderRadius: BorderRadius.circular(14)),
-          child: Row(children: [
-            Expanded(child: Padding(padding: const EdgeInsetsDirectional.only(start: 8), child: Text(label, style: TextStyle(fontFamily: uiFont, fontSize: dense ? 12.5 : 13.5, color: a.text)))),
-            IconButton(visualDensity: VisualDensity.compact, tooltip: l.smaller, onPressed: minus, icon: Icon(lo, size: 18)),
-            SizedBox(width: 44, child: Text(value, textAlign: TextAlign.center, style: TextStyle(fontFamily: uiFont, fontWeight: FontWeight.w700, fontSize: 13, color: a.accent))),
-            IconButton(visualDensity: VisualDensity.compact, tooltip: l.larger, onPressed: plus, icon: Icon(hi, size: 18)),
-          ]),
-        );
-    final size = reading.fontScale;
-    final line = reading.lineHeight;
+    final size = reading.fontScale.clamp(0.75, 1.8);
+    final line = reading.lineHeight.clamp(1.6, 2.9);
     return Column(children: [
-      stepper(l.textSize, '${(size * 100).round()}%', size > 0.75 ? () => reading.setFontScale(((size - 0.1) * 10).round() / 10) : null,
-          size < 1.8 ? () => reading.setFontScale(((size + 0.1) * 10).round() / 10) : null, Icons.text_decrease_rounded, Icons.text_increase_rounded),
+      ReaderSlider(
+        label: l.textSize,
+        value: size,
+        min: 0.75,
+        max: 1.8,
+        divisions: 21,
+        shown: '${(size * 100).round()}%',
+        lo: Icons.text_decrease_rounded,
+        hi: Icons.text_increase_rounded,
+        dense: dense,
+        accent: a.accent,
+        onChanged: (v) => reading.setFontScale((v * 20).round() / 20),
+      ),
       SizedBox(height: dense ? 6 : 8),
-      stepper(l.lineSpacing, line.toStringAsFixed(1), line > 1.65 ? () => reading.setLineHeight(((line - 0.2) * 10).round() / 10) : null,
-          line < 2.85 ? () => reading.setLineHeight(((line + 0.2) * 10).round() / 10) : null, Icons.density_small_rounded, Icons.density_large_rounded),
+      ReaderSlider(
+        label: l.lineSpacing,
+        value: line,
+        min: 1.6,
+        max: 2.9,
+        divisions: 13,
+        shown: line.toStringAsFixed(1),
+        lo: Icons.density_small_rounded,
+        hi: Icons.density_large_rounded,
+        dense: dense,
+        accent: a.accent,
+        onChanged: (v) => reading.setLineHeight((v * 10).round() / 10),
+      ),
     ]);
+  }
+}
+
+/// A labelled slider in a soft card: the value in a pill, small and large
+/// icons at the ends of a thick rounded track.
+class ReaderSlider extends StatelessWidget {
+  const ReaderSlider({
+    super.key,
+    required this.label,
+    required this.value,
+    required this.min,
+    required this.max,
+    required this.divisions,
+    required this.shown,
+    required this.lo,
+    required this.hi,
+    required this.onChanged,
+    required this.accent,
+    this.dense = false,
+  });
+  final String label;
+  final double value;
+  final double min;
+  final double max;
+  final int divisions;
+  final String shown;
+  final IconData lo;
+  final IconData hi;
+  final ValueChanged<double> onChanged;
+  final Color accent;
+  final bool dense;
+
+  @override
+  Widget build(BuildContext context) {
+    final a = context.aura;
+    return Container(
+      padding: EdgeInsets.fromLTRB(12, dense ? 8 : 10, 12, dense ? 2 : 4),
+      decoration: BoxDecoration(color: a.surfaceAlt, borderRadius: BorderRadius.circular(16)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(children: [
+          Expanded(child: Text(label, style: TextStyle(fontFamily: uiFont, fontSize: dense ? 12.5 : 13.5, fontWeight: FontWeight.w600, color: a.text))),
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 160),
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 2),
+            decoration: BoxDecoration(color: accent.withValues(alpha: a.dark ? 0.22 : 0.12), borderRadius: BorderRadius.circular(20)),
+            child: Text(shown, style: TextStyle(fontFamily: uiFont, fontWeight: FontWeight.w800, fontSize: 12, color: accent)),
+          ),
+        ]),
+        Row(children: [
+          Icon(lo, size: 16, color: a.muted),
+          Expanded(
+            child: SliderTheme(
+              data: SliderTheme.of(context).copyWith(
+                trackHeight: 6,
+                activeTrackColor: accent,
+                inactiveTrackColor: accent.withValues(alpha: 0.16),
+                thumbColor: accent,
+                overlayColor: accent.withValues(alpha: 0.12),
+                activeTickMarkColor: Colors.white.withValues(alpha: 0.55),
+                inactiveTickMarkColor: accent.withValues(alpha: 0.35),
+                tickMarkShape: const RoundSliderTickMarkShape(tickMarkRadius: 1.2),
+                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 9, elevation: 2, pressedElevation: 4),
+                overlayShape: const RoundSliderOverlayShape(overlayRadius: 18),
+                trackShape: const RoundedRectSliderTrackShape(),
+                showValueIndicator: ShowValueIndicator.never,
+              ),
+              child: Slider(value: value, min: min, max: max, divisions: divisions, semanticFormatterCallback: (_) => shown, onChanged: onChanged),
+            ),
+          ),
+          Icon(hi, size: 20, color: a.muted),
+        ]),
+      ]),
+    );
+  }
+}
+
+/// Jump to a volume and page from the reading tools: the printed page when
+/// the book has a page map, otherwise Turath's page number.
+class _GoToRow extends StatefulWidget {
+  const _GoToRow({required this.book, required this.current, required this.onGo, this.dense = false});
+  final BookDetails? book;
+  final int current;
+  final ValueChanged<int> onGo;
+  final bool dense;
+  @override
+  State<_GoToRow> createState() => _GoToRowState();
+}
+
+class _GoToRowState extends State<_GoToRow> {
+  late final bool _printed = widget.book?.pageMap.isNotEmpty ?? false;
+  late String _volume = widget.book?.locate(widget.current).volume ?? widget.book?.volumes.firstOrNull ?? '1';
+  final _number = TextEditingController();
+
+  @override
+  void dispose() {
+    _number.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final n = int.tryParse(_number.text.trim());
+    if (n == null) return;
+    final page = _printed ? widget.book?.internalFor(_volume, n) : n;
+    if (page == null) return;
+    Navigator.of(context).pop();
+    widget.onGo(page);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = context.l;
+    final a = context.aura;
+    final volumes = widget.book?.volumes ?? const <String>[];
+    final style = TextStyle(fontFamily: uiFont, fontSize: widget.dense ? 13 : 14, color: a.text);
+    final bounds = _printed ? widget.book?.volumeBounds[_volume] : null;
+    final last = bounds == null ? null : widget.book?.locate(bounds.$2).printed;
+    final hint = _printed ? (last == null ? l.printedPage : '${l.printedPage} · 1–$last') : l.turathPage;
+    return Container(
+      padding: const EdgeInsetsDirectional.fromSTEB(10, 4, 4, 4),
+      decoration: BoxDecoration(color: a.surfaceAlt, borderRadius: BorderRadius.circular(16)),
+      child: Row(children: [
+        Icon(Icons.move_down_rounded, size: 19, color: a.accent),
+        const SizedBox(width: 8),
+        if (_printed && volumes.length > 1) ...[
+          // The volume, as a compact menu.
+          PopupMenuButton<String>(
+            tooltip: l.volume,
+            initialValue: _volume,
+            onSelected: (v) => setState(() => _volume = v),
+            itemBuilder: (_) => [for (final v in volumes) PopupMenuItem(value: v, height: 38, child: Text('${l.volume} $v', style: style))],
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+              decoration: BoxDecoration(color: a.surface, borderRadius: BorderRadius.circular(12), border: Border.all(color: a.border)),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                Text('${l.volume} $_volume', style: style.copyWith(fontWeight: FontWeight.w700)),
+                Icon(Icons.expand_more_rounded, size: 18, color: a.muted),
+              ]),
+            ),
+          ),
+          const SizedBox(width: 8),
+        ],
+        Expanded(
+          child: TextField(
+            controller: _number,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            textInputAction: TextInputAction.go,
+            style: style,
+            decoration: InputDecoration(
+              isDense: true,
+              hintText: hint,
+              hintStyle: style.copyWith(color: a.muted, fontSize: 12.5),
+              filled: true,
+              fillColor: a.surface,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: a.border)),
+              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: a.border)),
+            ),
+            onSubmitted: (_) => _submit(),
+          ),
+        ),
+        const SizedBox(width: 6),
+        IconButton.filled(
+          tooltip: l.go,
+          visualDensity: VisualDensity.compact,
+          onPressed: _submit,
+          icon: Icon(Directionality.of(context) == TextDirection.rtl ? Icons.arrow_back_rounded : Icons.arrow_forward_rounded, size: 18),
+        ),
+      ]),
+    );
   }
 }
 
@@ -1914,25 +2143,39 @@ class ModePicker extends StatelessWidget {
 }
 
 /// Search inside one book; returns (page, query) for the chosen hit.
+/// A book search kept while the reader is open.
+class BookSearchMemory {
+  String query = '';
+  final items = <PagePassage>[];
+  int total = 0;
+  int page = 0;
+  double scroll = 0;
+}
+
 class _BookSearchSheet extends StatefulWidget {
-  const _BookSearchSheet({required this.bookId, required this.backend});
+  const _BookSearchSheet({required this.bookId, required this.backend, required this.memory});
   final String bookId;
   final ManabiBackend backend;
+  final BookSearchMemory memory;
   @override
   State<_BookSearchSheet> createState() => _BookSearchSheetState();
 }
 
 class _BookSearchSheetState extends State<_BookSearchSheet> {
-  final _field = TextEditingController();
-  final _items = <PagePassage>[];
-  String _q = '';
-  int _total = 0;
-  int _page = 0;
+  late final _field = TextEditingController(text: widget.memory.query);
+  late final _items = widget.memory.items;
+  late String _q = widget.memory.query;
+  late int _total = widget.memory.total;
+  late int _page = widget.memory.page;
   bool _loading = false;
   String? _error;
 
   @override
   void dispose() {
+    widget.memory
+      ..query = _q
+      ..total = _total
+      ..page = _page;
     _field.dispose();
     super.dispose();
   }
@@ -1976,7 +2219,7 @@ class _BookSearchSheetState extends State<_BookSearchSheet> {
         child: Column(children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-            child: AuraSearchField(controller: _field, hint: l.searchInBookHint, rtl: true, autofocus: true, onSubmitted: (_) => _search()),
+            child: AuraSearchField(controller: _field, hint: l.searchInBookHint, rtl: true, autofocus: _items.isEmpty, onSubmitted: (_) => _search()),
           ),
           if (_items.isNotEmpty)
             Padding(

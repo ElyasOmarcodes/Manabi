@@ -108,6 +108,7 @@ class _App extends StatelessWidget {
     return MaterialApp(
       title: 'Manabi · منابع',
       debugShowCheckedModeBanner: false,
+      navigatorObservers: [_DropFocusOnNavigate()],
       theme: buildTheme(Brightness.light),
       darkTheme: buildTheme(Brightness.dark),
       themeMode: settings.themeMode,
@@ -133,4 +134,17 @@ class _App extends StatelessWidget {
       home: const HomeShell(),
     );
   }
+}
+
+/// Leaving or returning to a page drops the keyboard focus, so coming back
+/// to the chat (or any page) never raises the keyboard by itself; a tap on
+/// a field still focuses it as usual.
+class _DropFocusOnNavigate extends NavigatorObserver {
+  // On push at once, before the new page's own autofocus; on pop after the
+  // page below has taken its focus back.
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) => FocusManager.instance.primaryFocus?.unfocus();
+  @override
+  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) =>
+      WidgetsBinding.instance.addPostFrameCallback((_) => FocusManager.instance.primaryFocus?.unfocus());
 }

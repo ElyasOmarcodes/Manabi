@@ -58,6 +58,9 @@ class ChatController extends ChangeNotifier with WidgetsBindingObserver {
   final List<Chat> chats;
   final Map<String, AskProgress> progress = {};
   final Map<String, StreamSubscription<AskEvent>> _running = {};
+
+  /// When each running answer last heard from the pipeline.
+  final Map<String, DateTime> _heard = {};
   final Map<String, ({String fallbackLanguage, String depth, String requestId})> _requests = {};
   final Set<String> _sawBackground = {};
   final Set<String> _resumeQueue = {};
@@ -116,6 +119,20 @@ class ChatController extends ChangeNotifier with WidgetsBindingObserver {
       for (final id in queued) {
         final found = _find(id);
         if (found != null && found.$2.state == MessageState.pending) _start(found.$1, found.$2, keepProgress: true);
+      }
+      // A connection the phone froze while the app was away can hang without
+      // an error: an answer silent for long is restarted, resuming from its
+      // finished steps (same request id).
+      final now = DateTime.now();
+      for (final id in [..._running.keys]) {
+        final last = _heard[id];
+        if (last == null || now.difference(last) < const Duration(seconds: 25)) continue;
+        final found = _find(id);
+        if (found == null || found.$2.state != MessageState.pending) continue;
+        _running.remove(id)?.cancel();
+        final p = progress[id];
+        if (p != null) p.activity.add(AskActivityEvent('retry', {'code': 'INTERRUPTED', 'attempt': 1}, now.difference(p.startedAt).inMilliseconds));
+        _start(found.$1, found.$2, keepProgress: true);
       }
     }
   }
@@ -211,8 +228,10 @@ class ChatController extends ChangeNotifier with WidgetsBindingObserver {
         history: history,
         depth: depth,
         requestId: requestId);
+    _heard[turn.id] = DateTime.now();
     _running[turn.id] = _backend().ask(request).listen(
       (event) {
+        _heard[turn.id] = DateTime.now();
         switch (event) {
           case AskStageEvent(:final stage):
             p.stage = stage;

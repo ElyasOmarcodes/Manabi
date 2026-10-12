@@ -143,7 +143,13 @@ class ServerBackend implements ManabiBackend {
     }
     var buffer = '';
     var gotResult = false;
-    await for (final chunk in res.stream.transform(utf8.decoder).timeout(const Duration(minutes: 3))) {
+    // The server sends a keep-alive every 15 s: 45 s of silence is a dead
+    // connection, reported as a network error (the answer then resumes).
+    final events = res.stream.transform(utf8.decoder).timeout(const Duration(seconds: 45), onTimeout: (sink) {
+      sink.addError(const BackendException('NETWORK', 'The connection to the server stalled'));
+      sink.close();
+    });
+    await for (final chunk in events) {
       buffer += chunk.replaceAll('\r\n', '\n');
       int idx;
       while ((idx = buffer.indexOf('\n\n')) >= 0) {

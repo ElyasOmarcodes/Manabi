@@ -31,12 +31,16 @@ const _fallback = {
 
 /// Per-call time limit and overall budget of one generation, per tier.
 class TierLimits {
-  const TierLimits(this.call, this.total);
+  const TierLimits(this.call, this.total, [this.idle = const Duration(seconds: 30)]);
   final Duration call;
   final Duration total;
+
+  /// Longest silence (no bytes) before a call counts as stalled: a dead
+  /// connection is noticed in seconds, not at the end of [call].
+  final Duration idle;
   static const defaults = {
-    ModelTier.fast: TierLimits(Duration(seconds: 45), Duration(seconds: 100)),
-    ModelTier.main: TierLimits(Duration(seconds: 70), Duration(seconds: 200)),
+    ModelTier.fast: TierLimits(Duration(seconds: 40), Duration(seconds: 90), Duration(seconds: 20)),
+    ModelTier.main: TierLimits(Duration(seconds: 60), Duration(seconds: 150), Duration(seconds: 35)),
   };
 }
 
@@ -125,14 +129,16 @@ class GeminiClient implements JsonModel {
 
   /// A streamed (alt=sse) call; [onText] gets the answer text as it grows.
   Future<({String text, Map<String, dynamic>? usage, String? blockReason, bool finished})> _stream(
-      String url, Object body, Duration timeout, void Function(String text) onText) async {
+      String url, Object body, Duration timeout, void Function(String text) onText, {Duration idle = const Duration(seconds: 30)}) async {
     final request = http.Request('POST', Uri.parse(url))
       ..headers.addAll({'content-type': 'application/json', 'x-goog-api-key': apiKey})
       ..body = jsonEncode(body);
     Future<({String text, Map<String, dynamic>? usage, String? blockReason, bool finished})> run() async {
       final http.StreamedResponse res;
       try {
-        res = await _http.send(request);
+        res = await _http.send(request).timeout(idle);
+      } on TimeoutException {
+        throw GeminiException('TIMEOUT', 'Gemini did not start answering within ${idle.inSeconds}s', retryable: true);
       } catch (_) {
         throw const GeminiException('NETWORK', 'Could not reach Gemini', retryable: true);
       }
@@ -142,14 +148,13 @@ class GeminiClient implements JsonModel {
       String? blocked;
       var finished = false;
       try {
-        await for (final line in res.stream.transform(utf8.decoder).transform(const LineSplitter())) {
-          if (!line.startsWith('data:')) continue;
-          final chunk = _json(line.substring(5).trim());
+        // Silence longer than [idle] means a stalled connection.
+        void take(Map<String, dynamic> chunk) {
           if (chunk['usageMetadata'] is Map) usage = (chunk['usageMetadata'] as Map).cast<String, dynamic>();
           final reason = (chunk['promptFeedback'] as Map?)?['blockReason'];
           if (reason != null) blocked = '$reason';
           final candidates = chunk['candidates'] as List?;
-          if (candidates == null || candidates.isEmpty) continue;
+          if (candidates == null || candidates.isEmpty) return;
           finished = true;
           final parts = ((candidates.first as Map)['content'] as Map?)?['parts'] as List? ?? const [];
           final piece = parts.whereType<Map>().where((p) => p['text'] is String && p['thought'] != true).map((p) => p['text']).join();
@@ -158,8 +163,28 @@ class GeminiClient implements JsonModel {
             onText(text.toString());
           }
         }
+
+        // Server-sent events; a plain JSON body (some proxies) is read whole.
+        final plain = StringBuffer();
+        var events = 0;
+        await for (final line in res.stream.timeout(idle).transform(utf8.decoder).transform(const LineSplitter())) {
+          if (!line.startsWith('data:')) {
+            if (events == 0) plain.writeln(line);
+            continue;
+          }
+          events++;
+          take(_json(line.substring(5).trim()));
+        }
+        if (events == 0 && plain.toString().trim().isNotEmpty) {
+          final whole = jsonDecode(plain.toString());
+          for (final c in whole is List ? whole : [whole]) {
+            if (c is Map) take(c.cast<String, dynamic>());
+          }
+        }
       } on GeminiException {
         rethrow;
+      } on TimeoutException {
+        throw GeminiException('TIMEOUT', 'Gemini stopped sending for ${idle.inSeconds}s', retryable: true);
       } catch (_) {
         throw const GeminiException('NETWORK', 'The connection to Gemini was interrupted', retryable: true);
       }
@@ -293,23 +318,14 @@ class GeminiClient implements JsonModel {
         final model = Uri.encodeComponent(name);
         String text;
         Object? usage;
-        if (onText != null) {
-          final out = await _stream('$_api/models/$model:streamGenerateContent?alt=sse', body, timeout, onText);
+        // Always streamed, so a stalled call is caught by the idle watchdog.
+        {
+          final out = await _stream('$_api/models/$model:streamGenerateContent?alt=sse', body, timeout, onText ?? (_) {}, idle: budget.idle);
           if (!out.finished) {
             throw GeminiException('BLOCKED', out.blockReason != null ? 'Gemini blocked the request: ${out.blockReason}' : 'Gemini returned no answer');
           }
           text = out.text;
           usage = out.usage;
-        } else {
-          final result = await _call('POST', '$_api/models/$model:generateContent', body: body, timeout: timeout);
-          final candidates = result['candidates'] as List?;
-          if (candidates == null || candidates.isEmpty) {
-            final reason = (result['promptFeedback'] as Map?)?['blockReason'];
-            throw GeminiException('BLOCKED', reason != null ? 'Gemini blocked the request: $reason' : 'Gemini returned no answer');
-          }
-          final parts = ((candidates.first as Map)['content'] as Map?)?['parts'] as List? ?? const [];
-          text = parts.whereType<Map>().where((p) => p['text'] is String && p['thought'] != true).map((p) => p['text']).join();
-          usage = result['usageMetadata'];
         }
         try {
           return (data: (jsonDecode(text) as Map).cast<String, dynamic>(), model: name, usage: _usage(usage));

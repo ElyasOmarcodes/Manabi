@@ -145,7 +145,7 @@ class _BookScreenState extends State<BookScreen> {
                           child: Column(children: [
                             for (final (i, e) in details.toc.indexed)
                               InkWell(
-                                onTap: e.page == null ? null : () => openReader(context, widget.bookId, e.page!, title: details.title),
+                                onTap: e.page == null ? null : () => openReader(context, widget.bookId, e.page!, title: details.title, reveal: e.title),
                                 child: Padding(
                                   padding: EdgeInsetsDirectional.fromSTEB(16.0 + (e.level - 1).clamp(0, 4) * 18, 9, 16, 9),
                                   child: Row(children: [

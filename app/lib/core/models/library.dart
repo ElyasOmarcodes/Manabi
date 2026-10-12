@@ -48,6 +48,15 @@ class PdfLinks {
 
   Map<String, dynamic> toJson() => {'root': root, 'files': files};
 
+  /// The volume number in a file name: the leading number ("04_54497.pdf")
+  /// or, failing that, the last one ("roohm_04.pdf"); 0 is the introduction.
+  static int? _volumeOf(String file) {
+    final f = file.split('|').first;
+    final lead = RegExp(r'^(\d+)[_\-. ]').firstMatch(f);
+    final tail = RegExp(r'(\d+)\.pdf$', caseSensitive: false).firstMatch(f);
+    return int.tryParse((lead ?? tail)?.group(1) ?? '');
+  }
+
   /// The whole-volume file for [volume] (parts are only used as a fallback).
   String url([String? volume]) {
     String name(String f) => f.split('|').first;
@@ -55,13 +64,14 @@ class PdfLinks {
     String? pick;
     final v = int.tryParse(volume ?? '');
     if (v != null) {
-      final prefix = '${v.toString().padLeft(2, '0')}_';
-      pick = whole.where((f) => f.startsWith(prefix)).firstOrNull ?? files.where((f) => f.startsWith(prefix)).firstOrNull;
+      pick = whole.where((f) => _volumeOf(f) == v).firstOrNull ?? files.where((f) => _volumeOf(f) == v).firstOrNull;
+      // Files numbered from 1 with no introduction file, in volume order.
+      if (pick == null && whole.every((f) => _volumeOf(f) == null) && v >= 1 && v <= whole.length) pick = whole[v - 1];
     } else if (volume != null && volume.trim().isNotEmpty) {
-      // A named volume such as المقدمة is the "00_" file.
-      pick = whole.where((f) => f.startsWith('00_')).firstOrNull;
+      // A named volume such as المقدمة is the "00" file.
+      pick = whole.where((f) => _volumeOf(f) == 0).firstOrNull;
     }
-    pick ??= (whole.length == 1 ? whole.first : null) ?? whole.where((f) => !f.startsWith('00_')).firstOrNull ?? files.first;
+    pick ??= (whole.length == 1 ? whole.first : null) ?? whole.where((f) => _volumeOf(f) != 0).firstOrNull ?? files.first;
     final path = '$root/${name(pick)}'.replaceAll(RegExp(r'/+'), '/');
     return 'https://files.turath.io/pdf/${path.startsWith('/') ? path.substring(1) : path}';
   }

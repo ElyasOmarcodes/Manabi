@@ -547,6 +547,7 @@ class ReadingSettingsPage extends StatelessWidget {
           icon: Icons.format_color_text_rounded,
           color: AuraHues.violet,
           title: l.textFormatting,
+          beta: true,
           subtitle: l.textFormattingSub,
           onTap: () => push(const TextFormattingSettingsPage()),
         ),

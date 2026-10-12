@@ -247,9 +247,12 @@ class SettingsGroup extends StatelessWidget {
 
 /// One row: tinted icon, title, optional subtitle and value, chevron.
 class SettingsRow extends StatelessWidget {
-  const SettingsRow({super.key, required this.icon, required this.title, this.color, this.subtitle, this.value, this.trailing, this.onTap, this.danger = false});
+  const SettingsRow({super.key, required this.icon, required this.title, this.color, this.subtitle, this.value, this.trailing, this.onTap, this.danger = false, this.beta = false});
   final IconData icon;
   final String title;
+
+  /// Shows a "Beta" badge after the title.
+  final bool beta;
   final Color? color;
   final String? subtitle;
   final String? value;
@@ -276,7 +279,10 @@ class SettingsRow extends StatelessWidget {
             const SizedBox(width: 14),
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-                Text(title, style: TextStyle(fontFamily: uiFont, fontSize: 15, fontWeight: FontWeight.w500, color: danger ? a.danger : a.text)),
+                Row(children: [
+                  Flexible(child: Text(title, style: TextStyle(fontFamily: uiFont, fontSize: 15, fontWeight: FontWeight.w500, color: danger ? a.danger : a.text))),
+                  if (beta) const BetaBadge(),
+                ]),
                 if (subtitle != null)
                   Text(subtitle!, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontFamily: uiFont, fontSize: 12.5, color: a.muted, height: 1.45)),
               ]),
@@ -337,3 +343,22 @@ Future<String?> showChoiceDialog(BuildContext context, {required String title, r
         );
       },
     );
+
+/// A small "Beta" badge: the feature is early and still growing.
+class BetaBadge extends StatelessWidget {
+  const BetaBadge({super.key});
+  @override
+  Widget build(BuildContext context) {
+    final a = context.aura;
+    return Container(
+      margin: const EdgeInsetsDirectional.only(start: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: AuraHues.amber.withValues(alpha: 0.7)),
+        color: AuraHues.amber.withValues(alpha: a.dark ? 0.16 : 0.1),
+      ),
+      child: const Text('Beta', style: TextStyle(fontFamily: 'Vazirmatn', fontSize: 10, fontWeight: FontWeight.w800, color: AuraHues.amber, height: 1.3)),
+    );
+  }
+}

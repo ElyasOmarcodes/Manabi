@@ -23,4 +23,13 @@ void main() {
   test('no volume opens the first real volume', () {
     expect(links.url(), 'https://files.turath.io/pdf/bksultanya/01_54495.pdf');
   });
+
+  // روح المعاني: the volume number is at the end and 00 is the introduction.
+  const tail = PdfLinks('shamela', ['roohm_00.pdf', 'roohm_01.pdf', 'roohm_04.pdf', 'roohm_15.pdf']);
+
+  test('a volume number at the end of the name picks that volume, not the cover', () {
+    expect(tail.url('4'), 'https://files.turath.io/pdf/shamela/roohm_04.pdf');
+    expect(tail.url('15'), 'https://files.turath.io/pdf/shamela/roohm_15.pdf');
+    expect(tail.url(), 'https://files.turath.io/pdf/shamela/roohm_01.pdf');
+  });
 }

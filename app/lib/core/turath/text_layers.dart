@@ -147,7 +147,13 @@ bool _validInner(String inner, int maxSpan) => inner.length + 2 <= maxSpan && _a
 /// A quote pair holds whole bracketed groups: "… («قال …" is a mispairing.
 bool _balanced(String inner) {
   for (final (o, c) in const [('(', ')'), ('«', '»'), ('[', ']'), ('﴿', '﴾')]) {
-    if (o.allMatches(inner).length != c.allMatches(inner).length) return false;
+    // Opened before closed, as many of each: "): وفي نسخة (" is a mispairing.
+    var depth = 0;
+    for (var i = 0; i < inner.length; i++) {
+      if (inner[i] == o) depth++;
+      if (inner[i] == c && --depth < 0) return false;
+    }
+    if (depth != 0) return false;
   }
   return true;
 }
@@ -547,6 +553,35 @@ List<(int, int)> aiTruth(String page, List<(String, String)> spans) {
   // The commentary repeats the block's words in order: look there first.
   final found = locateSpans(page, spans, from: b.sharhStart);
   return found.isEmpty && spans.isEmpty ? found : _merge([(0, b.blockEnd), ...found]);
+}
+
+/// The AI's matn stretches located on a whole page [text] (block and
+/// commentary together, in reading order), checked: in the commentary a
+/// stretch is a quote of the matn, so one that is long and not found in the
+/// matn above (or in [context]) is dropped, and nothing crosses the ــ line.
+List<(int, int)> aiMatnRanges(String text, List<(String, String)> spans, {List<String> context = const []}) {
+  final found = locateSpans(text, spans);
+  final b = matnBlock(text);
+  final matn = [
+    if (b != null) skeletonWords(text.substring(0, b.blockEnd)),
+    for (final c in context) skeletonWords(c),
+  ];
+  final out = <(int, int)>[];
+  for (var (s, e) in found) {
+    if (b != null && s < b.blockEnd && e > b.blockEnd) e = b.blockEnd;
+    if (b != null && s < b.sharhStart && s >= b.blockEnd) continue;
+    final inSharh = b != null && s >= b.sharhStart;
+    if (inSharh || b == null) {
+      final words = skeletonWords(text.substring(s, e));
+      final quoted = matn.any((m) => quotedFrom(words, m));
+      // A short lemma may differ a little from the matn; a long stretch of
+      // commentary marked as matn is a mistake.
+      if (!quoted && (e - s > 160 || words.length > 12) && matn.isNotEmpty) continue;
+      if (e - s > 700) continue;
+    }
+    out.add((s, e));
+  }
+  return _merge(out);
 }
 
 /// How well [rules] reproduce [truth] (matn letters marked by AI) on
