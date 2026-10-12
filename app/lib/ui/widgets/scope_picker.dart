@@ -288,7 +288,7 @@ class _ManyPickerState extends State<_ManyPicker> {
         ),
       Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: AuraSearchField(hint: hint, autofocus: false, onChanged: (v) => setState(() => _q = v)),
+        child: AuraSearchField(hint: hint, autofocus: widget.kind != PickKind.category, onChanged: (v) => setState(() => _q = v)),
       ),
       const SizedBox(height: 6),
       Expanded(

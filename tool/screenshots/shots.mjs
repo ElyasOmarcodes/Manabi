@@ -14,6 +14,8 @@ const open = async ({ width, height, lang = "ps", theme = "light", prefs = {} })
     localStorage.setItem("flutter.themeMode", JSON.stringify(theme));
     // The starter questions rotate; screenshots use the classic first ones.
     localStorage.setItem("flutter.fixedSuggestions", "true");
+    // Past the first-run library setup (it has its own screenshot run).
+    localStorage.setItem("flutter.librarySyncedAt", "1");
     for (const [k, v] of Object.entries(prefs)) localStorage.setItem(`flutter.${k}`, JSON.stringify(v));
   }, [lang, theme, prefs]);
   const page = await ctx.newPage();

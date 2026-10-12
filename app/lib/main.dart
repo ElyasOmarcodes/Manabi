@@ -181,7 +181,15 @@ class _DropFocusOnNavigate extends NavigatorObserver {
   // page below has taken its focus back.
   @override
   void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) => FocusManager.instance.primaryFocus?.unfocus();
+  // Only a text field on the page now on top loses its focus: focus that
+  // is still in the closing route (or elsewhere) is left alone, so Escape
+  // and other keys keep reaching the page below.
   @override
-  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) =>
-      WidgetsBinding.instance.addPostFrameCallback((_) => FocusManager.instance.primaryFocus?.unfocus());
+  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) => WidgetsBinding.instance.addPostFrameCallback((_) {
+        final focus = FocusManager.instance.primaryFocus;
+        final ctx = focus?.context;
+        if (focus == null || ctx == null || !ctx.mounted) return;
+        if (ctx.findAncestorWidgetOfExactType<EditableText>() == null && ctx.widget is! EditableText) return;
+        if (ModalRoute.of(ctx) == previousRoute) focus.unfocus();
+      });
 }
