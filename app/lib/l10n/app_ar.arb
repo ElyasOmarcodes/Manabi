@@ -454,6 +454,7 @@
   "pdfAlignHint": "إن لم تطابق صفحة PDF النص فحرّكها من هنا؛ تُحفظ لهذا الكتاب.",
   "pdfPage": "صفحة PDF {page}",
   "pdfOpenOutside": "فتح في المتصفح",
+  "pdfPartFailed": "لم يُحمَّل جزء من هذا الملف.",
   "pdfLoadingBytes": "جارٍ تحميل PDF… {size}",
   "matnBlockRule": "النص المطبوع أعلى كل صفحة فوق الخط هو المتن",
   "matnBlockShort": "متن مطبوع أعلى الصفحة",

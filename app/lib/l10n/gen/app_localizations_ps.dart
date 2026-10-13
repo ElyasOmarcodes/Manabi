@@ -1321,6 +1321,9 @@ class AppLocalizationsPs extends AppLocalizations {
   String get pdfOpenOutside => 'په براوزر کې پرانیستل';
 
   @override
+  String get pdfPartFailed => 'د دې PDF ځینې برخې پورته نه شوې.';
+
+  @override
   String pdfLoadingBytes(String size) {
     return 'PDF پورته کېږي… $size';
   }

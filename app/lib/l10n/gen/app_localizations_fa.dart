@@ -1323,6 +1323,9 @@ class AppLocalizationsFa extends AppLocalizations {
   String get pdfOpenOutside => 'باز کردن در مرورگر';
 
   @override
+  String get pdfPartFailed => 'بخشی از این PDF بارگیری نشد.';
+
+  @override
   String pdfLoadingBytes(String size) {
     return 'در حال بارگذاری PDF… $size';
   }

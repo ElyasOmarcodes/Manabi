@@ -1321,6 +1321,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get pdfOpenOutside => 'فتح في المتصفح';
 
   @override
+  String get pdfPartFailed => 'لم يُحمَّل جزء من هذا الملف.';
+
+  @override
   String pdfLoadingBytes(String size) {
     return 'جارٍ تحميل PDF… $size';
   }

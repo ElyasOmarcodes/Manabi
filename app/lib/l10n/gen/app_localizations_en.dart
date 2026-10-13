@@ -1325,6 +1325,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get pdfOpenOutside => 'Open in the browser';
 
   @override
+  String get pdfPartFailed => 'Part of this PDF did not load.';
+
+  @override
   String pdfLoadingBytes(String size) {
     return 'Loading the PDF… $size';
   }

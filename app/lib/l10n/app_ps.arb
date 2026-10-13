@@ -454,6 +454,7 @@
   "pdfAlignHint": "که د PDF پاڼه له متن سره سمه نه وي، دلته یې وښوروه؛ د دې کتاب لپاره ساتل کېږي.",
   "pdfPage": "د PDF پاڼه {page}",
   "pdfOpenOutside": "په براوزر کې پرانیستل",
+  "pdfPartFailed": "د دې PDF ځینې برخې پورته نه شوې.",
   "pdfLoadingBytes": "PDF پورته کېږي… {size}",
   "matnBlockRule": "د هر مخ په سر کې له کرښې پورته متن، متن دی",
   "matnBlockShort": "د مخ په سر کې چاپ شوی متن",

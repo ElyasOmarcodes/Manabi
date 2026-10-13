@@ -62,6 +62,24 @@ class _PdfPaneState extends State<PdfPane> {
   int? _shown;
   int? _count;
 
+  // Opening again (after a part of the file could not be read) starts a new
+  // document; the blocks already on disk are reused.
+  int _attempt = 0;
+  bool _partFailed = false;
+
+  void _onFailure() {
+    if (_partFailed || !mounted) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) setState(() => _partFailed = true);
+    });
+  }
+
+  void _again() => setState(() {
+    _attempt++;
+    _partFailed = false;
+    _count = null;
+  });
+
   @override
   void didUpdateWidget(PdfPane old) {
     super.didUpdateWidget(old);
@@ -74,112 +92,176 @@ class _PdfPaneState extends State<PdfPane> {
   @override
   Widget build(BuildContext context) {
     final l = context.l;
-    return Stack(children: [
-      Positioned.fill(
-        // Only the parts of the volume the shown pages need are fetched (HTTP
-        // byte ranges), not the whole file; on phones and computers they are
-        // kept on disk, so a page seen once opens again without the network.
-        child: PdfViewer(
-          PdfDocumentRefByLoader(
-            (progress) => openPdfInRanges(Uri.parse(widget.url), headers: widget.headers, progress: progress),
-            key: PdfDocumentRefKey(widget.url),
-          ),
-          controller: _controller,
-          initialPageNumber: widget.page,
-          params: PdfViewerParams(
-            backgroundColor: widget.background,
-            margin: 10,
-            // Mouse wheels and trackpads move about as fast as in the text.
-            scrollByMouseWheel: 0.6,
-            // Only the pages on screen are measured and read. Measuring every
-            // page up front (the default) reads nearly the whole volume.
-            behaviorControlParams: const PdfViewerBehaviorControlParams(loadPageDimensionsOnDemand: true),
-            onViewerReady: (doc, controller) {
-              if (mounted) setState(() => _count = doc.pages.length);
-            },
-            onPageChanged: (n) {
-              if (n == null || n == _shown) return;
-              _shown = n;
-              widget.onPage(n);
-              if (mounted) setState(() {});
-            },
-            loadingBannerBuilder: (context, downloaded, total) => Center(
-              child: Column(mainAxisSize: MainAxisSize.min, children: [
-                SizedBox(
-                  width: 180,
-                  child: AuraProgress(value: total == null || total == 0 ? null : downloaded / total),
-                ),
-                const SizedBox(height: 10),
-                Text(l.pdfLoadingBytes(_size(downloaded)), style: TextStyle(fontFamily: uiFont, fontSize: 12.5, color: widget.muted)),
-              ]),
+    return Stack(
+      children: [
+        Positioned.fill(
+          // Only the parts of the volume the shown pages need are fetched (HTTP
+          // byte ranges), not the whole file; on phones and computers they are
+          // kept on disk, so a page seen once opens again without the network.
+          child: PdfViewer(
+            PdfDocumentRefByLoader(
+              (progress) => openPdfInRanges(Uri.parse(widget.url), headers: widget.headers, progress: progress, onFailure: _onFailure),
+              key: PdfDocumentRefKey(widget.url, [_attempt]),
             ),
-            errorBannerBuilder: (context, error, stack, ref) => Center(
-              child: Column(mainAxisSize: MainAxisSize.min, children: [
-                Icon(Icons.cloud_off_rounded, color: AuraHues.rose, size: 34),
-                const SizedBox(height: 10),
-                Text(errorText(l, 'NETWORK'), textAlign: TextAlign.center, style: TextStyle(fontFamily: uiFont, color: widget.text)),
-                const SizedBox(height: 12),
-                Wrap(spacing: 8, children: [
-                  SoftButton(icon: Icons.open_in_new_rounded, label: l.pdfOpenOutside, onTap: () => openUrl('${widget.url}#page=${widget.page}')),
-                  SoftButton(icon: Icons.notes_rounded, label: l.showText, onTap: widget.onShowText),
-                ]),
-              ]),
+            controller: _controller,
+            initialPageNumber: widget.page,
+            params: PdfViewerParams(
+              backgroundColor: widget.background,
+              margin: 10,
+              // Mouse wheels and trackpads move about as fast as in the text.
+              scrollByMouseWheel: 0.6,
+              // Only the pages on screen are measured and read. Measuring every
+              // page up front (the default) reads nearly the whole volume.
+              behaviorControlParams: const PdfViewerBehaviorControlParams(loadPageDimensionsOnDemand: true),
+              onViewerReady: (doc, controller) {
+                if (mounted) setState(() => _count = doc.pages.length);
+              },
+              onPageChanged: (n) {
+                if (n == null || n == _shown) return;
+                _shown = n;
+                widget.onPage(n);
+                if (mounted) setState(() {});
+              },
+              loadingBannerBuilder: (context, downloaded, total) => Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(width: 180, child: AuraProgress(value: total == null || total == 0 ? null : downloaded / total)),
+                    const SizedBox(height: 10),
+                    Text(
+                      l.pdfLoadingBytes(_size(downloaded)),
+                      style: TextStyle(fontFamily: uiFont, fontSize: 12.5, color: widget.muted),
+                    ),
+                  ],
+                ),
+              ),
+              errorBannerBuilder: (context, error, stack, ref) => Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.cloud_off_rounded, color: AuraHues.rose, size: 34),
+                    const SizedBox(height: 10),
+                    Text(
+                      errorText(l, 'NETWORK'),
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontFamily: uiFont, color: widget.text),
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      alignment: WrapAlignment.center,
+                      children: [
+                        SoftButton(icon: Icons.refresh_rounded, label: l.retry, onTap: _again),
+                        SoftButton(icon: Icons.open_in_new_rounded, label: l.pdfOpenOutside, onTap: () => openUrl('${widget.url}#page=${widget.page}')),
+                        SoftButton(icon: Icons.notes_rounded, label: l.showText, onTap: widget.onShowText),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
         ),
-      ),
-      // Page, alignment with the text, and the way back to the text.
-      Positioned(
-        bottom: 12,
-        left: 0,
-        right: 0,
-        child: Center(
-          child: Material(
-            color: widget.bar.withValues(alpha: 0.94),
-            elevation: 3,
-            shadowColor: Colors.black26,
-            borderRadius: BorderRadius.circular(40),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                TextButton.icon(
-                  onPressed: widget.onShowText,
-                  icon: const Icon(Icons.notes_rounded, size: 18),
-                  label: Text(l.textView, style: TextStyle(fontFamily: uiFont, fontWeight: FontWeight.w700)),
-                ),
-                Container(width: 1, height: 22, color: widget.muted.withValues(alpha: 0.3)),
-                const SizedBox(width: 10),
-                Text(
-                  '${l.pdfPage(widget.digits(_shown ?? widget.page))}${_count == null ? '' : ' / ${widget.digits(_count!)}'}',
-                  style: TextStyle(fontFamily: uiFont, fontSize: 12.5, color: widget.text, fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(width: 4),
-                Tooltip(
-                  message: '${l.pdfAlign}\n${l.pdfAlignHint}',
-                  child: Row(mainAxisSize: MainAxisSize.min, children: [
-                    IconButton(
-                      visualDensity: VisualDensity.compact,
-                      icon: Icon(Icons.remove_rounded, size: 18, color: widget.muted),
-                      onPressed: () => widget.onOffset(widget.offset - 1),
-                    ),
-                    if (widget.offset != 0)
-                      Text(
-                        '${widget.offset > 0 ? '+' : '−'}${widget.digits(widget.offset.abs())}',
-                        style: TextStyle(fontFamily: uiFont, fontSize: 11.5, color: widget.muted),
+        if (_partFailed)
+          Positioned(
+            top: 10,
+            left: 12,
+            right: 12,
+            child: Center(
+              child: Material(
+                color: widget.bar.withValues(alpha: 0.96),
+                elevation: 3,
+                shadowColor: Colors.black26,
+                borderRadius: BorderRadius.circular(14),
+                child: Padding(
+                  padding: const EdgeInsetsDirectional.fromSTEB(14, 4, 4, 4),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.cloud_off_rounded, size: 18, color: AuraHues.rose),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          l.pdfPartFailed,
+                          style: TextStyle(fontFamily: uiFont, fontSize: 12.5, color: widget.text),
+                        ),
                       ),
-                    IconButton(
-                      visualDensity: VisualDensity.compact,
-                      icon: Icon(Icons.add_rounded, size: 18, color: widget.muted),
-                      onPressed: () => widget.onOffset(widget.offset + 1),
-                    ),
-                  ]),
+                      TextButton(
+                        onPressed: _again,
+                        child: Text(
+                          l.retry,
+                          style: TextStyle(fontFamily: uiFont, fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ]),
+              ),
+            ),
+          ),
+        // Page, alignment with the text, and the way back to the text.
+        Positioned(
+          bottom: 12,
+          left: 0,
+          right: 0,
+          child: Center(
+            child: Material(
+              color: widget.bar.withValues(alpha: 0.94),
+              elevation: 3,
+              shadowColor: Colors.black26,
+              borderRadius: BorderRadius.circular(40),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextButton.icon(
+                      onPressed: widget.onShowText,
+                      icon: const Icon(Icons.notes_rounded, size: 18),
+                      label: Text(
+                        l.textView,
+                        style: TextStyle(fontFamily: uiFont, fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                    Container(width: 1, height: 22, color: widget.muted.withValues(alpha: 0.3)),
+                    const SizedBox(width: 10),
+                    Text(
+                      '${l.pdfPage(widget.digits(_shown ?? widget.page))}${_count == null ? '' : ' / ${widget.digits(_count!)}'}',
+                      style: TextStyle(fontFamily: uiFont, fontSize: 12.5, color: widget.text, fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(width: 4),
+                    Tooltip(
+                      message: '${l.pdfAlign}\n${l.pdfAlignHint}',
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            visualDensity: VisualDensity.compact,
+                            icon: Icon(Icons.remove_rounded, size: 18, color: widget.muted),
+                            onPressed: () => widget.onOffset(widget.offset - 1),
+                          ),
+                          if (widget.offset != 0)
+                            Text(
+                              '${widget.offset > 0 ? '+' : '−'}${widget.digits(widget.offset.abs())}',
+                              style: TextStyle(fontFamily: uiFont, fontSize: 11.5, color: widget.muted),
+                            ),
+                          IconButton(
+                            visualDensity: VisualDensity.compact,
+                            icon: Icon(Icons.add_rounded, size: 18, color: widget.muted),
+                            onPressed: () => widget.onOffset(widget.offset + 1),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
         ),
-      ),
-    ]);
+      ],
+    );
   }
 
   static String _size(int bytes) {

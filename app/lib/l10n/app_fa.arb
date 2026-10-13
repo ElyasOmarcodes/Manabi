@@ -454,6 +454,7 @@
   "pdfAlignHint": "اگر صفحهٔ PDF با متن نمی‌خواند، از اینجا جابه‌جا کنید؛ برای این کتاب ذخیره می‌شود.",
   "pdfPage": "صفحهٔ PDF {page}",
   "pdfOpenOutside": "باز کردن در مرورگر",
+  "pdfPartFailed": "بخشی از این PDF بارگیری نشد.",
   "pdfLoadingBytes": "در حال بارگذاری PDF… {size}",
   "matnBlockRule": "متنِ بالای خط در سر هر صفحه، متن است",
   "matnBlockShort": "متن چاپ‌شده در بالای صفحه",

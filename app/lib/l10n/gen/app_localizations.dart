@@ -2496,6 +2496,12 @@ abstract class AppLocalizations {
   /// **'Open in the browser'**
   String get pdfOpenOutside;
 
+  /// No description provided for @pdfPartFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Part of this PDF did not load.'**
+  String get pdfPartFailed;
+
   /// No description provided for @pdfLoadingBytes.
   ///
   /// In en, this message translates to:
