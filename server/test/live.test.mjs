@@ -60,7 +60,9 @@ liveTest("live: nonsense question is reported as not documented", 180_000, async
 
 liveTest("live: Hanafi ruling with several sources, then a follow-up naming two books", 300_000, async () => {
   const q1 = "د حنفي مذهب علماء څه فرمايي چې کله د ميږې څخه بچی پيدا شي، او سر يې د سپي وي ايا ددی خوراک جايز دی کنه؟ پر پښتو ژبه ځواب راکړه او د اصل مرجع متن په عربي ذکر کړه";
-  const first = await pipeline.ask({ question: q1, language: "ps" });
+  const steps = [];
+  const first = await pipeline.ask({ question: q1, language: "ps" }, (e, d) => e === "activity" && steps.push(d));
+  console.log("HANAFI", JSON.stringify({ activity: steps.filter((d) => d.kind !== "search"), detail: first.detail, related: first.related?.map((s) => s.citation) }));
   await check(first);
   assert.notEqual(first.status, "insufficient");
   assert.ok(first.sources.length >= 2, `expected several sources, got ${first.sources.length}`);

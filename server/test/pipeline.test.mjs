@@ -305,3 +305,15 @@ test("a scoped book's chapter is read, the format and outline reach the writer",
   assert.equal(result.status, "answered");
   assert.ok(events.some(([e, d]) => e === "activity" && d.kind === "chapter" && d.chapter === "[الأحاديث]"));
 });
+
+test("each post keeps the quotation of the source it cites", async () => {
+  const { realignQuotes } = await import("../src/pipeline.mjs");
+  const answer = "مقدمه [S1]\n### 1 — الف\nمتن [S1]\n[[Q2]]\n### 2 — ب\nمتن [S2]\n[[Q3]]\n### 3 — ج\nمتن [S3]\n[[Q1]]\n### 4 — د\nمتن [S4]\n[[Q4]]";
+  const sourceOf = new Map([["Q1", "S1"], ["Q2", "S2"], ["Q3", "S3"], ["Q4", "S4"]]);
+  const fixed = realignQuotes(answer, sourceOf);
+  assert.deepEqual([...fixed.matchAll(/\[\[(Q\d)\]\]/g)].map((m) => m[1]), ["Q1", "Q2", "Q3", "Q4"]);
+  // Nothing to fix: unchanged.
+  assert.equal(realignQuotes(fixed, sourceOf), fixed);
+  // A part citing a source with no quote keeps what it has.
+  assert.equal(realignQuotes("### x\nمتن [S9]\n[[Q1]]", sourceOf), "### x\nمتن [S9]\n[[Q1]]");
+});

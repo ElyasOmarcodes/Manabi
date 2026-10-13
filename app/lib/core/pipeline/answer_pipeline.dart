@@ -501,6 +501,38 @@ PipelineSource _candidate(PagePassage p, String? rawSnippet, CatalogService cata
 final _marker = RegExp(r'\[\s*(S\d+(?:\s*[,،;]\s*S?\d+)*)\s*\]', caseSensitive: false);
 final _quoteMarker = RegExp(r'\[\[\s*(Q\d+)\s*\]\]', caseSensitive: false);
 
+List<String> _sourceKeys(String inner) => [
+      for (var part in inner.split(RegExp('[,،;]')))
+        if ((part = part.trim().toUpperCase()).isNotEmpty) part.startsWith('S') ? part : 'S$part',
+    ];
+
+/// Puts each quotation in the part of the answer that cites its source. The
+/// writer sometimes numbers its quotations in a different order than the
+/// posts or sections they belong to; each heading's part keeps a quote only
+/// when its text cites that quote's source, otherwise it takes a still unused
+/// quote of a source it does cite. [sourceOf] maps verified quote ids to source keys.
+String realignQuotes(String answer, Map<String, String> sourceOf) {
+  final parts = [
+    for (final text in answer.split(RegExp(r'(?=^#{2,4} )', multiLine: true)))
+      (
+        text: text,
+        cited: {for (final m in _marker.allMatches(text.replaceAll(_quoteMarker, ''))) ..._sourceKeys(m.group(1)!)},
+        quotes: [for (final m in _quoteMarker.allMatches(text)) m.group(1)!.toUpperCase()],
+      ),
+  ];
+  final used = {for (final p in parts) ...p.quotes.where((q) => p.cited.contains(sourceOf[q]))};
+  return parts
+      .map((p) => p.text.replaceAllMapped(_quoteMarker, (m) {
+            final q = m.group(1)!.toUpperCase();
+            if (p.cited.isEmpty || !sourceOf.containsKey(q) || p.cited.contains(sourceOf[q])) return m.group(0)!;
+            final better = sourceOf.entries.where((e) => !used.contains(e.key) && p.cited.contains(e.value)).firstOrNull;
+            if (better == null) return m.group(0)!;
+            used.add(better.key);
+            return '[[${better.key}]]';
+          }))
+      .join();
+}
+
 /// Verifies citations, renders inline quotes and renumbers markers. Pure – unit tested.
 AnswerResult finalizeAnswer({required Map<String, dynamic> composed, required List<PipelineSource> sources, required String language}) {
   final byKey = {for (final s in sources) s.key: s};
@@ -543,7 +575,7 @@ AnswerResult finalizeAnswer({required Map<String, dynamic> composed, required Li
     return n + 1;
   }
 
-  final answer = '${composed['answer'] ?? ''}'
+  final answer = realignQuotes('${composed['answer'] ?? ''}', {for (final e in inline.entries) e.key: e.value.key})
       .replaceAllMapped(_quoteMarker, (m) {
         final q = inline[m.group(1)!.toUpperCase()];
         if (q == null) return '';

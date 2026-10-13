@@ -444,6 +444,35 @@ const FORMATS = new Set(["standard", "posts", "quotes", "brief", "detailed"]);
 const MARKER = /\[\s*(S\d+(?:\s*[,،;]\s*S?\d+)*)\s*\]/gi;
 const QUOTE_MARKER = /\[\[\s*(Q\d+)\s*\]\]/gi;
 
+const sourceKeys = (inner) => inner.split(/[,،;]/).map((part) => part.trim().toUpperCase()).map((part) => (part.startsWith("S") ? part : `S${part}`));
+
+/**
+ * Puts each quotation in the part of the answer that cites its source. The
+ * writer sometimes numbers its quotations in a different order than the
+ * posts or sections they belong to; each heading's part keeps a quote only
+ * when its text cites that quote's source, otherwise it takes a still unused
+ * quote of a source it does cite. [sourceOf] maps verified quote ids to source keys.
+ */
+export const realignQuotes = (answer, sourceOf) => {
+  const parts = answer.split(/(?=^#{2,4} )/m).map((text) => {
+    const cited = new Set([...text.replace(QUOTE_MARKER, "").matchAll(MARKER)].flatMap((m) => sourceKeys(m[1])));
+    return { text, cited, quotes: [...text.matchAll(QUOTE_MARKER)].map((m) => m[1].toUpperCase()) };
+  });
+  const used = new Set(parts.flatMap((p) => p.quotes.filter((q) => p.cited.has(sourceOf.get(q)))));
+  return parts
+    .map(({ text, cited }) =>
+      text.replace(QUOTE_MARKER, (whole, raw) => {
+        const q = raw.toUpperCase();
+        if (!cited.size || !sourceOf.has(q) || cited.has(sourceOf.get(q))) return whole;
+        const better = [...sourceOf].find(([id, key]) => !used.has(id) && cited.has(key));
+        if (!better) return whole;
+        used.add(better[0]);
+        return `[[${better[0]}]]`;
+      }),
+    )
+    .join("");
+};
+
 const publicSource = (quotes) => (source, index) => ({
   n: index + 1,
   bookId: source.bookId,
@@ -501,7 +530,7 @@ export const finalize = ({ composed, sources, language }) => {
     }
     return n + 1;
   };
-  const answer = String(composed.answer ?? "")
+  const answer = realignQuotes(String(composed.answer ?? ""), new Map([...inline].map(([id, q]) => [id, q.key])))
     // Verified quotes become Arabic block quotes with their source number;
     // unverifiable ones disappear.
     .replace(QUOTE_MARKER, (_, qid) => {

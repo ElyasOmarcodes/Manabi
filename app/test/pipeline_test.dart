@@ -440,4 +440,13 @@ void main() {
       expect((events.last as AskResultEvent).result.status, AnswerStatus.answered);
     });
   });
+
+  test('each post keeps the quotation of the source it cites', () {
+    const answer = 'مقدمه [S1]\n### 1 — الف\nمتن [S1]\n[[Q2]]\n### 2 — ب\nمتن [S2]\n[[Q3]]\n### 3 — ج\nمتن [S3]\n[[Q1]]\n### 4 — د\nمتن [S4]\n[[Q4]]';
+    const sourceOf = {'Q1': 'S1', 'Q2': 'S2', 'Q3': 'S3', 'Q4': 'S4'};
+    final fixed = realignQuotes(answer, sourceOf);
+    expect(RegExp(r'\[\[(Q\d)\]\]').allMatches(fixed).map((m) => m.group(1)), ['Q1', 'Q2', 'Q3', 'Q4']);
+    expect(realignQuotes(fixed, sourceOf), fixed);
+    expect(realignQuotes('### x\nمتن [S9]\n[[Q1]]', sourceOf), '### x\nمتن [S9]\n[[Q1]]');
+  });
 }
