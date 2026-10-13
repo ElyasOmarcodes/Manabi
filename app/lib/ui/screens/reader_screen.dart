@@ -271,7 +271,9 @@ class _ReaderScreenState extends State<ReaderScreen> {
   /// The PDF pane is moving the text (not the other way round).
   bool _pdfDriving = false;
 
-  bool get _canSplit => !widget.embedded && MediaQuery.sizeOf(context).width >= 1100;
+  // A phone's "desktop site" is about 980 wide; two panes still read well at 900.
+  static const _splitWidth = 900.0;
+  bool get _canSplit => !widget.embedded && MediaQuery.sizeOf(context).width >= _splitWidth;
 
   Future<void> _openSplit() async {
     final l = context.l;
@@ -688,7 +690,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
         ),
       ]);
       // Large screens: the text with the scanned page or a second text beside it.
-      final split = _splitKind != null && !_pdf && !_immersive && box.maxWidth >= 1100 && !widget.embedded;
+      final split = _splitKind != null && !_pdf && !_immersive && box.maxWidth >= _splitWidth && !widget.embedded;
       final Widget body = !split
           ? reader
           : Directionality(
@@ -850,7 +852,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
       tool(Icons.tune_rounded, l.readerTools, _openTools),
       tool(Icons.fullscreen_rounded, l.fullScreen, _toggleImmersive),
       if (_book?.pdf != null) tool(_pdf ? Icons.picture_as_pdf_rounded : Icons.picture_as_pdf_outlined, _pdf ? l.showText : l.showPdf, _togglePdf, active: _pdf),
-      if (wide && _canSplit) tool(Icons.vertical_split_outlined, l.splitView, _openSplit, active: _splitKind != null),
+      if (_canSplit) tool(Icons.vertical_split_outlined, l.splitView, _openSplit, active: _splitKind != null),
     ];
     final slider = count != null && count > 1
         ? SliderTheme(
