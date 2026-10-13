@@ -260,18 +260,30 @@ class OfflineFirstBackend implements ManabiBackend {
     return p;
   }
 
+  /// Book details asked for and not yet answered, so the book page and the
+  /// reader opening together share one request.
+  final _asking = <String, Future<BookDetails>>{};
+
   @override
-  Future<BookDetails> book(String id) async {
-    try {
-      final d = await inner.book(id);
-      DiscoveredBooks.noteBook(d);
-      unawaited(ReadCache.putBook(d));
-      return d;
-    } catch (e) {
-      // Offline: the saved copy of the book's index, or the one read last.
-      final kept = (await _d?.details(id).catchError((Object _) => null)) ?? await ReadCache.book(id);
-      if (kept != null) return kept;
-      rethrow;
+  Future<BookDetails> book(String id) => _asking[id] ??= _book(id).whenComplete(() => _asking.remove(id));
+
+  Future<BookDetails> _book(String id) async {
+    BookDetails? kept;
+    for (var attempt = 0;; attempt++) {
+      try {
+        final d = await inner.book(id);
+        DiscoveredBooks.noteBook(d);
+        unawaited(ReadCache.putBook(d));
+        return d;
+      } catch (e) {
+        // Offline or slow: the saved copy of the book's index, or the one
+        // read last; without either, a passing failure is tried again.
+        kept ??= (await _d?.details(id).catchError((Object _) => null)) ?? await ReadCache.book(id);
+        if (kept != null) return kept;
+        final code = e is BackendException ? e.code : '';
+        if (attempt >= 2 || code == 'NOT_FOUND' || code == 'INVALID_ARGUMENT') rethrow;
+        await Future<void>.delayed(Duration(milliseconds: 700 * (attempt + 1) * (attempt + 1)));
+      }
     }
   }
 

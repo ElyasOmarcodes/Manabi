@@ -548,5 +548,7 @@
   "splitPdf": "متن او د همدې پاڼې PDF",
   "splitSameBook": "همدا کتاب، بله پاڼه",
   "splitOtherBook": "بل کتاب ورسره پرتله کړه",
-  "splitClose": "دوه اړخیز لید بندول"
+  "splitClose": "دوه اړخیز لید بندول",
+  "bookCard": "د کتاب پېژندنه",
+  "readMore": "نور ولوله"
 }

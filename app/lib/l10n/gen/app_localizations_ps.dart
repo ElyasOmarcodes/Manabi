@@ -1630,4 +1630,10 @@ class AppLocalizationsPs extends AppLocalizations {
 
   @override
   String get splitClose => 'دوه اړخیز لید بندول';
+
+  @override
+  String get bookCard => 'د کتاب پېژندنه';
+
+  @override
+  String get readMore => 'نور ولوله';
 }

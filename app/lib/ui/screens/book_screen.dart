@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/backend/backend.dart';
 import '../../core/catalog/catalog_service.dart';
+import '../../core/models/book_info.dart';
 import '../../core/models/library.dart';
 import '../../core/models/scope.dart';
 import '../../state/nav_controller.dart';
@@ -127,11 +128,12 @@ class _BookScreenState extends State<BookScreen> {
                   )
                 else ...[
                   if (details!.description?.trim().isNotEmpty == true) ...[
+                    SectionLabel(l.bookCard),
+                    Reveal(delay: 60, child: _InfoCard(info: details.description!)),
+                  ],
+                  if (details.about != null) ...[
                     SectionLabel(l.description),
-                    Reveal(
-                      delay: 60,
-                      child: AuraCard(child: SelectableText(details.description!.trim(), textDirection: TextDirection.rtl, style: arabicStyle(context, size: 15.5).copyWith(height: 1.95))),
-                    ),
+                    Reveal(delay: 90, child: _AboutCard(text: plainText(details.about!))),
                   ],
                   SectionLabel(l.tableOfContents,
                       trailing: SoftButton(dense: true, icon: Icons.chrome_reader_mode_outlined, label: l.readPage, onTap: () => openReader(context, widget.bookId, details.toc.firstOrNull?.page ?? 1, title: details.title))),
@@ -178,6 +180,86 @@ class _BookScreenState extends State<BookScreen> {
           ]);
         },
       ),
+    );
+  }
+}
+
+/// The book card: publisher, editor, edition, volumes, each on its own row.
+class _InfoCard extends StatelessWidget {
+  const _InfoCard({required this.info});
+  final String info;
+
+  @override
+  Widget build(BuildContext context) {
+    final a = context.aura;
+    final (:fields, :notes) = splitBookInfo(info);
+    return AuraCard(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: SelectionArea(
+        child: Directionality(
+          textDirection: TextDirection.rtl,
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            for (final (i, (k, v)) in fields.indexed)
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                decoration: BoxDecoration(border: i == 0 ? null : Border(top: BorderSide(color: a.faint.withValues(alpha: 0.35)))),
+                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  SizedBox(
+                    width: 104,
+                    child: Text(k, style: arabicStyle(context, size: 13.5, weight: FontWeight.w700).copyWith(color: a.muted, height: 1.8)),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text(v, style: arabicStyle(context, size: 15.5).copyWith(height: 1.8))),
+                ]),
+              ),
+            for (final n in notes)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(n, style: arabicStyle(context, size: 14).copyWith(color: a.muted, height: 1.8)),
+              ),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
+/// Turath's longer write-up of the book, folded when it is long.
+class _AboutCard extends StatefulWidget {
+  const _AboutCard({required this.text});
+  final String text;
+  @override
+  State<_AboutCard> createState() => _AboutCardState();
+}
+
+class _AboutCardState extends State<_AboutCard> {
+  bool _open = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final long = widget.text.length > 700;
+    return AuraCard(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        AnimatedSize(
+          duration: const Duration(milliseconds: 220),
+          alignment: Alignment.topCenter,
+          child: SelectableText(
+            widget.text,
+            textDirection: TextDirection.rtl,
+            maxLines: long && !_open ? 9 : null,
+            style: arabicStyle(context, size: 15.5).copyWith(height: 1.95, overflow: TextOverflow.ellipsis),
+          ),
+        ),
+        if (long)
+          Align(
+            alignment: AlignmentDirectional.centerEnd,
+            child: TextButton.icon(
+              onPressed: () => setState(() => _open = !_open),
+              icon: Icon(_open ? Icons.expand_less_rounded : Icons.expand_more_rounded, size: 18),
+              label: Text(_open ? context.l.showLess : context.l.readMore),
+            ),
+          ),
+      ]),
     );
   }
 }

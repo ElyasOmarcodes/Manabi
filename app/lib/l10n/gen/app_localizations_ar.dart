@@ -1629,4 +1629,10 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get splitClose => 'إغلاق العرض المقسوم';
+
+  @override
+  String get bookCard => 'بطاقة الكتاب';
+
+  @override
+  String get readMore => 'اقرأ المزيد';
 }

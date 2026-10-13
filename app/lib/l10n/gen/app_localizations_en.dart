@@ -1637,4 +1637,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get splitClose => 'Close split view';
+
+  @override
+  String get bookCard => 'Book card';
+
+  @override
+  String get readMore => 'Read more';
 }

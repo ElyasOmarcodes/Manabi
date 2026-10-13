@@ -30,6 +30,7 @@ dependencies:
   flutter_foreground_task: ^11.0.3
   lottie: ^3.6.1
   pdfrx: ^2.6.5
+  pdfrx_engine: ^0.6.1
 
 dev_dependencies:
   flutter_test:

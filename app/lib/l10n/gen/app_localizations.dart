@@ -3065,6 +3065,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Close split view'**
   String get splitClose;
+
+  /// No description provided for @bookCard.
+  ///
+  /// In en, this message translates to:
+  /// **'Book card'**
+  String get bookCard;
+
+  /// No description provided for @readMore.
+  ///
+  /// In en, this message translates to:
+  /// **'Read more'**
+  String get readMore;
 }
 
 class _AppLocalizationsDelegate

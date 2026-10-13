@@ -779,5 +779,7 @@
   "splitPdf": "Text and this page's PDF",
   "splitSameBook": "This book, another page",
   "splitOtherBook": "Compare with another book",
-  "splitClose": "Close split view"
+  "splitClose": "Close split view",
+  "bookCard": "Book card",
+  "readMore": "Read more"
 }

@@ -213,6 +213,7 @@ class TurathClient implements PassageSearch {
       authorId: meta['author_id']?.toString(),
       categoryId: meta['cat_id']?.toString(),
       description: meta['info'] as String?,
+      about: meta['info_long'] is String && (meta['info_long'] as String).trim().isNotEmpty ? meta['info_long'] as String : null,
       toc: toc,
       volumes: volumes,
       hasPdf: meta['pdf_links'] != null && meta['pdf_links'] != false && meta['pdf_links'] != '',

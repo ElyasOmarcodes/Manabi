@@ -548,5 +548,7 @@
   "splitPdf": "النص وصورة الصفحة PDF",
   "splitSameBook": "الكتاب نفسه، صفحة أخرى",
   "splitOtherBook": "قارن بكتاب آخر",
-  "splitClose": "إغلاق العرض المقسوم"
+  "splitClose": "إغلاق العرض المقسوم",
+  "bookCard": "بطاقة الكتاب",
+  "readMore": "اقرأ المزيد"
 }

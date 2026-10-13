@@ -1632,4 +1632,10 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get splitClose => 'بستن نمای دوبخشی';
+
+  @override
+  String get bookCard => 'شناسنامهٔ کتاب';
+
+  @override
+  String get readMore => 'بیشتر بخوانید';
 }

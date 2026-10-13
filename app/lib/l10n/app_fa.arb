@@ -548,5 +548,7 @@
   "splitPdf": "متن و PDF همین صفحه",
   "splitSameBook": "همین کتاب، صفحه‌ای دیگر",
   "splitOtherBook": "مقایسه با کتابی دیگر",
-  "splitClose": "بستن نمای دوبخشی"
+  "splitClose": "بستن نمای دوبخشی",
+  "bookCard": "شناسنامهٔ کتاب",
+  "readMore": "بیشتر بخوانید"
 }

@@ -3,6 +3,7 @@ import 'package:pdfrx/pdfrx.dart';
 
 import '../theme.dart';
 import 'common.dart';
+import 'pdf_open_web.dart' if (dart.library.io) 'pdf_open_native.dart';
 
 /// Where the viewer reads a Turath PDF from. On the web a browser may not
 /// read Turath's range answers from another origin, so the Manabi server
@@ -78,10 +79,11 @@ class _PdfPaneState extends State<PdfPane> {
         // Only the parts of the volume the shown pages need are fetched (HTTP
         // byte ranges), not the whole file; on phones and computers they are
         // kept on disk, so a page seen once opens again without the network.
-        child: PdfViewer.uri(
-          Uri.parse(widget.url),
-          preferRangeAccess: true,
-          headers: widget.headers,
+        child: PdfViewer(
+          PdfDocumentRefByLoader(
+            (progress) => openPdfInRanges(Uri.parse(widget.url), headers: widget.headers, progress: progress),
+            key: PdfDocumentRefKey(widget.url),
+          ),
           controller: _controller,
           initialPageNumber: widget.page,
           params: PdfViewerParams(
@@ -89,6 +91,9 @@ class _PdfPaneState extends State<PdfPane> {
             margin: 10,
             // Mouse wheels and trackpads move about as fast as in the text.
             scrollByMouseWheel: 0.6,
+            // Only the pages on screen are measured and read. Measuring every
+            // page up front (the default) reads nearly the whole volume.
+            behaviorControlParams: const PdfViewerBehaviorControlParams(loadPageDimensionsOnDemand: true),
             onViewerReady: (doc, controller) {
               if (mounted) setState(() => _count = doc.pages.length);
             },

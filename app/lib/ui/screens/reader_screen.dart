@@ -185,17 +185,31 @@ class _ReaderScreenState extends State<ReaderScreen> {
     _reveal = widget.reveal ?? widget.highlight;
     _revealPage = _page;
     _markPage = widget.highlight == null ? null : _page;
-    _backend.book(widget.bookId).then((b) {
-      if (mounted) setState(() => _book = b);
-    }).catchError((Object _) {});
+    _loadBook();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _remember();
       if (widget.openSearch) _openSearch();
     });
   }
 
+  /// The book's index (page count, volumes, PDF). The page slider and the
+  /// volume labels need it, so a failure is tried again until it arrives.
+  void _loadBook([int attempt = 0]) {
+    _backend.book(widget.bookId).then((b) {
+      if (mounted) setState(() => _book = b);
+    }).catchError((Object _) {
+      if (!mounted || attempt >= 8) return;
+      _bookRetry = Timer(Duration(seconds: 3 + attempt * 4), () {
+        if (mounted && _book == null) _loadBook(attempt + 1);
+      });
+    });
+  }
+
+  Timer? _bookRetry;
+
   @override
   void dispose() {
+    _bookRetry?.cancel();
     _scrollTick?.cancel();
     _scroll.dispose();
     _pages.dispose();
@@ -858,7 +872,10 @@ class _ReaderScreenState extends State<ReaderScreen> {
               onChangeEnd: (v) => _jump(v.round()),
             ),
           )
-        : const SizedBox();
+        // The slider waits for the book's page count.
+        : _book == null
+            ? const Center(child: AuraProgress(width: 90, height: 3))
+            : const SizedBox();
     final label = Pressable(
       onTap: _openGoTo,
       child: Container(

@@ -198,6 +198,8 @@ export const createApp = ({ config, pipeline, turath: client, catalog, gemini, n
         pageMap: Array.isArray(indexes.page_map) ? indexes.page_map : undefined,
         volumeBounds: indexes.volume_bounds && typeof indexes.volume_bounds === "object" ? indexes.volume_bounds : undefined,
         pdf: pdfLinks(book.raw?.meta?.pdf_links),
+        // Turath's longer write-up ("عن الكتاب").
+        about: typeof book.raw?.meta?.info_long === "string" && book.raw.meta.info_long.trim() ? book.raw.meta.info_long : undefined,
       };
     }],
     ["GET", /^\/api\/authors\/([1-9]\d*)$/, async (m) => stripRaw(await turath.getAuthor(m[1]))],

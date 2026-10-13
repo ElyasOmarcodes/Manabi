@@ -84,6 +84,7 @@ class BookDetails {
     this.authorId,
     this.categoryId,
     this.description,
+    this.about,
     this.toc = const [],
     this.volumes = const [],
     this.hasPdf = false,
@@ -96,6 +97,9 @@ class BookDetails {
   final String? authorId;
   final String? categoryId;
   final String? description;
+
+  /// Turath's longer write-up of the book ("عن الكتاب"), when it has one.
+  final String? about;
   final List<TocEntry> toc;
   final List<String> volumes;
   final bool hasPdf;
@@ -177,6 +181,7 @@ class BookDetails {
         'author': {'id': ?authorId},
         'category': {'id': ?categoryId},
         'description': ?description,
+        'about': ?about,
         'toc': [for (final e in toc) {'title': e.title, 'level': e.level, 'page': ?e.page}],
         'volumes': volumes,
         'hasPdf': hasPdf,
@@ -193,6 +198,7 @@ class BookDetails {
         authorId: (j['author'] as Map?)?['id']?.toString(),
         categoryId: (j['category'] as Map?)?['id']?.toString(),
         description: j['description'] as String?,
+        about: (j['about'] as String?)?.trim().isEmpty == true ? null : j['about'] as String?,
         toc: (j['toc'] as List?)
                 ?.whereType<Map>()
                 .map((e) => TocEntry(title: '${e['title']}', level: (e['level'] as num?)?.toInt() ?? 1, page: (e['page'] as num?)?.toInt()))
