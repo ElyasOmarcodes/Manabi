@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show BrowserContextMenu;
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'core/catalog/catalog_service.dart';
 import 'core/storage/app_dirs.dart';
@@ -25,6 +26,7 @@ import 'state/settings_controller.dart';
 import 'ui/home_shell.dart';
 import 'ui/screens/setup_screen.dart';
 import 'state/memory_controller.dart';
+import 'ui/screens/onboarding_screen.dart';
 import 'ui/screens/splash_screen.dart';
 import 'ui/theme.dart';
 import 'ui/widgets/visual_arrow_keys.dart';
@@ -38,7 +40,7 @@ void main() {
 }
 
 class AppServices {
-  AppServices(this.catalog, this.settings, this.chats, {required this.sync, this.needsSetup = false, MemoryController? memory})
+  AppServices(this.catalog, this.settings, this.chats, {required this.sync, this.needsSetup = false, this.onboard = false, MemoryController? memory})
       : memory = memory ?? MemoryController.inMemory();
   final CatalogService catalog;
 
@@ -52,6 +54,9 @@ class AppServices {
 
   /// First launch: the library is built before the app opens.
   final bool needsSetup;
+
+  /// First launch: the welcome pages come before that.
+  final bool onboard;
 
   static Future<AppServices> load() async {
     final minSplash = Future<void>.delayed(const Duration(milliseconds: 3800));
@@ -67,6 +72,8 @@ class AppServices {
     await PdfFlags.open(() => settings.backend);
     final sync = CatalogSync(catalog, () => settings.backend, storagePath: storagePath);
     final needsSetup = await CatalogSync.needsSetup();
+    // The welcome pages come once, on a new install (before the library is built).
+    final onboard = needsSetup && !((await SharedPreferences.getInstance()).getBool('onboarded') ?? false);
     // Later launches refresh the shared lists (new books, PDFs) quietly.
     if (!needsSetup) unawaited(sync.startBackground());
     final memory = await MemoryController.load();
@@ -77,7 +84,7 @@ class AppServices {
         if (memory.enabled) memory.add(text);
       };
     await minSplash;
-    return AppServices(catalog, settings, chats, sync: sync, needsSetup: needsSetup, memory: memory);
+    return AppServices(catalog, settings, chats, sync: sync, needsSetup: needsSetup, memory: memory, onboard: onboard);
   }
 }
 
@@ -127,21 +134,23 @@ class _ManabiAppState extends State<ManabiApp> {
               ChangeNotifierProvider.value(value: services.sync),
               ChangeNotifierProvider.value(value: services.memory),
             ],
-            child: _App(needsSetup: services.needsSetup),
+            child: _App(needsSetup: services.needsSetup, onboard: services.onboard),
           );
         },
       );
 }
 
 class _App extends StatefulWidget {
-  const _App({this.needsSetup = false});
+  const _App({this.needsSetup = false, this.onboard = false});
   final bool needsSetup;
+  final bool onboard;
   @override
   State<_App> createState() => _AppState();
 }
 
 class _AppState extends State<_App> {
   late bool _setup = widget.needsSetup;
+  late bool _onboard = widget.onboard;
 
   @override
   Widget build(BuildContext context) {
@@ -172,7 +181,12 @@ class _AppState extends State<_App> {
         final phone = mq.size.shortestSide < 600;
         return MediaQuery(data: mq.copyWith(textScaler: TextScaler.linear(base * (phone ? 0.9 : 1.0) * settings.textScale)), child: VisualArrowKeys(child: child!));
       },
-      home: _setup
+      home: _onboard
+          ? OnboardingScreen(onDone: () {
+              SharedPreferences.getInstance().then((p) => p.setBool('onboarded', true));
+              setState(() => _onboard = false);
+            })
+          : _setup
           ? SetupScreen(
               sync: context.read<CatalogSync>(),
               onDone: () {

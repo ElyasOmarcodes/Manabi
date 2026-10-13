@@ -1148,7 +1148,7 @@ class MemorySettingsPage extends StatelessWidget {
     return _SettingsPage(
       title: l.memory,
       children: [
-        SettingsGroup(children: [_switchRow(Icons.psychology_alt_outlined, AuraHues.violet, l.memoryOn, m.enabled, m.setEnabled, subtitle: l.memoryOnSub)]),
+        SettingsGroup(children: [_switchRow(Icons.psychology_outlined, AuraHues.violet, l.memoryOn, m.enabled, m.setEnabled, subtitle: l.memoryOnSub)]),
         SettingsGroup(
           children: [
             if (m.items.isEmpty)

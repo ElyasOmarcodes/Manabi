@@ -1677,4 +1677,63 @@ class AppLocalizationsPs extends AppLocalizations {
 
   @override
   String get memorySaved => 'حافظه تازه شوه';
+
+  @override
+  String get onbSkip => 'پرېږده';
+
+  @override
+  String get onbNext => 'بل';
+
+  @override
+  String get onbStart => 'پیل';
+
+  @override
+  String get onbAllow => 'خبرتیاوو ته اجازه';
+
+  @override
+  String get onbNotNow => 'اوس نه';
+
+  @override
+  String get onbLanguageTitle => 'خپله ژبه وټاکه';
+
+  @override
+  String get onbLanguageSub => 'وروسته یې په تنظیماتو کې بدلولی شې.';
+
+  @override
+  String get onbIntroTitle => 'منابع ته ښه راغلې';
+
+  @override
+  String get onbIntroSub =>
+      'د کلاسیکو کتابونو له مخې ځوابونه، د هر اقتباس له دقیقې پاڼې سره.';
+
+  @override
+  String get onbFeatureAnswers => 'داسې ځوابونه چې ازمویل یې شې';
+
+  @override
+  String get onbFeatureAnswersSub =>
+      'هر اقتباس کلمه په کلمه د تراث له اصلي پاڼې سره پرتله کېږي.';
+
+  @override
+  String get onbFeatureLibrary => 'یو بشپړ کتابتون';
+
+  @override
+  String get onbFeatureLibrarySub =>
+      'زرګونه کتابونه ولوله، پکې ولټوه او پرتله یې کړه، د چاپي PDF سره.';
+
+  @override
+  String get onbFeatureMemory => 'زده کوي چې ځوابونه څنګه خوښوې';
+
+  @override
+  String get onbFeatureMemorySub =>
+      'یو ځل یې ورته ووایه (لنډ، مفصل، یو مذهب) او په یاد یې ساتي. په تنظیماتو کې یې لیدلی او کنټرولولی شې.';
+
+  @override
+  String get onbPermissionTitle => 'ځوابونه دې روان پاتې شي';
+
+  @override
+  String get onbPermissionSub =>
+      'یو دقیق ځواب ښايي یوه دقیقه ونیسي. که خبرتیاوې فعالې وي، منابع د اپ له وتلو وروسته هم کار کوي او تر ځواب پورې یوه کوچنۍ خبرتیا ښيي.';
+
+  @override
+  String get onbPermissionNote => 'یوازې همدا خبرتیا، نه اعلانونه او نه بل څه.';
 }

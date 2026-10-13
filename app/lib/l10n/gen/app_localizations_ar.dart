@@ -1674,4 +1674,63 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get memorySaved => 'حُدّثت الذاكرة';
+
+  @override
+  String get onbSkip => 'تخطٍّ';
+
+  @override
+  String get onbNext => 'التالي';
+
+  @override
+  String get onbStart => 'ابدأ';
+
+  @override
+  String get onbAllow => 'السماح بالإشعارات';
+
+  @override
+  String get onbNotNow => 'ليس الآن';
+
+  @override
+  String get onbLanguageTitle => 'اختر لغتك';
+
+  @override
+  String get onbLanguageSub => 'يمكنك تغييرها لاحقًا من الإعدادات.';
+
+  @override
+  String get onbIntroTitle => 'مرحبًا بك في منابع';
+
+  @override
+  String get onbIntroSub =>
+      'أجوبة من الكتب التراثية، مع الصفحة الدقيقة لكل نقل.';
+
+  @override
+  String get onbFeatureAnswers => 'أجوبة يمكنك التحقّق منها';
+
+  @override
+  String get onbFeatureAnswersSub =>
+      'يُطابَق كل نقل كلمةً كلمة مع صفحته في تراث.';
+
+  @override
+  String get onbFeatureLibrary => 'مكتبة كاملة';
+
+  @override
+  String get onbFeatureLibrarySub =>
+      'اقرأ آلاف الكتب وابحث فيها وقارن بينها، مع نسختها المصوّرة.';
+
+  @override
+  String get onbFeatureMemory => 'يتعلّم كيف تحبّ الأجوبة';
+
+  @override
+  String get onbFeatureMemorySub =>
+      'أخبره مرة (مختصر، مفصّل، مذهب معيّن) فيتذكّر. تراه وتتحكّم فيه من الإعدادات.';
+
+  @override
+  String get onbPermissionTitle => 'لتستمرّ الأجوبة';
+
+  @override
+  String get onbPermissionSub =>
+      'قد يستغرق الجواب المتقن دقيقة. مع تفعيل الإشعارات يواصل منابع العمل إذا غادرت التطبيق، ويُظهر تنبيهًا صغيرًا حتى يجهز الجواب.';
+
+  @override
+  String get onbPermissionNote => 'هذا التنبيه وحده، بلا إعلانات ولا غيرها.';
 }

@@ -1683,4 +1683,63 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get memorySaved => 'Memory updated';
+
+  @override
+  String get onbSkip => 'Skip';
+
+  @override
+  String get onbNext => 'Next';
+
+  @override
+  String get onbStart => 'Start';
+
+  @override
+  String get onbAllow => 'Allow notifications';
+
+  @override
+  String get onbNotNow => 'Not now';
+
+  @override
+  String get onbLanguageTitle => 'Choose your language';
+
+  @override
+  String get onbLanguageSub => 'You can change it later in Settings.';
+
+  @override
+  String get onbIntroTitle => 'Welcome to Manabi';
+
+  @override
+  String get onbIntroSub =>
+      'Answers from the classical books, with the exact page of every quotation.';
+
+  @override
+  String get onbFeatureAnswers => 'Answers you can check';
+
+  @override
+  String get onbFeatureAnswersSub =>
+      'Every quotation is checked word by word against its page in Turath.';
+
+  @override
+  String get onbFeatureLibrary => 'A whole library';
+
+  @override
+  String get onbFeatureLibrarySub =>
+      'Read, search and compare thousands of books, with their printed PDF.';
+
+  @override
+  String get onbFeatureMemory => 'Learns how you like answers';
+
+  @override
+  String get onbFeatureMemorySub =>
+      'Tell it once — short, detailed, a school of law — and it remembers. You see and control it in Settings.';
+
+  @override
+  String get onbPermissionTitle => 'Keep answers going';
+
+  @override
+  String get onbPermissionSub =>
+      'A careful answer can take a minute. With notifications on, Manabi keeps working when you leave the app and shows a small note until the answer is ready.';
+
+  @override
+  String get onbPermissionNote => 'Only that note — no ads, nothing else.';
 }

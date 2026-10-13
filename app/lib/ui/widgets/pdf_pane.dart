@@ -113,6 +113,10 @@ class _PdfPaneState extends State<PdfPane> {
               // Only the pages on screen are measured and read. Measuring every
               // page up front (the default) reads nearly the whole volume.
               behaviorControlParams: const PdfViewerBehaviorControlParams(loadPageDimensionsOnDemand: true),
+            // Under each page, until its scan is drawn over it: the shape of a
+            // page of text and its number, so a page still coming never looks
+            // like an empty one.
+            pageBackgroundPaintCallbacks: [_paintLoadingPage],
               onViewerReady: (doc, controller) {
                 if (mounted) setState(() => _count = doc.pages.length);
               },
@@ -262,6 +266,27 @@ class _PdfPaneState extends State<PdfPane> {
         ),
       ],
     );
+  }
+
+  void _paintLoadingPage(Canvas canvas, Rect r, PdfPage page) {
+    final line = Paint()..color = widget.muted.withValues(alpha: 0.13);
+    final w = r.width;
+    final h = r.height;
+    final gap = h * 0.045;
+    final thick = (h * 0.012).clamp(3.0, 14.0);
+    final radius = Radius.circular(thick / 2);
+    for (var i = 0; i < 16; i++) {
+      final y = r.top + h * 0.12 + i * gap;
+      if (y > r.bottom - h * 0.1) break;
+      // Lines of a right-to-left page: flush right, the last of a paragraph shorter.
+      final len = w * (i % 5 == 4 ? 0.45 : 0.8);
+      canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(r.right - w * 0.1 - len, y, len, thick), radius), line);
+    }
+    final tp = TextPainter(
+      text: TextSpan(text: widget.digits(page.pageNumber), style: TextStyle(fontFamily: uiFont, fontSize: (w * 0.07).clamp(12.0, 40.0), color: widget.muted.withValues(alpha: 0.5), fontWeight: FontWeight.w700)),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    tp.paint(canvas, Offset(r.center.dx - tp.width / 2, r.bottom - h * 0.07 - tp.height / 2));
   }
 
   static String _size(int bytes) {

@@ -15,13 +15,17 @@ import 'package:http/http.dart' as http;
 /// failure as 0 (pdfium takes any other number as data, and would draw the
 /// page from a block of zeroes).
 class PdfRangeFile {
-  PdfRangeFile._(this.uri, this.headers, this._data, this._metaFile, this._client, this.blockSize, this.attemptTimeout, this.attempts);
+  PdfRangeFile._(this.uri, this.headers, this._data, this._metaFile, this._client, this.blockSize, this.attemptTimeout, this.attempts, this.readAhead);
 
   final Uri uri;
   final Map<String, String>? headers;
   final int blockSize;
   final Duration attemptTimeout;
   final int attempts;
+
+  /// Blocks fetched past a page's image while nothing waits: scans keep
+  /// their pages in order, so the next page is often on disk already.
+  final int readAhead;
   final File _metaFile;
   final http.Client Function() _client;
   final RandomAccessFile _data;
@@ -32,6 +36,8 @@ class PdfRangeFile {
   String? _etag;
   Uint8List _have = Uint8List(0);
   int _users = 0;
+  int _waiting = 0;
+  bool _closed = false;
 
   /// Reads that could not be served; the viewer offers to load again.
   final failures = ValueNotifier(0);
@@ -52,10 +58,11 @@ class PdfRangeFile {
     int blockSize = 128 * 1024,
     Duration attemptTimeout = const Duration(seconds: 20),
     int attempts = 3,
+    int readAhead = 3,
     http.Client Function()? client,
   }) async {
     final key = uri.toString();
-    final pending = _open[key] ??= _create(uri, dir, headers, blockSize, attemptTimeout, attempts, client ?? http.Client.new);
+    final pending = _open[key] ??= _create(uri, dir, headers, blockSize, attemptTimeout, attempts, readAhead, client ?? http.Client.new);
     try {
       final file = await pending;
       file._users++;
@@ -73,12 +80,13 @@ class PdfRangeFile {
     int blockSize,
     Duration attemptTimeout,
     int attempts,
+    int readAhead,
     http.Client Function() client,
   ) async {
     await dir.create(recursive: true);
     final name = sha1.convert(utf8.encode(uri.toString())).toString();
     final data = await File('${dir.path}/$name.pdf').open(mode: FileMode.append);
-    final file = PdfRangeFile._(uri, headers, data, File('${dir.path}/$name.json'), client, blockSize, attemptTimeout, attempts);
+    final file = PdfRangeFile._(uri, headers, data, File('${dir.path}/$name.json'), client, blockSize, attemptTimeout, attempts, readAhead);
     try {
       await file._start();
     } catch (_) {
@@ -91,6 +99,7 @@ class PdfRangeFile {
   /// Gives the file back; the last user closes it.
   Future<void> release() async {
     if (--_users > 0) return;
+    _closed = true;
     _open.remove(uri.toString());
     await _locked(() async {
       _http?.close();
@@ -145,33 +154,64 @@ class PdfRangeFile {
 
   /// Copies [length] bytes at [position] into [buffer]; returns [length], or 0
   /// when they could not be had.
-  Future<int> read(Uint8List buffer, int position, int length) => _locked(() async {
-    try {
-      if (length <= 0 || position < 0 || position + length > size) return 0;
-      final last = (position + length - 1) ~/ blockSize;
-      for (var b = position ~/ blockSize; b <= last; b++) {
-        if (_isHeld(b)) continue;
-        // A run of missing blocks in one request. No reading ahead: pdfium
-        // asks for a page's whole image at once, and most of its other reads
-        // are small and far apart.
-        var n = 1;
-        while (b + n <= last && !_isHeld(b + n)) {
+  Future<int> read(Uint8List buffer, int position, int length) {
+    _waiting++;
+    return _locked(() async {
+      _waiting--;
+      try {
+        if (length <= 0 || position < 0 || position + length > size) return 0;
+        final last = (position + length - 1) ~/ blockSize;
+        for (var b = position ~/ blockSize; b <= last; b++) {
+          if (_isHeld(b)) continue;
+          // A run of missing blocks in one request. No reading ahead: pdfium
+          // asks for a page's whole image at once, and most of its other reads
+          // are small and far apart.
+          var n = 1;
+          while (b + n <= last && !_isHeld(b + n)) {
+            n++;
+          }
+          await _fetch(b, n);
+          b += n - 1;
+        }
+        for (var b = position ~/ blockSize; b <= last; b++) {
+          if (!_isHeld(b)) throw StateError('block $b missing');
+        }
+        await _data.setPosition(position);
+        if (await _data.readInto(buffer, 0, length) != length) throw StateError('short read');
+        // A page's image was just read: the next page usually follows it.
+        if (length >= blockSize ~/ 2) _readAheadFrom(last + 1);
+        return length;
+      } catch (_) {
+        failures.value++;
+        return 0;
+      }
+    });
+  }
+
+  // One try only, and never while a read waits: pdfium's own reads come first.
+  void _readAheadFrom(int block) {
+    if (readAhead <= 0) return;
+    unawaited(
+      _locked(() async {
+        if (_waiting > 0 || _closed) return;
+        var b = block;
+        while (b < _blocks && b < block + readAhead && _isHeld(b)) {
+          b++;
+        }
+        var n = 0;
+        while (b + n < _blocks && b + n < block + readAhead && !_isHeld(b + n)) {
           n++;
         }
-        await _fetch(b, n);
-        b += n - 1;
-      }
-      for (var b = position ~/ blockSize; b <= last; b++) {
-        if (!_isHeld(b)) throw StateError('block $b missing');
-      }
-      await _data.setPosition(position);
-      if (await _data.readInto(buffer, 0, length) != length) throw StateError('short read');
-      return length;
-    } catch (_) {
-      failures.value++;
-      return 0;
-    }
-  });
+        if (n == 0) return;
+        try {
+          await _fetchOnce(b, n, start: false).timeout(attemptTimeout);
+        } catch (_) {
+          _http?.close();
+          _http = null;
+        }
+      }),
+    );
+  }
 
   // Blocks [block, block + count) from the network, tried [attempts] times,
   // each try (the answer and every byte of it) within [attemptTimeout].

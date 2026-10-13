@@ -1677,4 +1677,63 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get memorySaved => 'حافظه به‌روز شد';
+
+  @override
+  String get onbSkip => 'رد شدن';
+
+  @override
+  String get onbNext => 'بعدی';
+
+  @override
+  String get onbStart => 'شروع';
+
+  @override
+  String get onbAllow => 'اجازهٔ اعلان‌ها';
+
+  @override
+  String get onbNotNow => 'اکنون نه';
+
+  @override
+  String get onbLanguageTitle => 'زبان خود را برگزینید';
+
+  @override
+  String get onbLanguageSub => 'بعداً می‌توانید آن را در تنظیمات تغییر دهید.';
+
+  @override
+  String get onbIntroTitle => 'به منابع خوش آمدید';
+
+  @override
+  String get onbIntroSub =>
+      'پاسخ‌هایی از کتاب‌های کهن، با صفحهٔ دقیق هر نقل‌قول.';
+
+  @override
+  String get onbFeatureAnswers => 'پاسخ‌هایی که می‌توانید بررسی کنید';
+
+  @override
+  String get onbFeatureAnswersSub =>
+      'هر نقل‌قول کلمه به کلمه با صفحهٔ آن در تراث سنجیده می‌شود.';
+
+  @override
+  String get onbFeatureLibrary => 'یک کتابخانهٔ کامل';
+
+  @override
+  String get onbFeatureLibrarySub =>
+      'هزاران کتاب را بخوانید، جست‌وجو و مقایسه کنید، همراه PDF چاپی.';
+
+  @override
+  String get onbFeatureMemory => 'یاد می‌گیرد پاسخ‌ها را چگونه دوست دارید';
+
+  @override
+  String get onbFeatureMemorySub =>
+      'یک بار بگویید (کوتاه، مفصل، یک مذهب) و به یاد می‌سپارد. در تنظیمات آن را می‌بینید و کنترل می‌کنید.';
+
+  @override
+  String get onbPermissionTitle => 'تا پاسخ‌ها ادامه یابند';
+
+  @override
+  String get onbPermissionSub =>
+      'یک پاسخ دقیق ممکن است یک دقیقه طول بکشد. با روشن بودن اعلان‌ها، منابع پس از خروج از برنامه هم کار می‌کند و تا آماده شدن پاسخ یک اعلان کوچک نشان می‌دهد.';
+
+  @override
+  String get onbPermissionNote => 'فقط همین اعلان، نه تبلیغ و نه چیز دیگر.';
 }

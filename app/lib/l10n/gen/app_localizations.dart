@@ -3149,6 +3149,114 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Memory updated'**
   String get memorySaved;
+
+  /// No description provided for @onbSkip.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip'**
+  String get onbSkip;
+
+  /// No description provided for @onbNext.
+  ///
+  /// In en, this message translates to:
+  /// **'Next'**
+  String get onbNext;
+
+  /// No description provided for @onbStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Start'**
+  String get onbStart;
+
+  /// No description provided for @onbAllow.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow notifications'**
+  String get onbAllow;
+
+  /// No description provided for @onbNotNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Not now'**
+  String get onbNotNow;
+
+  /// No description provided for @onbLanguageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose your language'**
+  String get onbLanguageTitle;
+
+  /// No description provided for @onbLanguageSub.
+  ///
+  /// In en, this message translates to:
+  /// **'You can change it later in Settings.'**
+  String get onbLanguageSub;
+
+  /// No description provided for @onbIntroTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Welcome to Manabi'**
+  String get onbIntroTitle;
+
+  /// No description provided for @onbIntroSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Answers from the classical books, with the exact page of every quotation.'**
+  String get onbIntroSub;
+
+  /// No description provided for @onbFeatureAnswers.
+  ///
+  /// In en, this message translates to:
+  /// **'Answers you can check'**
+  String get onbFeatureAnswers;
+
+  /// No description provided for @onbFeatureAnswersSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Every quotation is checked word by word against its page in Turath.'**
+  String get onbFeatureAnswersSub;
+
+  /// No description provided for @onbFeatureLibrary.
+  ///
+  /// In en, this message translates to:
+  /// **'A whole library'**
+  String get onbFeatureLibrary;
+
+  /// No description provided for @onbFeatureLibrarySub.
+  ///
+  /// In en, this message translates to:
+  /// **'Read, search and compare thousands of books, with their printed PDF.'**
+  String get onbFeatureLibrarySub;
+
+  /// No description provided for @onbFeatureMemory.
+  ///
+  /// In en, this message translates to:
+  /// **'Learns how you like answers'**
+  String get onbFeatureMemory;
+
+  /// No description provided for @onbFeatureMemorySub.
+  ///
+  /// In en, this message translates to:
+  /// **'Tell it once — short, detailed, a school of law — and it remembers. You see and control it in Settings.'**
+  String get onbFeatureMemorySub;
+
+  /// No description provided for @onbPermissionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep answers going'**
+  String get onbPermissionTitle;
+
+  /// No description provided for @onbPermissionSub.
+  ///
+  /// In en, this message translates to:
+  /// **'A careful answer can take a minute. With notifications on, Manabi keeps working when you leave the app and shows a small note until the answer is ready.'**
+  String get onbPermissionSub;
+
+  /// No description provided for @onbPermissionNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Only that note — no ads, nothing else.'**
+  String get onbPermissionNote;
 }
 
 class _AppLocalizationsDelegate

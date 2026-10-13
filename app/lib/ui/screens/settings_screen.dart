@@ -103,7 +103,7 @@ class SettingsScreen extends StatelessWidget {
               Builder(builder: (context) {
                 final m = context.watch<MemoryController>();
                 return SettingsRow(
-                  icon: Icons.psychology_alt_outlined,
+                  icon: Icons.psychology_outlined,
                   color: AuraHues.violet,
                   title: l.memory,
                   subtitle: l.memorySub,

@@ -74,8 +74,8 @@ void main() {
     await dir.delete(recursive: true);
   });
 
-  Future<PdfRangeFile> open({Duration timeout = const Duration(seconds: 2), Uri? uri}) =>
-      PdfRangeFile.open(uri ?? server.uri, dir: dir, blockSize: block, attemptTimeout: timeout);
+  Future<PdfRangeFile> open({Duration timeout = const Duration(seconds: 2), Uri? uri, int readAhead = 0}) =>
+      PdfRangeFile.open(uri ?? server.uri, dir: dir, blockSize: block, attemptTimeout: timeout, readAhead: readAhead);
 
   test('reads the asked bytes, fetching only the blocks around them', () async {
     final f = await open();
@@ -170,6 +170,19 @@ void main() {
     expect(await b.read(buf, 6 * block, 50), 50);
     expect(buf, server.body.sublist(6 * block, 6 * block + 50));
     await b.release();
+  });
+
+  test('after a page-sized read, the next blocks are fetched while nothing waits', () async {
+    final f = await open(readAhead: 2);
+    final buf = Uint8List(block);
+    expect(await f.read(buf, 2 * block, block), block);
+    await Future<void>.delayed(const Duration(milliseconds: 200));
+    expect(server.ranges, ['bytes=0-1023', 'bytes=2048-3071', 'bytes=3072-5119']);
+    // The read-ahead blocks are served from disk.
+    expect(await f.read(buf, 3 * block, block), block);
+    expect(buf, server.body.sublist(3 * block, 4 * block));
+    expect(server.ranges.where((r) => r.startsWith('bytes=3072')).length, 1);
+    await f.release();
   });
 
   test('reads past the end, or of nothing, say 0', () async {
