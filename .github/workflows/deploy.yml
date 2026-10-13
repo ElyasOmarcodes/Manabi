@@ -1,0 +1,54 @@
+name: Deploy web to Cloudflare Pages
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-cloudflare
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # Same Flutter and build settings as build.yml.
+  FLUTTER_VERSION: "3.47.7"
+  SERVER_URL: ${{ vars.MANABI_SERVER_URL }}
+  REPORT_DEFINES: --dart-define=MANABI_REPORT_WHATSAPP=${{ vars.MANABI_REPORT_WHATSAPP }} --dart-define=MANABI_REPORT_EMAIL=${{ vars.MANABI_REPORT_EMAIL }}
+  PROJECT_NAME: manabi-ai
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter build web --release --no-web-resources-cdn --no-wasm-dry-run --base-href "/" --dart-define=MANABI_SERVER_URL=${{ env.SERVER_URL }} ${{ env.REPORT_DEFINES }}
+      - name: Check the SPA routing file is in the build
+        run: |
+          test -f build/web/_redirects || { echo "::error::build/web/_redirects is missing"; exit 1; }
+          cat build/web/_redirects
+      - name: Create the Pages project if it does not exist yet
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages project create ${{ env.PROJECT_NAME }} --production-branch=main
+        continue-on-error: true
+      - name: Deploy
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: app
+          command: pages deploy build/web --project-name=${{ env.PROJECT_NAME }} --branch=main
