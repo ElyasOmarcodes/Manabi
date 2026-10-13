@@ -11,28 +11,42 @@ const catalog = JSON.parse(fs.readFileSync(new URL("app/assets/catalog/catalog.j
 const ids = [...new Set(catalog.books.map((b) => Number(b[0])))].filter((n) => n > 0).sort((a, b) => a - b);
 const outputs = [new URL("app/assets/catalog/pdf_flags.json", root), new URL("server/src/data/pdf-flags.json", root)];
 
-const WORKERS = 6;
-const PAUSE_MS = 100;
+const WORKERS = 4;
+const PAUSE_MS = 250;
 // Stop in time for the workflow to commit what was learned; the next run
 // goes on from there.
 const BUDGET_MS = Number(process.env.CRAWL_MINUTES ?? 70) * 60_000;
 const FULL = process.argv.includes("--full");
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// Turath turns away bursts for a while (429s, timeouts). Then every worker
+// waits together, longer each time, and the book is asked again later.
+let coolUntil = 0;
+let cooldown = 20_000;
+const backOff = (retryAfter) => {
+  const wait = Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : cooldown;
+  coolUntil = Math.max(coolUntil, Date.now() + wait);
+  cooldown = Math.min(cooldown * 2, 300_000);
+};
+
+/** true / false, or "retry" when Turath did not answer this time. */
 const one = async (id) => {
-  for (let attempt = 0; attempt < 3; attempt++) {
-    try {
-      const res = await fetch(`https://api.turath.io/book?id=${id}&ver=3`, { signal: AbortSignal.timeout(20_000), headers: { "user-agent": "Manabi (PDF list, monthly)" } });
-      if (res.status === 404) return undefined;
-      if (res.status === 429 || res.status >= 500) throw new Error(`HTTP ${res.status}`);
-      const j = await res.json();
-      const files = j?.meta?.pdf_links?.files;
-      return Array.isArray(files) && files.some((f) => typeof f === "string" && f.trim());
-    } catch {
-      await sleep(2000 * (attempt + 1));
+  try {
+    const res = await fetch(`https://api.turath.io/book?id=${id}&ver=3`, { signal: AbortSignal.timeout(20_000), headers: { "user-agent": "Manabi (PDF list, monthly)" } });
+    // A book Turath no longer has has no PDF either.
+    if (res.status === 404) return false;
+    if (res.status === 429 || res.status >= 500) {
+      backOff(Number(res.headers.get("retry-after")));
+      return "retry";
     }
+    const j = await res.json();
+    cooldown = Math.max(20_000, cooldown / 2);
+    const files = j?.meta?.pdf_links?.files;
+    return Array.isArray(files) && files.some((f) => typeof f === "string" && f.trim());
+  } catch {
+    backOff();
+    return "retry";
   }
-  return undefined;
 };
 
 // What earlier runs learned (a monthly --full run asks again about all).
@@ -62,23 +76,41 @@ const save = () => {
 };
 
 const started = Date.now();
-let next = 0;
+const queue = [...todo];
+const tries = new Map();
 let done = 0;
 let failed = 0;
+let waited = 0;
+const timeLeft = () => Date.now() - started < BUDGET_MS;
 await Promise.all(
   Array.from({ length: WORKERS }, async () => {
-    while (next < todo.length && Date.now() - started < BUDGET_MS) {
-      const id = todo[next++];
+    while (queue.length && timeLeft()) {
+      if (Date.now() < coolUntil) {
+        const ms = coolUntil - Date.now();
+        waited += ms;
+        await sleep(ms);
+        continue;
+      }
+      const id = queue.shift();
       const v = await one(id);
-      if (v === undefined) failed++;
-      else known.set(id, v);
-      if (++done % 250 === 0) {
-        const c = save();
-        console.log(`${done}/${todo.length} asked · ${c.yes} with a PDF · ${failed} failed · ${Math.round((Date.now() - started) / 1000)}s`);
+      if (v === "retry") {
+        const n = (tries.get(id) ?? 0) + 1;
+        tries.set(id, n);
+        if (n < 6) queue.push(id);
+        else failed++;
+      } else {
+        known.set(id, v);
+        if (++done % 250 === 0) {
+          const c = save();
+          console.log(`${done}/${todo.length} known · ${c.yes} with a PDF · ${queue.length} waiting · ${Math.round(waited / 1000)}s cooling · ${Math.round((Date.now() - started) / 1000)}s`);
+        }
       }
       await sleep(PAUSE_MS);
     }
   }),
 );
 const c = save();
-console.log(`saved: ${c.yes} with a PDF, ${c.no} without, ${ids.length - c.yes - c.no} still unknown (${done} asked this run, ${failed} failed)`);
+const unknown = ids.length - c.yes - c.no;
+console.log(`saved: ${c.yes} with a PDF, ${c.no} without, ${unknown} still unknown (${done} learned this run, ${failed} given up)`);
+// For the workflow: go on in another run while something is learned.
+if (process.env.GITHUB_OUTPUT) fs.appendFileSync(process.env.GITHUB_OUTPUT, `unknown=${unknown}\nlearned=${done}\n`);

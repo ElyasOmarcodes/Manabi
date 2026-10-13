@@ -14,6 +14,8 @@ on:
 
 permissions:
   contents: write
+  # To start the next run while books are still unknown.
+  actions: write
 
 concurrency:
   group: pdf-flags-${{ github.ref }}
@@ -28,6 +30,7 @@ jobs:
         with:
           node-version: "22"
       - name: Ask Turath which books have a PDF
+        id: crawl
         # Saves as it goes and stops after 70 minutes; the next run goes on.
         run: node tool/pdf-flags/crawl.mjs ${{ (github.event_name == 'schedule' || github.event.inputs.full == 'true') && '--full' || '' }}
       - name: Commit the list when it changed
@@ -42,3 +45,9 @@ jobs:
           git commit -m "Update the bundled PDF list"
           git pull --rebase origin "${GITHUB_REF_NAME}"
           git push origin "HEAD:${GITHUB_REF_NAME}"
+      - name: Go on in another run while books are still unknown
+        # Only when this run learned something, so a Turath outage does not loop.
+        if: always() && steps.crawl.outputs.unknown != '0' && steps.crawl.outputs.learned != '0' && steps.crawl.outputs.learned != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run pdf-flags.yml --ref "${GITHUB_REF_NAME}" -f full=false
