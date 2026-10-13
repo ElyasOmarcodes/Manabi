@@ -249,17 +249,33 @@ await run("live-4-reader", async () => {
   await tap(page, "مخ لوستل");
   await page.waitForTimeout(3000);
   await shot(page, "live-4-reader");
-  await tap(page, "په کتاب کې لټون");
-  await page.waitForTimeout(800);
-  await page.keyboard.type("النيات");
-  await page.keyboard.press("Control+Enter");
+  // The book page: its card (publisher, editor …) and its long write-up.
+  await tap(page, "الأربعون النووية");
   await page.waitForTimeout(2500);
-  await shot(page, "live-4-reader-search");
-  await page.keyboard.press("Escape");
-  await page.waitForTimeout(600);
-  await tap(page, "فهرست", { exact: true });
+  await shot(page, "live-4-book");
+  await page.mouse.move(phone.width / 2, phone.height / 2);
+  await page.mouse.wheel(0, phone.height * 0.6);
   await page.waitForTimeout(900);
-  await shot(page, "live-4-reader-toc");
+  await shot(page, "live-4-book-2");
+  await page.goBack().catch(() => undefined);
+  await tap(page, "شاته").catch(() => page.keyboard.press("Escape"));
+  await page.waitForTimeout(1200);
+  // In-book search and contents (on a phone the tools sit on the bar's other page).
+  try {
+    await tap(page, "په کتاب کې لټون");
+    await page.waitForTimeout(800);
+    await page.keyboard.type("النيات");
+    await page.keyboard.press("Control+Enter");
+    await page.waitForTimeout(2500);
+    await shot(page, "live-4-reader-search");
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(600);
+    await tap(page, "فهرست", { exact: true });
+    await page.waitForTimeout(900);
+    await shot(page, "live-4-reader-toc");
+  } catch (e) {
+    console.log("live-4 tools skipped:", e.message.split("\n")[0]);
+  }
   await ctx.close();
 });
 

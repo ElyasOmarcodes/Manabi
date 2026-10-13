@@ -265,7 +265,10 @@ class OfflineFirstBackend implements ManabiBackend {
   final _asking = <String, Future<BookDetails>>{};
 
   @override
-  Future<BookDetails> book(String id) => _asking[id] ??= _book(id).whenComplete(() => _asking.remove(id));
+  Future<BookDetails> book(String id) => _asking[id] ??= _book(id).whenComplete(() {
+        // A block body: returning the removed future would make it wait for itself.
+        _asking.remove(id);
+      });
 
   Future<BookDetails> _book(String id) async {
     BookDetails? kept;
