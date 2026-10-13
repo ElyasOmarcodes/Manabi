@@ -15,7 +15,8 @@ if (!key) {
 }
 const API = "https://generativelanguage.googleapis.com/v1beta";
 const question = process.env.DIAG_QUESTION || "د حنفي فقهې او فتاوی له نظره میت یعني مړي ته د غسل پر وخت د اوبو په وسیله استنجاء څه حکم لري، او د لوټې(مَدَر) پر وسیله څه حکم لري؟";
-const scope = { categoryId: process.env.DIAG_CATEGORY || "14" };
+// The default question is a Hanafi one; a question given by hand searches everything.
+const scope = process.env.DIAG_CATEGORY ? { categoryId: process.env.DIAG_CATEGORY } : process.env.DIAG_QUESTION ? {} : { categoryId: "14" };
 const depth = process.env.DIAG_DEPTH || "quick";
 
 const t0 = Date.now();
@@ -61,6 +62,7 @@ const pipeline = createPipeline({ gemini: timed, turath: createTurathClient({ ti
 try {
   const result = await pipeline.ask({ question, language: "ps", scope, depth }, (event, data) => {
     if (event === "stage") console.log(`stage ${data.stage} +${Date.now() - t0}ms`);
+    if (event === "activity") console.log(`act ${data.kind} ${JSON.stringify({ ...data, kind: undefined, t: undefined }).slice(0, 600)}`);
   });
   console.log(JSON.stringify({ status: result.status, model: result.model, elapsedMs: result.elapsedMs, sources: result.sources.map((s) => s.citation) }, null, 1));
   console.log("answer:", result.answer.slice(0, 1500));

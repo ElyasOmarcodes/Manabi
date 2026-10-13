@@ -72,6 +72,22 @@ class _PdfPaneState extends State<PdfPane> {
   final _ready = <int, Future<void>>{};
   final _readyDone = <int>{};
 
+  /// Opens the volume and reads the page to be shown before the viewer
+  /// appears, so the loading bar gives way to a page with its scan on it
+  /// rather than to a blank one; the next page follows in the background.
+  Future<PdfDocument> _open(PdfDownloadProgressCallback progress) async {
+    final doc = await openPdfInRanges(Uri.parse(widget.url), headers: widget.headers, progress: progress, onFailure: _onFailure);
+    final count = doc.pages.length;
+    if (count > 0) {
+      final n = widget.page.clamp(1, count);
+      final first = _ready.putIfAbsent(n, () => _readPage(doc.pages[n - 1]));
+      await first.timeout(const Duration(seconds: 45), onTimeout: () {});
+      _readyDone.add(n);
+      if (n < count) _ready.putIfAbsent(n + 1, () => _readPage(doc.pages[n]));
+    }
+    return doc;
+  }
+
   Future<void> _readPage(PdfPage page) async {
     try {
       final img = await page.render(fullWidth: 24, fullHeight: 32, width: 24, height: 32);
@@ -114,7 +130,7 @@ class _PdfPaneState extends State<PdfPane> {
           // kept on disk, so a page seen once opens again without the network.
           child: PdfViewer(
             PdfDocumentRefByLoader(
-              (progress) => openPdfInRanges(Uri.parse(widget.url), headers: widget.headers, progress: progress, onFailure: _onFailure),
+              _open,
               key: PdfDocumentRefKey(widget.url, [_attempt]),
             ),
             controller: _controller,

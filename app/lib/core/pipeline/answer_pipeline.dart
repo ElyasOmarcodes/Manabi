@@ -822,7 +822,8 @@ class AnswerPipeline {
       tier: ModelTier.fast,
     );
     final p = plan.data;
-    final queries = cleanQueries(p['queries']);
+    final queries = cleanQueries(p['queries'], max: 10);
+    final parts = [for (final x in p['parts'] as List? ?? const []) if (x is String && x.trim().isNotEmpty) x.trim()].take(5).toList();
     final detected = p['detectedLanguage'];
     final language = languageNames.containsKey(request.language)
         ? request.language
@@ -835,7 +836,9 @@ class AnswerPipeline {
     final authorIds = resolveAuthors(_titles(p['requestedAuthors'], limits.requestedAuthors), catalog, max: limits.requestedAuthors);
     final chapterTerms = _titles(p['chapterTerms'], 3);
     final format = const {'standard', 'posts', 'quotes', 'brief', 'detailed'}.contains(p['answerFormat']) ? p['answerFormat'] as String : 'standard';
-    final standalone = (p['standaloneQuestion'] as String?)?.trim().isNotEmpty == true ? (p['standaloneQuestion'] as String).trim() : question;
+    final asked = (p['standaloneQuestion'] as String?)?.trim().isNotEmpty == true ? (p['standaloneQuestion'] as String).trim() : question;
+    // A question in parts carries them to the reading and writing steps, so each is judged and answered.
+    final standalone = parts.length > 1 ? '$asked\nPARTS OF THE QUESTION:\n${parts.map((x) => '- $x').join('\n')}' : asked;
     emit(AskPlanEvent(queries));
     act('plan', {
       'queries': queries,

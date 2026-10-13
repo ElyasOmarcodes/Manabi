@@ -629,7 +629,8 @@ export const createPipeline = ({ gemini, turath: client, catalog }) => {
       tier: "fast",
     });
     const p = plan.data ?? {};
-    const queries = cleanQueries(p.queries);
+    const queries = cleanQueries(p.queries, 10);
+    const parts = (Array.isArray(p.parts) ? p.parts : []).filter((x) => typeof x === "string" && x.trim()).map((x) => x.trim()).slice(0, 5);
     const requested = LANG_CODES.has(input.language) ? input.language : undefined;
     const detected = LANG_CODES.has(p.detectedLanguage) ? p.detectedLanguage : undefined;
     const language = requested ?? detected ?? (LANG_CODES.has(input.fallbackLanguage) ? input.fallbackLanguage : "en");
@@ -639,7 +640,9 @@ export const createPipeline = ({ gemini, turath: client, catalog }) => {
     const requestedAuthorIds = resolveAuthors(cleanTitles(p.requestedAuthors, L.requestedAuthors), catalog, L.requestedAuthors);
     const chapterTerms = cleanTitles(p.chapterTerms, 3);
     const format = FORMATS.has(p.answerFormat) ? p.answerFormat : "standard";
-    const standalone = typeof p.standaloneQuestion === "string" && p.standaloneQuestion.trim() ? p.standaloneQuestion.trim() : question;
+    const asked = typeof p.standaloneQuestion === "string" && p.standaloneQuestion.trim() ? p.standaloneQuestion.trim() : question;
+    // A question in parts carries them to the reading and writing steps, so each is judged and answered.
+    const standalone = parts.length > 1 ? `${asked}\nPARTS OF THE QUESTION:\n${parts.map((x) => `- ${x}`).join("\n")}` : asked;
     const plannedBooks = [...requestedBookIds, ...referenceBookIds].map((id) => catalog.book(id)?.title).filter(Boolean);
     onEvent("plan", { queries, language, books: plannedBooks });
     act("plan", { queries, books: plannedBooks, madhhabs, authors: requestedAuthorIds.map((id) => catalog.authorName(id)).filter(Boolean), format });

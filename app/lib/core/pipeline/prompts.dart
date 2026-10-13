@@ -26,6 +26,8 @@ const planSchema = {
     },
     'isIslamicStudies': {'type': 'BOOLEAN'},
     'chatReply': _str,
+    'narration': _str,
+    'parts': _strList,
     'remember': _str,
     'queries': _strList,
     'madhhabs': {
@@ -45,11 +47,11 @@ const planSchema = {
     'referenceBooks': _strList,
   },
   'required': [
-    'standaloneQuestion', 'detectedLanguage', 'questionType', 'isIslamicStudies', 'chatReply', 'remember', 'queries', 'madhhabs', //
+    'standaloneQuestion', 'detectedLanguage', 'questionType', 'isIslamicStudies', 'chatReply', 'remember', 'narration', 'parts', 'queries', 'madhhabs', //
     'requestedBooks', 'requestedAuthors', 'chapterTerms', 'answerFormat', 'referenceBooks'
   ],
   'propertyOrdering': [
-    'standaloneQuestion', 'detectedLanguage', 'questionType', 'isIslamicStudies', 'chatReply', 'remember', 'queries', 'madhhabs', //
+    'standaloneQuestion', 'detectedLanguage', 'questionType', 'isIslamicStudies', 'chatReply', 'remember', 'narration', 'parts', 'queries', 'madhhabs', //
     'requestedBooks', 'requestedAuthors', 'chapterTerms', 'answerFormat', 'referenceBooks'
   ],
 };
