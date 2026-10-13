@@ -72,8 +72,9 @@ liveTest("live: Hanafi ruling with several sources, then a follow-up naming two 
   const history = [{ question: q1, summary: first.summary, books: first.sources.map((s) => s.bookTitle) }];
   const second = await pipeline.ask({ question: "نوري حوالې وګوره لکه الفقه الاسلامي للزحيلي، الموسوعة الفقهية", language: "ps", history });
   await check(second);
-  const books = second.sources.map((s) => s.bookId);
-  assert.ok(books.includes("384") || books.includes("38056"), `requested books should be consulted, got ${second.sources.map((s) => s.bookTitle).join(" | ")}`);
+  // Any edition of either requested work counts (Turath has several, e.g. 384, 38056, 11430).
+  const requested = second.sources.filter((s) => /الموسوعة الفقهية|الفقه الإسلامي وأدلته/.test(s.bookTitle));
+  assert.ok(requested.length >= 1, `requested books should be consulted, got ${second.sources.map((s) => s.bookTitle).join(" | ")}`);
 });
 
 liveTest("live: what al-Ghazali says on repentance, as short posts with references", 300_000, async () => {
