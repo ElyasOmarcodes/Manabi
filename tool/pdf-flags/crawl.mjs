@@ -54,7 +54,10 @@ const save = () => {
     else if (v === false) no.push(id);
   }
   const data = JSON.stringify({ scannedAt: new Date().toISOString().slice(0, 10), with: yes, without: no }) + "\n";
-  for (const f of outputs) fs.writeFileSync(f, data);
+  for (const f of outputs) {
+    fs.mkdirSync(new URL(".", f), { recursive: true });
+    fs.writeFileSync(f, data);
+  }
   return { yes: yes.length, no: no.length };
 };
 
