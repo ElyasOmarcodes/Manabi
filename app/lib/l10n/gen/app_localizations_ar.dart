@@ -460,7 +460,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get modeDirectInfo =>
-      'يتصل التطبيق بتراث و Gemini بنفسه باستخدام مفتاح Gemini الخاص بك المحفوظ بأمان على هذا الجهاز. غير متاح على الويب.';
+      'يتصل التطبيق بتراث و Gemini بنفسه باستخدام مفتاح Gemini الخاص بك المحفوظ بأمان على هذا الجهاز. تُفتح الكتب دون المفتاح؛ لا يحتاجه إلا الذكاء الاصطناعي.';
 
   @override
   String get serverUrl => 'عنوان الخادم';

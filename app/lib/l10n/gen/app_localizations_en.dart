@@ -459,7 +459,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get modeDirectInfo =>
-      'The app talks to Turath and Gemini itself using your own Gemini API key, stored securely on this device. Not available on the web.';
+      'The app talks to Turath and Gemini itself using your own Gemini API key, stored securely on this device. Books open without a key; only the AI answers need it.';
 
   @override
   String get serverUrl => 'Server address';

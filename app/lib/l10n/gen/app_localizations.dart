@@ -921,7 +921,7 @@ abstract class AppLocalizations {
   /// No description provided for @modeDirectInfo.
   ///
   /// In en, this message translates to:
-  /// **'The app talks to Turath and Gemini itself using your own Gemini API key, stored securely on this device. Not available on the web.'**
+  /// **'The app talks to Turath and Gemini itself using your own Gemini API key, stored securely on this device. Books open without a key; only the AI answers need it.'**
   String get modeDirectInfo;
 
   /// No description provided for @serverUrl.

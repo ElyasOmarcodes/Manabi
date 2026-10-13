@@ -17,7 +17,7 @@ env:
   FLUTTER_VERSION: "3.47.7"
   SERVER_URL: ${{ vars.MANABI_SERVER_URL }}
   REPORT_DEFINES: --dart-define=MANABI_REPORT_WHATSAPP=${{ vars.MANABI_REPORT_WHATSAPP }} --dart-define=MANABI_REPORT_EMAIL=${{ vars.MANABI_REPORT_EMAIL }}
-  PROJECT_NAME: manabi-ai
+  PROJECT_NAME: manabi-app
 
 jobs:
   deploy:

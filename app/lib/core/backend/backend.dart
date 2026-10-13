@@ -30,24 +30,20 @@ BackendException mapError(Object e) {
   if (e is BackendException) return e;
   if (e is PipelineException) return BackendException(e.code, e.message);
   if (e is TurathException) {
-    return BackendException(
-        switch (e.code) {
-          'NOT_FOUND' => 'NOT_FOUND',
-          'RATE_LIMITED' => 'TURATH_RATE_LIMITED',
-          'INVALID_ARGUMENT' => 'INVALID_ARGUMENT',
-          _ => 'TURATH_UNAVAILABLE',
-        },
-        e.message);
+    return BackendException(switch (e.code) {
+      'NOT_FOUND' => 'NOT_FOUND',
+      'RATE_LIMITED' => 'TURATH_RATE_LIMITED',
+      'INVALID_ARGUMENT' => 'INVALID_ARGUMENT',
+      _ => 'TURATH_UNAVAILABLE',
+    }, e.message);
   }
   if (e is GeminiException) {
-    return BackendException(
-        switch (e.code) {
-          'AUTH' => 'GEMINI_AUTH',
-          'QUOTA' => 'GEMINI_QUOTA',
-          'NETWORK' => 'NETWORK',
-          _ => 'GEMINI_UNAVAILABLE',
-        },
-        '${e.code}: ${e.message}');
+    return BackendException(switch (e.code) {
+      'AUTH' => 'GEMINI_AUTH',
+      'QUOTA' => 'GEMINI_QUOTA',
+      'NETWORK' => 'NETWORK',
+      _ => 'GEMINI_UNAVAILABLE',
+    }, '${e.code}: ${e.message}');
   }
   if (e is TimeoutException || e is http.ClientException) return BackendException('NETWORK', '$e');
   return BackendException('INTERNAL', '$e');
@@ -105,18 +101,16 @@ SearchResultPage mergeSearchPages(List<SearchResultPage> pages, int page) {
 List<String> _layerSamples(List<String> pages) => [for (final p in pages.where((p) => p.trim().isNotEmpty).take(4)) p.length > 5000 ? p.substring(0, 5000) : p];
 
 class ServerBackend implements ManabiBackend {
-  ServerBackend(String baseUrl, {this.accessToken, http.Client? client})
-      : baseUrl = baseUrl.replaceAll(RegExp(r'/+$'), ''),
-        _http = client ?? http.Client();
+  ServerBackend(String baseUrl, {this.accessToken, http.Client? client}) : baseUrl = baseUrl.replaceAll(RegExp(r'/+$'), ''), _http = client ?? http.Client();
 
   final String baseUrl;
   final String? accessToken;
   final http.Client _http;
 
   Map<String, String> get _headers => {
-        'accept': 'application/json',
-        if (accessToken != null && accessToken!.isNotEmpty) 'authorization': 'Bearer $accessToken',
-      };
+    'accept': 'application/json',
+    if (accessToken != null && accessToken!.isNotEmpty) 'authorization': 'Bearer $accessToken',
+  };
 
   Future<Map<String, dynamic>> _get(String path, [Map<String, String>? query]) async {
     final uri = Uri.parse('$baseUrl$path').replace(queryParameters: query);
@@ -164,10 +158,15 @@ class ServerBackend implements ManabiBackend {
     var gotResult = false;
     // The server sends a keep-alive every 15 s: 45 s of silence is a dead
     // connection, reported as a network error (the answer then resumes).
-    final events = res.stream.transform(utf8.decoder).timeout(const Duration(seconds: 45), onTimeout: (sink) {
-      sink.addError(const BackendException('NETWORK', 'The connection to the server stalled'));
-      sink.close();
-    });
+    final events = res.stream
+        .transform(utf8.decoder)
+        .timeout(
+          const Duration(seconds: 45),
+          onTimeout: (sink) {
+            sink.addError(const BackendException('NETWORK', 'The connection to the server stalled'));
+            sink.close();
+          },
+        );
     await for (final chunk in events) {
       buffer += chunk.replaceAll('\r\n', '\n');
       int idx;
@@ -191,7 +190,13 @@ class ServerBackend implements ManabiBackend {
           case 'sources':
             yield AskSourcesEvent((payload['count'] as num?)?.toInt() ?? 0, (payload['totalMatches'] as num?)?.toInt() ?? 0);
           case 'activity':
-            yield AskActivityEvent('${payload['kind'] ?? ''}', {...payload}..remove('kind')..remove('t'), (payload['t'] as num?)?.toInt() ?? 0);
+            yield AskActivityEvent(
+              '${payload['kind'] ?? ''}',
+              {...payload}
+                ..remove('kind')
+                ..remove('t'),
+              (payload['t'] as num?)?.toInt() ?? 0,
+            );
           case 'usage':
             yield AskUsageEvent(TokenUsage.fromJson(payload));
           case 'draft':
@@ -208,8 +213,12 @@ class ServerBackend implements ManabiBackend {
   }
 
   @override
-  Future<SearchResultPage> search(String query, {int page = 1, SearchScope scope = SearchScope.all, TextSearchOptions options = TextSearchOptions.standard}) async =>
-      SearchResultPage.fromJson(await _get('/api/search', {'q': query, 'page': '$page', ...scope.toRequest(), ...options.toRequest()}));
+  Future<SearchResultPage> search(
+    String query, {
+    int page = 1,
+    SearchScope scope = SearchScope.all,
+    TextSearchOptions options = TextSearchOptions.standard,
+  }) async => SearchResultPage.fromJson(await _get('/api/search', {'q': query, 'page': '$page', ...scope.toRequest(), ...options.toRequest()}));
 
   @override
   Future<BookDetails> book(String id) async => BookDetails.fromJson(await _get('/api/books/$id'));
@@ -223,7 +232,10 @@ class ServerBackend implements ManabiBackend {
   @override
   Future<List<PagePassage>> pages(String bookId, int from, int to) async {
     final j = await _get('/api/pages/$bookId/$from-$to');
-    return [for (final p in j['items'] as List? ?? const []) if (p is Map) PagePassage.fromJson(p.cast<String, dynamic>())];
+    return [
+      for (final p in j['items'] as List? ?? const [])
+        if (p is Map) PagePassage.fromJson(p.cast<String, dynamic>()),
+    ];
   }
 
   @override
@@ -249,7 +261,10 @@ class ServerBackend implements ManabiBackend {
   @override
   Future<({List<ModelInfo> models, String? auto})> models() async {
     final j = await _get('/api/models');
-    return (models: [for (final m in (j['models'] as List? ?? const []).whereType<Map>()) ModelInfo.fromJson(m.cast<String, dynamic>())], auto: j['auto'] as String?);
+    return (
+      models: [for (final m in (j['models'] as List? ?? const []).whereType<Map>()) ModelInfo.fromJson(m.cast<String, dynamic>())],
+      auto: j['auto'] as String?,
+    );
   }
 
   @override
@@ -257,8 +272,11 @@ class ServerBackend implements ManabiBackend {
     http.Response res;
     try {
       res = await _http
-          .post(Uri.parse('$baseUrl/api/layers'),
-              headers: {..._headers, 'content-type': 'application/json'}, body: jsonEncode({'title': title, 'pages': _layerSamples(pages)}))
+          .post(
+            Uri.parse('$baseUrl/api/layers'),
+            headers: {..._headers, 'content-type': 'application/json'},
+            body: jsonEncode({'title': title, 'pages': _layerSamples(pages)}),
+          )
           .timeout(const Duration(seconds: 90));
     } catch (e) {
       throw BackendException('NETWORK', '$e');
@@ -275,14 +293,27 @@ class ServerBackend implements ManabiBackend {
 }
 
 class DirectBackend implements ManabiBackend {
-  DirectBackend({required String apiKey, required CatalogService catalog, String? model, http.Client? client})
-      : _turath = TurathClient(client: client),
-        _gemini = GeminiClient(apiKey: apiKey, model: model, client: client),
-        _catalog = catalog;
+  /// Without [apiKey] the library still works; only the AI parts fail, with
+  /// [noAiCode] (what the user has to set up).
+  DirectBackend({
+    required String apiKey,
+    required CatalogService catalog,
+    String? model,
+    http.Client? client,
+    String turathBaseUrl = 'https://api.turath.io/',
+    this.noAiCode = 'NO_API_KEY',
+  }) : _turath = TurathClient(client: client, baseUrl: turathBaseUrl),
+       _gemini = GeminiClient(apiKey: apiKey, model: model, client: client),
+       _hasKey = apiKey.trim().isNotEmpty,
+       _catalog = catalog;
 
   final TurathClient _turath;
   final GeminiClient _gemini;
   final CatalogService _catalog;
+  final bool _hasKey;
+  final String noAiCode;
+
+  GeminiClient get _ai => _hasKey ? _gemini : throw BackendException(noAiCode);
 
   Future<T> _wrap<T>(Future<T> Function() fn) async {
     try {
@@ -294,7 +325,7 @@ class DirectBackend implements ManabiBackend {
 
   @override
   Stream<AskEvent> ask(AskRequest request) async* {
-    final pipeline = AnswerPipeline(model: _gemini, turath: _turath, catalog: _catalog);
+    final pipeline = AnswerPipeline(model: _ai, turath: _turath, catalog: _catalog);
     try {
       yield* pipeline.ask(request);
     } catch (e) {
@@ -303,7 +334,8 @@ class DirectBackend implements ManabiBackend {
   }
 
   @override
-  Future<SearchResultPage> search(String query, {int page = 1, SearchScope scope = SearchScope.all, TextSearchOptions options = TextSearchOptions.standard}) => _wrap(() async {
+  Future<SearchResultPage> search(String query, {int page = 1, SearchScope scope = SearchScope.all, TextSearchOptions options = TextSearchOptions.standard}) =>
+      _wrap(() async {
         // One search per scope target (Turath filters one id of each kind).
         final targets = scope.targets;
         if (targets.length == 1) {
@@ -329,7 +361,7 @@ class DirectBackend implements ManabiBackend {
   Future<PagePassage> page(String bookId, int page) => _wrap(() => _turath.getPage(bookId, page));
 
   @override
-  Future<String> check() => _wrap(_gemini.check);
+  Future<String> check() => _wrap(() => _ai.check());
 
   @override
   Future<List<PagePassage>> pages(String bookId, int from, int to) => _wrap(() => _turath.getPages(bookId, from, to));
@@ -346,64 +378,82 @@ class DirectBackend implements ManabiBackend {
 
   @override
   Future<({List<ModelInfo> models, String? auto})> models() => _wrap(() async {
-        final list = await _gemini.chatModelList();
-        return (models: list, auto: await _gemini.resolveModel());
-      });
+    final list = await _ai.chatModelList();
+    return (models: list, auto: await _ai.resolveModel());
+  });
 
   @override
   Future<Map<String, bool>> pdfFlags(List<String> ids) => _wrap(() async {
-        final out = <String, bool>{};
-        await Future.wait([
-          for (final id in ids)
-            _turath.bookHasPdf(id).then((v) {
+    final out = <String, bool>{};
+    await Future.wait([
+      for (final id in ids)
+        _turath
+            .bookHasPdf(id)
+            .then((v) {
               if (v != null) out[id] = v;
-            }).catchError((Object _) {}),
-        ]);
-        return out;
-      });
+            })
+            .catchError((Object _) {}),
+    ]);
+    return out;
+  });
 
   @override
-  Future<LayersGuess> detectLayers(String title, List<String> pages) => _wrap(() async => LayersGuess.fromJson((await _gemini.generateJson(
+  Future<LayersGuess> detectLayers(String title, List<String> pages) => _wrap(
+    () async => LayersGuess.fromJson(
+      (await _ai.generateJson(
         system: layersSystem,
         prompt: layersPrompt(title: title, pages: _layerSamples(pages)),
         schema: layersSchema,
         temperature: 0,
         tier: ModelTier.fast,
-      ))
-          .data));
+      )).data,
+    ),
+  );
 }
 
-/// Used until the user configures a server or a key.
-class UnconfiguredBackend implements ManabiBackend {
-  const UnconfiguredBackend(this.code);
-  final String code;
-  Never _fail() => throw BackendException(code);
+/// The Manabi server, with the library read straight from Turath when the
+/// server cannot be reached: books open even when the AI side is down.
+class LibraryFallbackBackend implements ManabiBackend {
+  LibraryFallbackBackend(this.server, this.library);
+  final ManabiBackend server;
+  final ManabiBackend library;
+
+  Future<T> _either<T>(Future<T> Function(ManabiBackend b) f) async {
+    try {
+      return await f(server);
+    } on BackendException catch (e) {
+      if (e.code != 'NETWORK' && e.code != 'INTERNAL' && e.code != 'UNAUTHORIZED') rethrow;
+      return f(library);
+    }
+  }
+
   @override
-  Stream<AskEvent> ask(AskRequest request) => Stream.error(BackendException(code));
+  Stream<AskEvent> ask(AskRequest request) => server.ask(request);
   @override
-  Future<SearchResultPage> search(String query, {int page = 1, SearchScope scope = SearchScope.all, TextSearchOptions options = TextSearchOptions.standard}) async => _fail();
+  Future<String> check() => server.check();
   @override
-  Future<BookDetails> book(String id) async => _fail();
+  Future<LayersGuess> detectLayers(String title, List<String> pages) => server.detectLayers(title, pages);
   @override
-  Future<AuthorDetails> author(String id) async => _fail();
+  Future<({List<ModelInfo> models, String? auto})> models() => server.models();
   @override
-  Future<PagePassage> page(String bookId, int page) async => _fail();
+  Future<SearchResultPage> search(String query, {int page = 1, SearchScope scope = SearchScope.all, TextSearchOptions options = TextSearchOptions.standard}) =>
+      _either((b) => b.search(query, page: page, scope: scope, options: options));
   @override
-  Future<String> check() async => _fail();
+  Future<BookDetails> book(String id) => _either((b) => b.book(id));
   @override
-  Future<LayersGuess> detectLayers(String title, List<String> pages) async => _fail();
+  Future<AuthorDetails> author(String id) => _either((b) => b.author(id));
   @override
-  Future<List<PagePassage>> pages(String bookId, int from, int to) async => _fail();
+  Future<PagePassage> page(String bookId, int page) => _either((b) => b.page(bookId, page));
   @override
-  Future<NarratorPage> narrators(String query, {int page = 1}) async => _fail();
+  Future<List<PagePassage>> pages(String bookId, int from, int to) => _either((b) => b.pages(bookId, from, to));
   @override
-  Future<Narrator> narrator(String id) async => _fail();
+  Future<NarratorPage> narrators(String query, {int page = 1}) => _either((b) => b.narrators(query, page: page));
   @override
-  Future<List<dynamic>> discoveredBooks() async => const [];
+  Future<Narrator> narrator(String id) => _either((b) => b.narrator(id));
   @override
-  Future<Map<String, bool>> pdfFlags(List<String> ids) async => const {};
+  Future<List<dynamic>> discoveredBooks() => _either((b) => b.discoveredBooks());
   @override
-  Future<({List<ModelInfo> models, String? auto})> models() async => _fail();
+  Future<Map<String, bool>> pdfFlags(List<String> ids) => _either((b) => b.pdfFlags(ids));
   @override
-  Future<Map<String, bool>> pdfFlagsAll() async => const {};
+  Future<Map<String, bool>> pdfFlagsAll() => _either((b) => b.pdfFlagsAll());
 }

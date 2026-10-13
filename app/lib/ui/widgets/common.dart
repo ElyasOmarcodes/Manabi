@@ -15,23 +15,22 @@ extension L10nX on BuildContext {
 }
 
 String errorText(AppLocalizations l, String? code) => switch (code) {
-      'NETWORK' => l.errNetwork,
-      'SERVER_NOT_CONFIGURED' => l.errServerNotConfigured,
-      'NO_API_KEY' => l.errNoApiKey,
-      'DIRECT_NOT_ON_WEB' => l.errDirectNotOnWeb,
-      'GEMINI_AUTH' => l.errGeminiAuth,
-      'GEMINI_QUOTA' => l.errGeminiQuota,
-      'GEMINI_UNAVAILABLE' => l.errGeminiUnavailable,
-      'TURATH_UNAVAILABLE' || 'TURATH_RATE_LIMITED' => l.errTurathUnavailable,
-      'RATE_LIMITED' => l.errRateLimited,
-      'UNAUTHORIZED' => l.errUnauthorized,
-      'INTERRUPTED' => l.errInterrupted,
-      'CANCELLED' => l.errCancelled,
-      'NOT_FOUND' => l.errNotFound,
-      _ => l.errGeneric,
-    };
+  'NETWORK' => l.errNetwork,
+  'SERVER_NOT_CONFIGURED' => l.errServerNotConfigured,
+  'NO_API_KEY' => l.errNoApiKey,
+  'GEMINI_AUTH' => l.errGeminiAuth,
+  'GEMINI_QUOTA' => l.errGeminiQuota,
+  'GEMINI_UNAVAILABLE' => l.errGeminiUnavailable,
+  'TURATH_UNAVAILABLE' || 'TURATH_RATE_LIMITED' => l.errTurathUnavailable,
+  'RATE_LIMITED' => l.errRateLimited,
+  'UNAUTHORIZED' => l.errUnauthorized,
+  'INTERRUPTED' => l.errInterrupted,
+  'CANCELLED' => l.errCancelled,
+  'NOT_FOUND' => l.errNotFound,
+  _ => l.errGeneric,
+};
 
-bool isSetupError(String? code) => const {'SERVER_NOT_CONFIGURED', 'NO_API_KEY', 'DIRECT_NOT_ON_WEB', 'GEMINI_AUTH', 'UNAUTHORIZED'}.contains(code);
+bool isSetupError(String? code) => const {'SERVER_NOT_CONFIGURED', 'NO_API_KEY', 'GEMINI_AUTH', 'UNAUTHORIZED'}.contains(code);
 
 /// Three dots breathing through the brand gradient.
 class TypingDots extends StatefulWidget {
@@ -52,22 +51,28 @@ class _TypingDotsState extends State<TypingDots> with SingleTickerProviderStateM
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
-        animation: _c,
-        builder: (context, _) => Row(mainAxisSize: MainAxisSize.min, children: [
-          for (var i = 0; i < 3; i++)
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: widget.size * 0.3),
-              child: Transform.translate(
-                offset: Offset(0, -3 * math.max(0, math.sin(_c.value * 2 * math.pi - i * 0.8))),
-                child: Container(
-                  width: widget.size,
-                  height: widget.size,
-                  decoration: BoxDecoration(shape: BoxShape.circle, color: AuraHues.violet.withValues(alpha: 0.45 + 0.25 * i)),
+    animation: _c,
+    builder: (context, _) => Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (var i = 0; i < 3; i++)
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: widget.size * 0.3),
+            child: Transform.translate(
+              offset: Offset(0, -3 * math.max(0, math.sin(_c.value * 2 * math.pi - i * 0.8))),
+              child: Container(
+                width: widget.size,
+                height: widget.size,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AuraHues.violet.withValues(alpha: 0.45 + 0.25 * i),
                 ),
               ),
             ),
-        ]),
-      );
+          ),
+      ],
+    ),
+  );
 }
 
 class EmptyState extends StatelessWidget {
@@ -78,28 +83,41 @@ class EmptyState extends StatelessWidget {
   final Color color;
   @override
   Widget build(BuildContext context) => Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(32),
-          child: Reveal(
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              Stack(alignment: Alignment.center, children: [
+    child: SingleChildScrollView(
+      padding: const EdgeInsets.all(32),
+      child: Reveal(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Stack(
+              alignment: Alignment.center,
+              children: [
                 Container(
                   width: 120,
                   height: 120,
-                  decoration: BoxDecoration(shape: BoxShape.circle, gradient: RadialGradient(colors: [color.withValues(alpha: 0.22), color.withValues(alpha: 0)])),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(colors: [color.withValues(alpha: 0.22), color.withValues(alpha: 0)]),
+                  ),
                 ),
                 IconTile(icon: icon, color: color, size: 64, gradient: true),
-              ]),
-              const SizedBox(height: 12),
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 360),
-                child: Text(text, textAlign: TextAlign.center, style: TextStyle(fontFamily: uiFont, fontSize: 15, height: 1.7, color: context.aura.muted)),
+              ],
+            ),
+            const SizedBox(height: 12),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 360),
+              child: Text(
+                text,
+                textAlign: TextAlign.center,
+                style: TextStyle(fontFamily: uiFont, fontSize: 15, height: 1.7, color: context.aura.muted),
               ),
-              if (action != null) ...[const SizedBox(height: 18), action!],
-            ]),
-          ),
+            ),
+            if (action != null) ...[const SizedBox(height: 18), action!],
+          ],
         ),
-      );
+      ),
+    ),
+  );
 }
 
 class ErrorPanel extends StatelessWidget {
@@ -108,11 +126,11 @@ class ErrorPanel extends StatelessWidget {
   final VoidCallback? onRetry;
   @override
   Widget build(BuildContext context) => EmptyState(
-        icon: Icons.cloud_off_rounded,
-        color: AuraHues.rose,
-        text: errorText(context.l, code),
-        action: onRetry == null ? null : SoftButton(onTap: onRetry, icon: Icons.refresh_rounded, label: context.l.retry),
-      );
+    icon: Icons.cloud_off_rounded,
+    color: AuraHues.rose,
+    text: errorText(context.l, code),
+    action: onRetry == null ? null : SoftButton(onTap: onRetry, icon: Icons.refresh_rounded, label: context.l.retry),
+  );
 }
 
 Future<void> copyText(BuildContext context, String text) async {
@@ -138,7 +156,12 @@ class ReadingWidth extends StatelessWidget {
   final Widget child;
   final double maxWidth;
   @override
-  Widget build(BuildContext context) => Center(child: ConstrainedBox(constraints: BoxConstraints(maxWidth: maxWidth), child: child));
+  Widget build(BuildContext context) => Center(
+    child: ConstrainedBox(
+      constraints: BoxConstraints(maxWidth: maxWidth),
+      child: child,
+    ),
+  );
 }
 
 /// Scaffold for pushed pages: aurora background and a floating back button.
@@ -161,28 +184,38 @@ class AuraPage extends StatelessWidget {
       bottomNavigationBar: bottom,
       body: SafeArea(
         bottom: false,
-        child: Column(children: [
-          SizedBox(
-            height: 56,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              child: Row(children: [
-                RoundIconButton(
-                  icon: Directionality.of(context) == TextDirection.rtl ? Icons.arrow_forward_rounded : Icons.arrow_back_rounded,
-                  tooltip: MaterialLocalizations.of(context).backButtonTooltip,
-                  onTap: () => Navigator.of(context).maybePop(),
+        child: Column(
+          children: [
+            SizedBox(
+              height: 56,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                child: Row(
+                  children: [
+                    RoundIconButton(
+                      icon: Directionality.of(context) == TextDirection.rtl ? Icons.arrow_forward_rounded : Icons.arrow_back_rounded,
+                      tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+                      onTap: () => Navigator.of(context).maybePop(),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child:
+                          title ??
+                          Text(
+                            titleText ?? '',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontFamily: uiFont, fontSize: 17, fontWeight: FontWeight.w700, color: a.text),
+                          ),
+                    ),
+                    ...actions,
+                  ],
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: title ??
-                      Text(titleText ?? '', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontFamily: uiFont, fontSize: 17, fontWeight: FontWeight.w700, color: a.text)),
-                ),
-                ...actions,
-              ]),
+              ),
             ),
-          ),
-          Expanded(child: body),
-        ]),
+            Expanded(child: body),
+          ],
+        ),
       ),
     );
   }
@@ -222,32 +255,58 @@ class SettingsGroup extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final a = context.aura;
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      if (title != null)
-        Padding(
-          padding: const EdgeInsetsDirectional.fromSTEB(14, 20, 14, 8),
-          child: Text(title!, style: TextStyle(fontFamily: uiFont, fontSize: 13, fontWeight: FontWeight.w600, color: a.muted)),
-        )
-      else
-        const SizedBox(height: 12),
-      Material(
-        color: a.surface,
-        clipBehavior: Clip.antiAlias,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18), side: BorderSide(color: a.border)),
-        child: Column(children: [
-          for (var i = 0; i < children.length; i++) ...[
-            children[i],
-            if (i < children.length - 1) Padding(padding: const EdgeInsetsDirectional.only(start: 58), child: Divider(height: 1, color: a.border)),
-          ],
-        ]),
-      ),
-    ]);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (title != null)
+          Padding(
+            padding: const EdgeInsetsDirectional.fromSTEB(14, 20, 14, 8),
+            child: Text(
+              title!,
+              style: TextStyle(fontFamily: uiFont, fontSize: 13, fontWeight: FontWeight.w600, color: a.muted),
+            ),
+          )
+        else
+          const SizedBox(height: 12),
+        Material(
+          color: a.surface,
+          clipBehavior: Clip.antiAlias,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+            side: BorderSide(color: a.border),
+          ),
+          child: Column(
+            children: [
+              for (var i = 0; i < children.length; i++) ...[
+                children[i],
+                if (i < children.length - 1)
+                  Padding(
+                    padding: const EdgeInsetsDirectional.only(start: 58),
+                    child: Divider(height: 1, color: a.border),
+                  ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
   }
 }
 
 /// One row: tinted icon, title, optional subtitle and value, chevron.
 class SettingsRow extends StatelessWidget {
-  const SettingsRow({super.key, required this.icon, required this.title, this.color, this.subtitle, this.value, this.trailing, this.onTap, this.danger = false, this.beta = false});
+  const SettingsRow({
+    super.key,
+    required this.icon,
+    required this.title,
+    this.color,
+    this.subtitle,
+    this.value,
+    this.trailing,
+    this.onTap,
+    this.danger = false,
+    this.beta = false,
+  });
   final IconData icon;
   final String title;
 
@@ -269,37 +328,63 @@ class SettingsRow extends StatelessWidget {
         constraints: const BoxConstraints(minHeight: 54),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          child: Row(children: [
-            Container(
-              width: 30,
-              height: 30,
-              decoration: BoxDecoration(color: tint.withValues(alpha: a.dark ? 0.18 : 0.1), borderRadius: BorderRadius.circular(9)),
-              child: Icon(icon, size: 18, color: tint),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-                Row(children: [
-                  Flexible(child: Text(title, style: TextStyle(fontFamily: uiFont, fontSize: 15, fontWeight: FontWeight.w500, color: danger ? a.danger : a.text))),
-                  if (beta) const BetaBadge(),
-                ]),
-                if (subtitle != null)
-                  Text(subtitle!, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontFamily: uiFont, fontSize: 12.5, color: a.muted, height: 1.45)),
-              ]),
-            ),
-            if (value != null)
-              Padding(
-                padding: const EdgeInsetsDirectional.only(start: 8),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 150),
-                  child: Text(value!, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontFamily: uiFont, fontSize: 14, color: a.muted)),
+          child: Row(
+            children: [
+              Container(
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  color: tint.withValues(alpha: a.dark ? 0.18 : 0.1),
+                  borderRadius: BorderRadius.circular(9),
+                ),
+                child: Icon(icon, size: 18, color: tint),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            title,
+                            style: TextStyle(fontFamily: uiFont, fontSize: 15, fontWeight: FontWeight.w500, color: danger ? a.danger : a.text),
+                          ),
+                        ),
+                        if (beta) const BetaBadge(),
+                      ],
+                    ),
+                    if (subtitle != null)
+                      Text(
+                        subtitle!,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontFamily: uiFont, fontSize: 12.5, color: a.muted, height: 1.45),
+                      ),
+                  ],
                 ),
               ),
-            if (trailing != null)
-              trailing!
-            else if (onTap != null)
-              Icon(Directionality.of(context) == TextDirection.rtl ? Icons.chevron_left_rounded : Icons.chevron_right_rounded, color: a.faint, size: 22),
-          ]),
+              if (value != null)
+                Padding(
+                  padding: const EdgeInsetsDirectional.only(start: 8),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 150),
+                    child: Text(
+                      value!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontFamily: uiFont, fontSize: 14, color: a.muted),
+                    ),
+                  ),
+                ),
+              if (trailing != null)
+                trailing!
+              else if (onTap != null)
+                Icon(Directionality.of(context) == TextDirection.rtl ? Icons.chevron_left_rounded : Icons.chevron_right_rounded, color: a.faint, size: 22),
+            ],
+          ),
         ),
       ),
     );
@@ -307,7 +392,8 @@ class SettingsRow extends StatelessWidget {
 }
 
 /// Radio-list dialog for picking one value (languages and the like).
-Future<String?> showChoiceDialog(BuildContext context, {required String title, required Map<String, String> options, required String selected}) => showDialog<String>(
+Future<String?> showChoiceDialog(BuildContext context, {required String title, required Map<String, String> options, required String selected}) =>
+    showDialog<String>(
       context: context,
       builder: (context) {
         final a = context.aura;
@@ -317,27 +403,41 @@ Future<String?> showChoiceDialog(BuildContext context, {required String title, r
             constraints: const BoxConstraints(maxWidth: 380),
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 14),
-              child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(22, 6, 22, 10),
-                  child: Text(title, style: TextStyle(fontFamily: uiFont, fontSize: 17, fontWeight: FontWeight.w700, color: a.text)),
-                ),
-                for (final e in options.entries)
-                  InkWell(
-                    onTap: () => Navigator.of(context).pop(e.key),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 13),
-                      child: Row(children: [
-                        Expanded(child: Text(e.value, style: TextStyle(fontFamily: uiFont, fontSize: 15, color: a.text))),
-                        AnimatedOpacity(
-                          duration: const Duration(milliseconds: 150),
-                          opacity: e.key == selected ? 1 : 0,
-                          child: Icon(Icons.check_rounded, color: a.accent, size: 22),
-                        ),
-                      ]),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(22, 6, 22, 10),
+                    child: Text(
+                      title,
+                      style: TextStyle(fontFamily: uiFont, fontSize: 17, fontWeight: FontWeight.w700, color: a.text),
                     ),
                   ),
-              ]),
+                  for (final e in options.entries)
+                    InkWell(
+                      onTap: () => Navigator.of(context).pop(e.key),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 13),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                e.value,
+                                style: TextStyle(fontFamily: uiFont, fontSize: 15, color: a.text),
+                              ),
+                            ),
+                            AnimatedOpacity(
+                              duration: const Duration(milliseconds: 150),
+                              opacity: e.key == selected ? 1 : 0,
+                              child: Icon(Icons.check_rounded, color: a.accent, size: 22),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
         );
@@ -358,7 +458,10 @@ class BetaBadge extends StatelessWidget {
         border: Border.all(color: AuraHues.amber.withValues(alpha: 0.7)),
         color: AuraHues.amber.withValues(alpha: a.dark ? 0.16 : 0.1),
       ),
-      child: const Text('Beta', style: TextStyle(fontFamily: 'Vazirmatn', fontSize: 10, fontWeight: FontWeight.w800, color: AuraHues.amber, height: 1.3)),
+      child: const Text(
+        'Beta',
+        style: TextStyle(fontFamily: 'Vazirmatn', fontSize: 10, fontWeight: FontWeight.w800, color: AuraHues.amber, height: 1.3),
+      ),
     );
   }
 }
@@ -410,7 +513,10 @@ class _AuraProgressState extends State<AuraProgress> with SingleTickerProviderSt
       width: widget.width,
       height: widget.height,
       child: widget.value == null
-          ? AnimatedBuilder(animation: _c, builder: (context, _) => CustomPaint(painter: _ProgressPainter(color, null, _c.value, rtl)))
+          ? AnimatedBuilder(
+              animation: _c,
+              builder: (context, _) => CustomPaint(painter: _ProgressPainter(color, null, _c.value, rtl)),
+            )
           : TweenAnimationBuilder<double>(
               tween: Tween(end: widget.value!.clamp(0.0, 1.0)),
               duration: const Duration(milliseconds: 350),
@@ -423,11 +529,18 @@ class _AuraProgressState extends State<AuraProgress> with SingleTickerProviderSt
       value: widget.value == null ? null : '${(widget.value! * 100).round()}%',
       child: widget.label == null
           ? bar
-          : Column(mainAxisSize: MainAxisSize.min, children: [
-              bar,
-              const SizedBox(height: 10),
-              Text(widget.label!, textAlign: TextAlign.center, style: TextStyle(fontFamily: uiFont, fontSize: 12.5, color: a.muted)),
-            ]),
+          : Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                bar,
+                const SizedBox(height: 10),
+                Text(
+                  widget.label!,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontFamily: uiFont, fontSize: 12.5, color: a.muted),
+                ),
+              ],
+            ),
     );
   }
 }
@@ -458,7 +571,13 @@ class _ProgressPainter extends CustomPainter {
       seg = Rect.fromLTWH(rtl ? size.width - x - w : x, 0, w, size.height);
     }
     if (seg.width > 0) {
-      final shader = LinearGradient(colors: [color.withValues(alpha: value == null ? 0.35 : 0.75), color, color.withValues(alpha: value == null ? 0.35 : 1)]).createShader(seg);
+      final shader = LinearGradient(
+        colors: [
+          color.withValues(alpha: value == null ? 0.35 : 0.75),
+          color,
+          color.withValues(alpha: value == null ? 0.35 : 1),
+        ],
+      ).createShader(seg);
       canvas.drawRRect(RRect.fromRectAndRadius(seg, r), Paint()..shader = shader);
     }
     canvas.restore();

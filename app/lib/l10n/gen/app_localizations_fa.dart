@@ -456,7 +456,7 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get modeDirectInfo =>
-      'برنامه خودش با کلید Gemini شما که به‌طور امن روی همین دستگاه نگه‌داری می‌شود، با تراث و Gemini ارتباط می‌گیرد. در وب در دسترس نیست.';
+      'برنامه خودش با کلید Gemini شما که به‌طور امن روی همین دستگاه نگه‌داری می‌شود، با تراث و Gemini ارتباط می‌گیرد. کتاب‌ها بدون کلید هم باز می‌شوند؛ فقط پاسخ‌های هوش مصنوعی به آن نیاز دارند.';
 
   @override
   String get serverUrl => 'نشانی سرور';

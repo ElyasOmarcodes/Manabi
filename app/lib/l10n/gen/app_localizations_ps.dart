@@ -455,7 +455,7 @@ class AppLocalizationsPs extends AppLocalizations {
 
   @override
   String get modeDirectInfo =>
-      'اپلیکیشن په خپله له تراث او Gemini سره د ستاسو د Gemini کیلي په مرسته اړیکه نیسي، چې په دې وسیله کې په خوندي ډول ساتل کېږي. په ویب کې نشته.';
+      'اپلیکیشن په خپله له تراث او Gemini سره د ستاسو د Gemini کیلي په مرسته اړیکه نیسي، چې په دې وسیله کې په خوندي ډول ساتل کېږي. کتابونه له کیلي پرته هم خلاصېږي؛ یوازې د AI ځوابونو ته اړتیا ده.';
 
   @override
   String get serverUrl => 'د سرور پته';

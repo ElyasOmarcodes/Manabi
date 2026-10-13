@@ -48,7 +48,9 @@ class SettingsController extends ChangeNotifier {
 
   ManabiBackend? _backend;
 
-  bool get directAvailable => !kIsWeb;
+  /// A browser cannot call api.turath.io (no CORS headers); the web build
+  /// reads Turath through the site's own relay (app/functions/turath).
+  String get _turathBase => kIsWeb ? Uri.base.resolve('/turath/').toString() : 'https://api.turath.io/';
 
   static Future<SettingsController> load(CatalogService catalog) async {
     final prefs = await SharedPreferences.getInstance();
@@ -63,8 +65,7 @@ class SettingsController extends ChangeNotifier {
     appUiFont = c.uiFontFamily;
     c.serverUrl = prefs.getString('serverUrl') ?? defaultServerUrl;
     final savedMode = ConnectionMode.values.asNameMap()[prefs.getString('mode')];
-    c.mode = savedMode ?? (c.serverUrl.isEmpty && c.directAvailable ? ConnectionMode.direct : ConnectionMode.server);
-    if (!c.directAvailable) c.mode = ConnectionMode.server;
+    c.mode = savedMode ?? (c.serverUrl.isEmpty ? ConnectionMode.direct : ConnectionMode.server);
     c.modelOverride = prefs.getString('modelOverride') ?? '';
     c.chatModel = prefs.getString('chatModel') ?? c.modelOverride;
     c.maxSources = prefs.getInt('maxSources') ?? 12;
@@ -83,25 +84,23 @@ class SettingsController extends ChangeNotifier {
   Locale get locale => Locale(uiLanguage);
 
   /// The configured backend, reading saved books from the device first.
-  ManabiBackend get backend => _backend ??= OfflineFirstBackend(_raw = _createBackend());
-  ManabiBackend? _raw;
+  ManabiBackend get backend => _backend ??= OfflineFirstBackend(_createBackend());
 
   ManabiBackend _createBackend() {
+    // The library never needs the AI: without a key or a server, books are
+    // read straight from Turath and only the AI parts ask to be set up.
     if (mode == ConnectionMode.direct) {
-      if (!directAvailable) return const UnconfiguredBackend('DIRECT_NOT_ON_WEB');
-      if (geminiKey.trim().isEmpty) return const UnconfiguredBackend('NO_API_KEY');
       // The picked model is preferred per question (see [chatModel]), so the
       // others still take over when it is out of quota.
-      return DirectBackend(apiKey: geminiKey.trim(), catalog: _catalog);
+      return DirectBackend(apiKey: geminiKey.trim(), catalog: _catalog, turathBaseUrl: _turathBase);
     }
-    if (serverUrl.trim().isEmpty) return const UnconfiguredBackend('SERVER_NOT_CONFIGURED');
-    return ServerBackend(serverUrl.trim(), accessToken: accessToken.trim());
+    final library = DirectBackend(apiKey: '', catalog: _catalog, turathBaseUrl: _turathBase, noAiCode: 'SERVER_NOT_CONFIGURED');
+    if (serverUrl.trim().isEmpty) return library;
+    return LibraryFallbackBackend(ServerBackend(serverUrl.trim(), accessToken: accessToken.trim()), library);
   }
 
-  bool get isConfigured {
-    backend;
-    return _raw is! UnconfiguredBackend;
-  }
+  /// Whether the AI side is set up (the library always works).
+  bool get isConfigured => mode == ConnectionMode.direct ? geminiKey.trim().isNotEmpty : serverUrl.trim().isNotEmpty;
 
   void _changed({bool backendChanged = false}) {
     if (backendChanged) _backend = null;
@@ -222,7 +221,7 @@ class SettingsController extends ChangeNotifier {
     arabicScale = 1.0;
     researchDepth = 'standard';
     textScale = 1.0;
-    mode = serverUrl.isEmpty && directAvailable ? ConnectionMode.direct : ConnectionMode.server;
+    mode = serverUrl.isEmpty ? ConnectionMode.direct : ConnectionMode.server;
     _changed(backendChanged: true);
   }
 

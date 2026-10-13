@@ -164,7 +164,7 @@
   "modeServer": "Manabi server",
   "modeServerInfo": "Recommended. The Gemini key stays on the server and the app works on every platform, including the web.",
   "modeDirect": "Direct (own key)",
-  "modeDirectInfo": "The app talks to Turath and Gemini itself using your own Gemini API key, stored securely on this device. Not available on the web.",
+  "modeDirectInfo": "The app talks to Turath and Gemini itself using your own Gemini API key, stored securely on this device. Books open without a key; only the AI answers need it.",
   "serverUrl": "Server address",
   "accessToken": "Access token (optional)",
   "geminiKey": "Gemini API key",
