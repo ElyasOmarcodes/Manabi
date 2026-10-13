@@ -16,6 +16,8 @@ Return JSON with:
 - "detectedLanguage": ps, ar, fa, en or other. Pashto uses ټ ډ ړ ږ ښ ګ ڼ ې ۍ; Persian/Dari uses گ چ پ ژ and words like است، چیست، آیا.
 - "questionType": quran, hadith, fiqh, aqidah, tafsir, seerah, history, language, ethics or other.
 - "isIslamicStudies": true if it is about Islamic sciences or classical Arabic heritage.
+- "remember": "" unless the user states a lasting wish about how they want to be answered, or a fact about themselves that should shape later answers (e.g. "always answer briefly", "I follow the Hanafi school", "call me Elyas", "I like posts"); then one short sentence in English stating it. Never the topic of the question itself, and nothing already in WHAT YOU KNOW ABOUT THIS USER.
+- "chatReply": "" for anything to research. When the message is conversation rather than a question to look up (a greeting, thanks, "who are you?", a question about Manabi itself or what it can do, small talk), a short warm reply in the user's language (1 to 3 sentences) and "queries" empty. Manabi is an assistant that answers questions on the Islamic sciences from classical books in the Turath library and cites the exact page of every quotation; it gives sources, not fatwas.
 - "queries": 5 to 8 Arabic search queries without diacritics, 1 to 5 words each. Mix (a) the exact phrasing a classical author would most likely use for this case, e.g. "ولدت شاة كلبا", "رأسه رأس كلب", "صاح صياح الغنم"; (b) the technical term of the chapter, e.g. "المتولد من مأكول"; (c) one or two shorter general terms. If the user quotes a verse or hadith, include a distinctive exact 2–5 word phrase from it. Most specific first.
 - "madhhabs": the schools whose books must be searched: any of hanafi, maliki, shafii, hanbali. If the user names a school, include only that school. For comparative fiqh include all four. Empty if not a fiqh question.
 - "requestedBooks": Arabic titles of books the user explicitly asks to consult (as the user wrote them), e.g. "الفقه الإسلامي وأدلته", "الموسوعة الفقهية". Empty if none.
@@ -33,6 +35,8 @@ export const PLAN_SCHEMA = {
     detectedLanguage: { type: "STRING", enum: ["ps", "ar", "fa", "en", "other"] },
     questionType: { type: "STRING", enum: ["quran", "hadith", "fiqh", "aqidah", "tafsir", "seerah", "history", "language", "ethics", "other"] },
     isIslamicStudies: { type: "BOOLEAN" },
+    chatReply: { type: "STRING" },
+    remember: { type: "STRING" },
     queries: { type: "ARRAY", items: { type: "STRING" } },
     madhhabs: { type: "ARRAY", items: { type: "STRING", enum: ["hanafi", "maliki", "shafii", "hanbali"] } },
     requestedBooks: { type: "ARRAY", items: { type: "STRING" } },
@@ -41,8 +45,8 @@ export const PLAN_SCHEMA = {
     answerFormat: { type: "STRING", enum: ["standard", "posts", "quotes", "brief", "detailed"] },
     referenceBooks: { type: "ARRAY", items: { type: "STRING" } },
   },
-  required: ["standaloneQuestion", "detectedLanguage", "questionType", "isIslamicStudies", "queries", "madhhabs", "requestedBooks", "requestedAuthors", "chapterTerms", "answerFormat", "referenceBooks"],
-  propertyOrdering: ["standaloneQuestion", "detectedLanguage", "questionType", "isIslamicStudies", "queries", "madhhabs", "requestedBooks", "requestedAuthors", "chapterTerms", "answerFormat", "referenceBooks"],
+  required: ["standaloneQuestion", "detectedLanguage", "questionType", "isIslamicStudies", "chatReply", "remember", "queries", "madhhabs", "requestedBooks", "requestedAuthors", "chapterTerms", "answerFormat", "referenceBooks"],
+  propertyOrdering: ["standaloneQuestion", "detectedLanguage", "questionType", "isIslamicStudies", "chatReply", "remember", "queries", "madhhabs", "requestedBooks", "requestedAuthors", "chapterTerms", "answerFormat", "referenceBooks"],
 };
 
 export const RERANK_SYSTEM = `You are the reading step of Manabi. You receive a question and numbered CANDIDATE excerpts retrieved from classical books on Turath.
@@ -128,6 +132,10 @@ export const COMPOSE_SCHEMA = {
   propertyOrdering: ["status", "answer", "summary", "citations", "opinions", "notes"],
 };
 
+// What the app remembers of the user's own wishes (shown and editable in its settings).
+export const memoryBlock = (memory) =>
+  Array.isArray(memory) && memory.length ? `WHAT YOU KNOW ABOUT THIS USER (their own wishes from earlier chats; follow them unless this question asks otherwise; not a source):\n${memory.map((m) => `- ${m}`).join("\n")}\n\n` : "";
+
 const historyBlock = (history) => {
   if (!history?.length) return "";
   const lines = history
@@ -137,8 +145,8 @@ const historyBlock = (history) => {
   return `CONVERSATION HISTORY (not a source):\n${lines}\n\n`;
 };
 
-export const planPrompt = ({ question, history, scopeLabel }) =>
-  `${historyBlock(history)}${scopeLabel ? `The user restricted the search to: ${scopeLabel}\n` : ""}USER QUESTION:\n${question}`;
+export const planPrompt = ({ question, history, scopeLabel, memory }) =>
+  `${memoryBlock(memory)}${historyBlock(history)}${scopeLabel ? `The user restricted the search to: ${scopeLabel}\n` : ""}USER QUESTION:\n${question}`;
 
 const meta = (s) =>
   [
@@ -168,8 +176,8 @@ export const outlineBlock = (outlines = []) =>
         .join("\n")}\n\n`
     : "";
 
-export const composePrompt = ({ question, history, sources, languageName, missing, format = "standard", outlines = [] }) =>
-  `${historyBlock(history)}ANSWER LANGUAGE: ${languageName}\nFORMAT: ${format}\n${missing ? `NOTE FROM THE READING STEP (what may be missing): ${missing}\n` : ""}\n${outlineBlock(outlines)}SOURCES:\n${sourceBlock(sources)}\n\nUSER QUESTION:\n${question}`;
+export const composePrompt = ({ question, history, sources, languageName, missing, format = "standard", outlines = [], memory }) =>
+  `${memoryBlock(memory)}${historyBlock(history)}ANSWER LANGUAGE: ${languageName}\nFORMAT: ${format}\n${missing ? `NOTE FROM THE READING STEP (what may be missing): ${missing}\n` : ""}\n${outlineBlock(outlines)}SOURCES:\n${sourceBlock(sources)}\n\nUSER QUESTION:\n${question}`;
 
 export const LAYERS_SYSTEM = `You annotate pages of a classical Arabic book: mark every stretch of the base text (المتن) that the book explains.
 How these books are laid out:

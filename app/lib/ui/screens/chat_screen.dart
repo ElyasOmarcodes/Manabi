@@ -63,16 +63,36 @@ class _ChatScreenState extends State<ChatScreen> {
     return SafeArea(
       bottom: false,
       child: Column(children: [
-        _TopBar(chat: chat, wide: wide),
+        if (empty) _TopBar(chat: chat, wide: wide),
         Expanded(
           child: empty
               ? _Welcome(configured: settings.isConfigured)
-              : ListView.builder(
-                  controller: _scroll,
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                  itemCount: chat.turns.length,
-                  itemBuilder: (context, i) => ReadingWidth(maxWidth: 740, child: _TurnView(chat: chat, turn: chat.turns[i], progress: chats.progress[chat.turns[i].id])),
-                ),
+              // The messages slide under the top bar and toward the composer,
+              // fading out on the way, so neither bar is ever crowded.
+              : Stack(children: [
+                  Positioned.fill(
+                    child: LayoutBuilder(builder: (context, c) {
+                      final h = c.maxHeight;
+                      double at(double px) => (px / h).clamp(0.0, 1.0);
+                      return ShaderMask(
+                        blendMode: BlendMode.dstIn,
+                        shaderCallback: (r) => LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: const [Color(0x00000000), Color(0x00000000), Color(0x2E000000), Color(0xFF000000), Color(0xFF000000), Color(0x00000000)],
+                          stops: [0, at(14), at(_barHeight), at(_barHeight + 36), at(h - 30), 1],
+                        ).createShader(r),
+                        child: ListView.builder(
+                          controller: _scroll,
+                          padding: const EdgeInsets.fromLTRB(16, _barHeight + 8, 16, 34),
+                          itemCount: chat.turns.length,
+                          itemBuilder: (context, i) => ReadingWidth(maxWidth: 740, child: _TurnView(chat: chat, turn: chat.turns[i], progress: chats.progress[chat.turns[i].id])),
+                        ),
+                      );
+                    }),
+                  ),
+                  Positioned(top: 0, left: 0, right: 0, child: _TopBar(chat: chat, wide: wide)),
+                ]),
         ),
         if (empty) const _Suggestions(),
         _Composer(pending: pending),
@@ -81,6 +101,8 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 }
+
+const double _barHeight = 56;
 
 class _TopBar extends StatelessWidget {
   const _TopBar({required this.chat, required this.wide});
@@ -92,7 +114,7 @@ class _TopBar extends StatelessWidget {
     final a = context.aura;
     final hasTurns = chat != null && chat!.turns.isNotEmpty;
     return SizedBox(
-      height: 56,
+      height: _barHeight,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 10),
         child: Row(children: [
@@ -436,16 +458,11 @@ class _ComposerState extends State<_Composer> {
     final scope = nav.scope;
     final scopeLabel = scope.label();
     final langLabel = settings.answerLanguage == 'auto' ? null : languageLabels(l)[settings.answerLanguage];
-    final deepOrQuick = settings.researchDepth != 'standard';
     final pills = [
       if (settings.chatModel.isNotEmpty)
         _Pill(icon: Icons.memory_rounded, label: modelShortName(settings.chatModel), onTap: () => showModelPicker(context), onClear: () => settings.setChatModel('')),
       if (scopeLabel.isNotEmpty) _Pill(icon: Icons.filter_list_rounded, label: scopeLabel, onTap: () => showOptionsSheet(context), onClear: () => nav.setScope(SearchScope.all)),
       if (langLabel != null) _Pill(icon: Icons.translate_rounded, label: langLabel, onTap: () => showOptionsSheet(context), onClear: () => settings.setAnswerLanguage('auto')),
-      if (deepOrQuick)
-        Builder(
-            builder: (pill) => _Pill(
-                icon: Icons.speed_rounded, label: depthLabel(l, settings.researchDepth), onTap: () => showDepthPopup(pill), onClear: () => settings.setResearchDepth('standard'))),
     ];
 
     return Padding(

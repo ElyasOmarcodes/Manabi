@@ -8,7 +8,7 @@
 PRODUCT_NAME = Manabi
 
 // The application's bundle identifier
-PRODUCT_BUNDLE_IDENTIFIER = com.manabi.manabi
+PRODUCT_BUNDLE_IDENTIFIER = com.ElyasOmar.manabi
 
 // The copyright displayed in application information
 PRODUCT_COPYRIGHT = Copyright © 2026 com.manabi. All rights reserved.

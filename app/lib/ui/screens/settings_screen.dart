@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../state/memory_controller.dart';
+
 import '../../state/downloads.dart';
 import '../../state/reading_controller.dart';
 import '../../state/settings_controller.dart';
@@ -98,6 +100,17 @@ class SettingsScreen extends StatelessWidget {
             ]),
             SettingsGroup(title: l.settingsAnswersGroup, children: [
               SettingsRow(icon: Icons.auto_awesome_outlined, color: AuraHues.amber, title: l.aiStyle, value: depthLabel(l, s.researchDepth), onTap: () => push(const AiStyleSettingsPage())),
+              Builder(builder: (context) {
+                final m = context.watch<MemoryController>();
+                return SettingsRow(
+                  icon: Icons.psychology_alt_outlined,
+                  color: AuraHues.violet,
+                  title: l.memory,
+                  subtitle: l.memorySub,
+                  value: m.enabled ? '${m.items.length}' : null,
+                  onTap: () => push(const MemorySettingsPage()),
+                );
+              }),
               SettingsRow(
                 icon: Icons.cloud_outlined,
                 color: AuraHues.teal,

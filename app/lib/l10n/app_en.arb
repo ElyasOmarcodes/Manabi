@@ -796,5 +796,15 @@
         "type": "String"
       }
     }
-  }
+  },
+  "memory": "Memory",
+  "memorySub": "What the assistant remembers about how you like answers",
+  "memoryOn": "Remember and use",
+  "memoryOnSub": "When you say how you want answers (\"answer briefly\", \"I follow the Hanafi school\"), it is kept here and followed in later chats. Kept only on this device.",
+  "memoryEmpty": "Nothing remembered yet.",
+  "memoryAdd": "Add to memory",
+  "memoryHint": "e.g. Answer briefly, with the Hanafi view first",
+  "memoryClear": "Forget everything",
+  "memoryClearConfirm": "Forget everything the assistant remembers?",
+  "memorySaved": "Memory updated"
 }

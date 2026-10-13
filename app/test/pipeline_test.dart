@@ -249,6 +249,18 @@ void main() {
       expect(model.prompts, hasLength(1));
     });
 
+    test('conversation is answered at once, with no search', () async {
+      final model = ScriptedModel([
+        {...plan(), 'queries': <String>[], 'chatReply': 'زه منابع یم: له تراث څخه د اسلامي علومو پوښتنو ته ځواب درکوم.'},
+      ]);
+      final pipeline = AnswerPipeline(model: model, turath: TurathClient(client: turathMock(empty: true)), catalog: catalog);
+      final r = ((await pipeline.ask(const AskRequest(question: 'ته څوک یې؟')).toList()).last as AskResultEvent).result;
+      expect(r.status, AnswerStatus.answered);
+      expect(r.answer, startsWith('زه منابع یم'));
+      expect(r.sources, isEmpty);
+      expect(model.prompts, hasLength(1));
+    });
+
     test('follow-up round searches new queries', () async {
       final log = <Uri>[];
       final model = ScriptedModel([

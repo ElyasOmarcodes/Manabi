@@ -24,6 +24,7 @@ import 'state/search_history.dart';
 import 'state/settings_controller.dart';
 import 'ui/home_shell.dart';
 import 'ui/screens/setup_screen.dart';
+import 'state/memory_controller.dart';
 import 'ui/screens/splash_screen.dart';
 import 'ui/theme.dart';
 import 'ui/widgets/visual_arrow_keys.dart';
@@ -37,8 +38,12 @@ void main() {
 }
 
 class AppServices {
-  AppServices(this.catalog, this.settings, this.chats, {required this.sync, this.needsSetup = false});
+  AppServices(this.catalog, this.settings, this.chats, {required this.sync, this.needsSetup = false, MemoryController? memory})
+      : memory = memory ?? MemoryController.inMemory();
   final CatalogService catalog;
+
+  /// What the assistant remembers of the user.
+  final MemoryController memory;
   final SettingsController settings;
   final ChatController chats;
 
@@ -64,9 +69,15 @@ class AppServices {
     final needsSetup = await CatalogSync.needsSetup();
     // Later launches refresh the shared lists (new books, PDFs) quietly.
     if (!needsSetup) unawaited(sync.startBackground());
-    final chats = ChatController(store, () => settings.backend)..modelProvider = () => settings.chatModel.isEmpty ? null : settings.chatModel;
+    final memory = await MemoryController.load();
+    final chats = ChatController(store, () => settings.backend)
+      ..modelProvider = (() => settings.chatModel.isEmpty ? null : settings.chatModel)
+      ..memoryProvider = (() => memory.forPrompt)
+      ..onRemember = (text) {
+        if (memory.enabled) memory.add(text);
+      };
     await minSplash;
-    return AppServices(catalog, settings, chats, sync: sync, needsSetup: needsSetup);
+    return AppServices(catalog, settings, chats, sync: sync, needsSetup: needsSetup, memory: memory);
   }
 }
 
@@ -114,6 +125,7 @@ class _ManabiAppState extends State<ManabiApp> {
               ChangeNotifierProvider(create: (_) => ReadingController()..load()),
               ChangeNotifierProvider.value(value: DownloadController.instance ?? DownloadController.empty()),
               ChangeNotifierProvider.value(value: services.sync),
+              ChangeNotifierProvider.value(value: services.memory),
             ],
             child: _App(needsSetup: services.needsSetup),
           );

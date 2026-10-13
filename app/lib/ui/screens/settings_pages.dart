@@ -6,6 +6,7 @@ import '../../core/backend/backend.dart';
 import '../../core/catalog/catalog_service.dart';
 import '../../core/turath/arabic_match.dart';
 import '../../state/chat_controller.dart';
+import '../../state/memory_controller.dart';
 import '../../state/reading_controller.dart';
 import '../../state/catalog_sync.dart';
 import '../../state/read_cache.dart';
@@ -1102,6 +1103,103 @@ class AboutPage extends StatelessWidget {
             style: TextStyle(fontFamily: uiFont, fontSize: 12, color: a.faint, height: 1.7),
           ),
         ),
+      ],
+    );
+  }
+}
+
+/// What the assistant remembers: switched on or off, each item editable,
+/// new ones added by hand, all forgotten at once.
+class MemorySettingsPage extends StatelessWidget {
+  const MemorySettingsPage({super.key});
+
+  Future<String?> _ask(BuildContext context, {String initial = ''}) {
+    final l = context.l;
+    final controller = TextEditingController(text: initial);
+    return showDialog<String>(
+      context: context,
+      builder: (dialog) => AlertDialog(
+        title: Text(
+          l.memoryAdd,
+          style: TextStyle(fontFamily: uiFont, fontWeight: FontWeight.w700),
+        ),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          minLines: 1,
+          maxLines: 4,
+          maxLength: 240,
+          decoration: InputDecoration(hintText: l.memoryHint),
+          onSubmitted: (v) => Navigator.pop(dialog, v),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialog), child: Text(MaterialLocalizations.of(dialog).cancelButtonLabel)),
+          FilledButton(onPressed: () => Navigator.pop(dialog, controller.text), child: Text(MaterialLocalizations.of(dialog).okButtonLabel)),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = context.l;
+    final a = context.aura;
+    final m = context.watch<MemoryController>();
+    return _SettingsPage(
+      title: l.memory,
+      children: [
+        SettingsGroup(children: [_switchRow(Icons.psychology_alt_outlined, AuraHues.violet, l.memoryOn, m.enabled, m.setEnabled, subtitle: l.memoryOnSub)]),
+        SettingsGroup(
+          children: [
+            if (m.items.isEmpty)
+              Padding(
+                padding: const EdgeInsets.all(18),
+                child: Text(
+                  l.memoryEmpty,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontFamily: uiFont, color: a.muted),
+                ),
+              )
+            else
+              for (var i = 0; i < m.items.length; i++)
+                SettingsRow(
+                  icon: Icons.bookmark_border_rounded,
+                  color: AuraHues.teal,
+                  title: m.items[i].text,
+                  trailing: IconButton(
+                    tooltip: MaterialLocalizations.of(context).deleteButtonTooltip,
+                    icon: Icon(Icons.close_rounded, color: a.muted),
+                    onPressed: () => m.remove(i),
+                  ),
+                  onTap: () async {
+                    final v = await _ask(context, initial: m.items[i].text);
+                    if (v != null) m.update(i, v);
+                  },
+                ),
+            SettingsRow(
+              icon: Icons.add_rounded,
+              color: AuraHues.blue,
+              title: l.memoryAdd,
+              onTap: () async {
+                final v = await _ask(context);
+                if (v != null) m.add(v);
+              },
+            ),
+          ],
+        ),
+        if (m.items.isNotEmpty)
+          SettingsGroup(
+            children: [
+              SettingsRow(
+                icon: Icons.delete_sweep_outlined,
+                title: l.memoryClear,
+                danger: true,
+                onTap: () async {
+                  if (await confirmDialog(context, l.memoryClearConfirm)) m.clear();
+                },
+              ),
+            ],
+          ),
       ],
     );
   }

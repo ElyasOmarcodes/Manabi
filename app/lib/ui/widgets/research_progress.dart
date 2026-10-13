@@ -231,7 +231,9 @@ class _Orb extends StatelessWidget {
   }
 }
 
-/// Five segments, one per stage; the current one shimmers.
+/// One slim track for the five stages: the fill glides to the current stage
+/// (halfway into it) in the reading direction, and a soft glowing head with a
+/// light sweeping toward it shows that work goes on.
 class _StepBar extends StatelessWidget {
   const _StepBar({required this.stage, required this.animation});
   final AskStage stage;
@@ -239,33 +241,77 @@ class _StepBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final a = context.aura;
-    return Row(children: [
-      for (final s in AskStage.values) ...[
-        Expanded(
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(3),
-            child: SizedBox(
-              height: 4,
-              child: s.index < stage.index
-                  ? ColoredBox(color: a.accent)
-                  : s.index > stage.index
-                      ? ColoredBox(color: a.border)
-                      : AnimatedBuilder(
-                          animation: animation,
-                          builder: (context, _) => DecoratedBox(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [a.accent.withValues(alpha: 0.25), a.accent, a.accent.withValues(alpha: 0.25)],
-                                stops: [(animation.value - 0.35).clamp(0, 1), animation.value, (animation.value + 0.35).clamp(0, 1)],
-                              ),
-                            ),
+    final dir = Directionality.of(context);
+    final target = (stage.index + 0.5) / AskStage.values.length;
+    return SizedBox(
+      height: 10,
+      child: TweenAnimationBuilder<double>(
+        tween: Tween(end: target),
+        duration: const Duration(milliseconds: 700),
+        curve: Curves.easeOutCubic,
+        builder: (context, f, _) => LayoutBuilder(
+          builder: (context, c) {
+            final w = c.maxWidth;
+            final fill = w * f;
+            return Stack(
+              clipBehavior: Clip.none,
+              alignment: AlignmentDirectional.centerStart,
+              children: [
+                Container(
+                  height: 3,
+                  decoration: BoxDecoration(color: a.border.withValues(alpha: 0.7), borderRadius: BorderRadius.circular(3)),
+                ),
+                PositionedDirectional(
+                  start: 0,
+                  width: fill,
+                  child: AnimatedBuilder(
+                    animation: animation,
+                    builder: (context, _) {
+                      final t = animation.value;
+                      return Container(
+                        height: 3,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(3),
+                          gradient: LinearGradient(
+                            begin: AlignmentDirectional.centerStart.resolve(dir),
+                            end: AlignmentDirectional.centerEnd.resolve(dir),
+                            colors: [a.accent.withValues(alpha: 0.55), a.accent, Colors.white.withValues(alpha: 0.9), a.accent],
+                            stops: [0, (t - 0.12).clamp(0.0, 1.0), t, (t + 0.12).clamp(0.0, 1.0)],
                           ),
                         ),
-            ),
-          ),
+                      );
+                    },
+                  ),
+                ),
+                PositionedDirectional(
+                  start: fill - 5,
+                  child: AnimatedBuilder(
+                    animation: animation,
+                    builder: (context, _) {
+                      final pulse = 0.5 + 0.5 * (1 - (animation.value * 2 - 1).abs());
+                      return Container(
+                        width: 10,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: a.accent,
+                          boxShadow: [
+                            BoxShadow(
+                              color: a.accent.withValues(alpha: 0.25 + 0.35 * pulse),
+                              blurRadius: 6 + 6 * pulse,
+                              spreadRadius: 1 + pulse,
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            );
+          },
         ),
-        if (s != AskStage.values.last) const SizedBox(width: 4),
-      ],
-    ]);
+      ),
+    );
   }
 }

@@ -25,6 +25,8 @@ const planSchema = {
       'enum': ['quran', 'hadith', 'fiqh', 'aqidah', 'tafsir', 'seerah', 'history', 'language', 'ethics', 'other'],
     },
     'isIslamicStudies': {'type': 'BOOLEAN'},
+    'chatReply': _str,
+    'remember': _str,
     'queries': _strList,
     'madhhabs': {
       'type': 'ARRAY',
@@ -43,11 +45,11 @@ const planSchema = {
     'referenceBooks': _strList,
   },
   'required': [
-    'standaloneQuestion', 'detectedLanguage', 'questionType', 'isIslamicStudies', 'queries', 'madhhabs', //
+    'standaloneQuestion', 'detectedLanguage', 'questionType', 'isIslamicStudies', 'chatReply', 'remember', 'queries', 'madhhabs', //
     'requestedBooks', 'requestedAuthors', 'chapterTerms', 'answerFormat', 'referenceBooks'
   ],
   'propertyOrdering': [
-    'standaloneQuestion', 'detectedLanguage', 'questionType', 'isIslamicStudies', 'queries', 'madhhabs', //
+    'standaloneQuestion', 'detectedLanguage', 'questionType', 'isIslamicStudies', 'chatReply', 'remember', 'queries', 'madhhabs', //
     'requestedBooks', 'requestedAuthors', 'chapterTerms', 'answerFormat', 'referenceBooks'
   ],
 };
@@ -118,8 +120,13 @@ String _historyBlock(List<HistoryTurn> history) {
   return 'CONVERSATION HISTORY (not a source):\n$lines\n\n';
 }
 
-String planPrompt({required String question, List<HistoryTurn> history = const [], String scopeLabel = ''}) =>
-    '${_historyBlock(history)}${scopeLabel.isNotEmpty ? 'The user restricted the search to: $scopeLabel\n' : ''}USER QUESTION:\n$question';
+/// What the app remembers of the user's own wishes (shown and editable in its settings).
+String memoryBlock(List<String> memory) => memory.isEmpty
+    ? ''
+    : 'WHAT YOU KNOW ABOUT THIS USER (their own wishes from earlier chats; follow them unless this question asks otherwise; not a source):\n${memory.map((m) => '- $m').join('\n')}\n\n';
+
+String planPrompt({required String question, List<HistoryTurn> history = const [], String scopeLabel = '', List<String> memory = const []}) =>
+    '${memoryBlock(memory)}${_historyBlock(history)}${scopeLabel.isNotEmpty ? 'The user restricted the search to: $scopeLabel\n' : ''}USER QUESTION:\n$question';
 
 /// A page as shown to the model.
 class PromptSource {
@@ -178,8 +185,9 @@ String composePrompt({
   String missing = '',
   String format = 'standard',
   List<ChapterOutline> outlines = const [],
+  List<String> memory = const [],
 }) =>
-    '${_historyBlock(history)}ANSWER LANGUAGE: $languageName\nFORMAT: $format\n${missing.isNotEmpty ? 'NOTE FROM THE READING STEP (what may be missing): $missing\n' : ''}\n${outlineBlock(outlines)}SOURCES:\n${sourceBlock(sources)}\n\nUSER QUESTION:\n$question';
+    '${memoryBlock(memory)}${_historyBlock(history)}ANSWER LANGUAGE: $languageName\nFORMAT: $format\n${missing.isNotEmpty ? 'NOTE FROM THE READING STEP (what may be missing): $missing\n' : ''}\n${outlineBlock(outlines)}SOURCES:\n${sourceBlock(sources)}\n\nUSER QUESTION:\n$question';
 
 /// Mirrors LAYERS_SCHEMA in server/src/prompts.mjs.
 const layersSchema = {

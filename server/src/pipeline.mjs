@@ -614,6 +614,7 @@ export const createPipeline = ({ gemini, turath: client, catalog }) => {
     const scope = input.scope ?? {};
     const nususScope = scopeToNusus(scope);
     const history = Array.isArray(input.history) ? input.history.slice(-3) : [];
+    const memory = (Array.isArray(input.memory) ? input.memory : []).filter((m) => typeof m === "string" && m.trim()).slice(0, 30).map((m) => m.trim().slice(0, 240));
     const depth = DEPTHS[input.depth] ? input.depth : "standard";
     const L = limitsFor(depth);
     const maxSources = clampInt(input.maxSources, 3, L.maxSelected, L.maxSelected);
@@ -622,7 +623,7 @@ export const createPipeline = ({ gemini, turath: client, catalog }) => {
     onEvent("stage", { stage: "planning" });
     const plan = await generate("plan", {
       system: PLAN_SYSTEM,
-      prompt: planPrompt({ question, history, scopeLabel: scopeLabel(scope, catalog) }),
+      prompt: planPrompt({ question, history, scopeLabel: scopeLabel(scope, catalog), memory }),
       schema: PLAN_SCHEMA,
       temperature: 0.1,
       tier: "fast",
@@ -643,7 +644,12 @@ export const createPipeline = ({ gemini, turath: client, catalog }) => {
     onEvent("plan", { queries, language, books: plannedBooks });
     act("plan", { queries, books: plannedBooks, madhhabs, authors: requestedAuthorIds.map((id) => catalog.authorName(id)).filter(Boolean), format });
 
-    const done = (result, extra = {}) => ({ ...result, queries, language, depth, model: plan.model, elapsedMs: Date.now() - started, usage: { ...usage }, ...extra });
+    // A lasting wish the user just stated, for the app to keep.
+    const remember = typeof p.remember === "string" ? p.remember.trim().slice(0, 240) : "";
+    const done = (result, extra = {}) => ({ ...result, queries, language, depth, model: plan.model, elapsedMs: Date.now() - started, usage: { ...usage }, ...(remember ? { remember } : {}), ...extra });
+    // Conversation ("who are you?", thanks): answered at once, nothing to research.
+    const chatReply = typeof p.chatReply === "string" ? p.chatReply.trim() : "";
+    if (chatReply && !queries.length) return done({ status: "answered", answer: chatReply, summary: chatReply.slice(0, 200), sources: [], related: [], opinions: [] });
     if (!queries.length) return done(finalize({ composed: { status: "insufficient" }, sources: [], language }));
 
     // 2. search
@@ -762,7 +768,7 @@ export const createPipeline = ({ gemini, turath: client, catalog }) => {
         if (draft) onEvent("draft", { text: draft });
       },
       system: composeSystem(LANGUAGES[language]),
-      prompt: composePrompt({ question: standalone, history, sources, languageName: LANGUAGES[language], missing: ranking.coverage === "full" ? "" : ranking.missing, format, outlines: chapters.outlines }),
+      prompt: composePrompt({ question: standalone, history, sources, languageName: LANGUAGES[language], missing: ranking.coverage === "full" ? "" : ranking.missing, format, outlines: chapters.outlines, memory }),
       schema: COMPOSE_SCHEMA,
       temperature: 0.2,
     });

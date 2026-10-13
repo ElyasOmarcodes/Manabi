@@ -73,6 +73,12 @@ class ChatController extends ChangeNotifier with WidgetsBindingObserver {
   /// The model the user picked for answers, or null for automatic.
   String? Function() modelProvider = () => null;
 
+  /// What the assistant remembers of the user, sent with every question.
+  List<String> Function() memoryProvider = () => const [];
+
+  /// Told when an answer brings a new wish to remember.
+  void Function(String text)? onRemember;
+
   /// Text of the "preparing your answer" notification.
   set keepAliveLabels(({String title, String text}) value) => _keepAlive.labels = value;
 
@@ -231,7 +237,8 @@ class ChatController extends ChangeNotifier with WidgetsBindingObserver {
         history: history,
         depth: depth,
         requestId: requestId,
-        model: modelProvider());
+        model: modelProvider(),
+        memory: memoryProvider());
     _heard[turn.id] = DateTime.now();
     _running[turn.id] = _backend().ask(request).listen(
       (event) {
@@ -253,6 +260,7 @@ class ChatController extends ChangeNotifier with WidgetsBindingObserver {
             turn
               ..result = result
               ..state = MessageState.done;
+            if (result.remember.isNotEmpty) onRemember?.call(result.remember);
         }
         notifyListeners();
       },

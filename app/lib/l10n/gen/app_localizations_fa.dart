@@ -1646,4 +1646,35 @@ class AppLocalizationsFa extends AppLocalizations {
   String actChapter(String book, String chapter, String pages) {
     return 'فصل «$chapter» از «$book» خوانده شد ($pages صفحه)';
   }
+
+  @override
+  String get memory => 'حافظه';
+
+  @override
+  String get memorySub => 'آنچه دستیار دربارهٔ پاسخ‌های دلخواه شما به یاد دارد';
+
+  @override
+  String get memoryOn => 'به یاد سپردن و به کار بردن';
+
+  @override
+  String get memoryOnSub =>
+      'وقتی بگویید پاسخ‌ها را چگونه می‌خواهید («کوتاه پاسخ بده»، «من حنفی هستم»)، اینجا نگه داشته می‌شود و در گفت‌وگوهای بعدی رعایت می‌شود. فقط روی همین دستگاه نگه داشته می‌شود.';
+
+  @override
+  String get memoryEmpty => 'هنوز چیزی به یاد سپرده نشده است.';
+
+  @override
+  String get memoryAdd => 'افزودن به حافظه';
+
+  @override
+  String get memoryHint => 'مثلاً: کوتاه پاسخ بده، اول نظر حنفی‌ها';
+
+  @override
+  String get memoryClear => 'فراموش کردن همه';
+
+  @override
+  String get memoryClearConfirm => 'همهٔ آنچه دستیار به یاد دارد فراموش شود؟';
+
+  @override
+  String get memorySaved => 'حافظه به‌روز شد';
 }

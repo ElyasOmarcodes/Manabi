@@ -170,7 +170,11 @@ class AnswerMarkdown extends StatelessWidget {
                       Text.rich(_spans(
                         context,
                         b.text,
-                        arabic ? arabicStyle(context, size: (base.fontSize ?? 16) + 2.5, scale: quoteScale).copyWith(height: 2.0) : base.copyWith(fontStyle: FontStyle.italic),
+                        // A classical face, a little smaller than the answer's own text.
+                        arabic
+                            ? arabicStyle(context, size: (base.fontSize ?? 16) - 0.5, scale: quoteScale)
+                                .copyWith(fontFamily: 'Amiri', fontFamilyFallback: const ['NotoNaskhArabic'], height: 1.95)
+                            : base.copyWith(fontStyle: FontStyle.italic, fontSize: (base.fontSize ?? 16) - 1),
                       )),
                     ]),
                   ),
@@ -180,6 +184,23 @@ class AnswerMarkdown extends StatelessWidget {
           ),
         );
       case BlockKind.paragraph:
+        // "— Book, 4/2 [1]": where a quotation comes from, small and quiet.
+        if (b.text.startsWith('—') || b.text.startsWith('– ')) {
+          final arabic = _isArabic(b.text);
+          final a = context.aura;
+          return Text.rich(_spans(
+            context,
+            b.text,
+            base.copyWith(
+              fontFamily: arabic ? 'Amiri' : base.fontFamily,
+              fontFamilyFallback: const ['NotoNaskhArabic'],
+              fontSize: (base.fontSize ?? 16) - 2,
+              fontWeight: FontWeight.w700,
+              color: a.muted,
+              height: 1.6,
+            ),
+          ));
+        }
         return Text.rich(_spans(context, b.text, base));
     }
   }

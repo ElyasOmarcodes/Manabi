@@ -25,7 +25,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.manabi.manabi"
+        applicationId = "com.ElyasOmar.manabi"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion

@@ -169,9 +169,13 @@ class AnswerResult {
     this.totalMatches,
     this.elapsedMs,
     this.usage = const TokenUsage(),
+    this.remember = '',
   });
 
   final AnswerStatus status;
+
+  /// A lasting wish the user stated in this question, for the memory.
+  final String remember;
 
   /// Markdown with numbered citation markers like `[1]`.
   final String answer;
@@ -221,6 +225,7 @@ class AnswerResult {
         totalMatches: _int(j['totalMatches']),
         elapsedMs: _int(j['elapsedMs']),
         usage: TokenUsage.fromJson(j['usage']),
+        remember: j['remember'] as String? ?? '',
       );
 
   Map<String, dynamic> toJson() => {
@@ -238,6 +243,7 @@ class AnswerResult {
         if (totalMatches != null) 'totalMatches': totalMatches,
         if (elapsedMs != null) 'elapsedMs': elapsedMs,
         if (!usage.isEmpty) 'usage': usage.toJson(),
+        if (remember.isNotEmpty) 'remember': remember,
       };
 }
 

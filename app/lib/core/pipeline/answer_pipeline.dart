@@ -158,8 +158,12 @@ class AskRequest {
     this.depth = 'standard',
     this.requestId,
     this.model,
+    this.memory = const [],
   });
   final String question;
+
+  /// The user's remembered wishes, followed in every answer.
+  final List<String> memory;
   final String language;
   final String fallbackLanguage;
   final SearchScope scope;
@@ -189,6 +193,7 @@ class AskRequest {
         'depth': depth,
         'requestId': ?requestId,
         'model': ?model,
+        if (memory.isNotEmpty) 'memory': memory,
       };
 }
 
@@ -811,7 +816,7 @@ class AnswerPipeline {
     final plan = await generate(
       'plan',
       system: planSystem,
-      prompt: planPrompt(question: question, history: request.history, scopeLabel: _scopeLabel(scope)),
+      prompt: planPrompt(question: question, history: request.history, scopeLabel: _scopeLabel(scope), memory: request.memory),
       schema: planSchema,
       temperature: 0.1,
       tier: ModelTier.fast,
@@ -840,7 +845,10 @@ class AnswerPipeline {
       'format': format,
     });
 
+    // A lasting wish the user just stated, for the app to keep.
+    final remember = p['remember'] is String ? (p['remember'] as String).trim() : '';
     AnswerResult withMeta(AnswerResult r, {int? total, String? modelName}) => AnswerResult(
+          remember: remember.length > 240 ? remember.substring(0, 240) : remember,
           status: r.status,
           answer: r.answer,
           summary: r.summary,
@@ -859,6 +867,16 @@ class AnswerPipeline {
     AnswerResult nothing({int? total, List<PipelineSource> related = const []}) =>
         withMeta(finalizeAnswer(composed: const {'status': 'insufficient'}, sources: related, language: language), total: total);
 
+    // Conversation ("who are you?", thanks): answered at once, nothing to research.
+    final chatReply = p['chatReply'] is String ? (p['chatReply'] as String).trim() : '';
+    if (chatReply.isNotEmpty && queries.isEmpty) {
+      emit(AskResultEvent(withMeta(AnswerResult(
+        status: AnswerStatus.answered,
+        answer: chatReply,
+        summary: chatReply.length > 200 ? chatReply.substring(0, 200) : chatReply,
+      ))));
+      return;
+    }
     if (queries.isEmpty) {
       emit(AskResultEvent(nothing()));
       return;
@@ -965,6 +983,7 @@ class AnswerPipeline {
         missing: ranking['coverage'] == 'full' ? '' : '${ranking['missing'] ?? ''}',
         format: format,
         outlines: chapters.outlines,
+        memory: request.memory,
       ),
       schema: composeSchema,
       temperature: 0.2,

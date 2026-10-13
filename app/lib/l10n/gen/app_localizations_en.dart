@@ -1651,4 +1651,36 @@ class AppLocalizationsEn extends AppLocalizations {
   String actChapter(String book, String chapter, String pages) {
     return 'Read the chapter “$chapter” of $book ($pages pages)';
   }
+
+  @override
+  String get memory => 'Memory';
+
+  @override
+  String get memorySub =>
+      'What the assistant remembers about how you like answers';
+
+  @override
+  String get memoryOn => 'Remember and use';
+
+  @override
+  String get memoryOnSub =>
+      'When you say how you want answers (\"answer briefly\", \"I follow the Hanafi school\"), it is kept here and followed in later chats. Kept only on this device.';
+
+  @override
+  String get memoryEmpty => 'Nothing remembered yet.';
+
+  @override
+  String get memoryAdd => 'Add to memory';
+
+  @override
+  String get memoryHint => 'e.g. Answer briefly, with the Hanafi view first';
+
+  @override
+  String get memoryClear => 'Forget everything';
+
+  @override
+  String get memoryClearConfirm => 'Forget everything the assistant remembers?';
+
+  @override
+  String get memorySaved => 'Memory updated';
 }

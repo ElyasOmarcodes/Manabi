@@ -1644,4 +1644,37 @@ class AppLocalizationsPs extends AppLocalizations {
   String actChapter(String book, String chapter, String pages) {
     return 'د «$book» فصل «$chapter» ولوستل شو ($pages مخونه)';
   }
+
+  @override
+  String get memory => 'حافظه';
+
+  @override
+  String get memorySub =>
+      'هغه څه چې مرستیال ستا د خوښې ځوابونو په اړه یې په یاد ساتي';
+
+  @override
+  String get memoryOn => 'په یاد ساتل او کارول';
+
+  @override
+  String get memoryOnSub =>
+      'کله چې ووایې ځوابونه څنګه غواړې («لنډ ځواب راکړه»، «زه حنفي یم»)، دلته ساتل کېږي او په راتلونکو چټونو کې پرې عمل کېږي. یوازې په همدې وسیله کې ساتل کېږي.';
+
+  @override
+  String get memoryEmpty => 'تر اوسه هیڅ نه دي په یاد ساتل شوي.';
+
+  @override
+  String get memoryAdd => 'حافظې ته ورزیاتول';
+
+  @override
+  String get memoryHint => 'لکه: لنډ ځواب راکړه، لومړی د حنفي مذهب نظر';
+
+  @override
+  String get memoryClear => 'ټول هېرول';
+
+  @override
+  String get memoryClearConfirm =>
+      'هغه ټول څه چې مرستیال یې په یاد لري هېر شي؟';
+
+  @override
+  String get memorySaved => 'حافظه تازه شوه';
 }

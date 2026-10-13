@@ -5,13 +5,13 @@ import '../../state/reading_controller.dart';
 import '../theme.dart';
 import 'common.dart';
 
-/// Where text-error reports go, set at build time (nothing is hard-coded):
-///   `--dart-define=MANABI_REPORT_WHATSAPP=<number with country code>`
-///   `--dart-define=MANABI_REPORT_EMAIL=<address>`
-/// Without them WhatsApp lets the user pick a chat and the mail has no
-/// recipient yet.
-const reportWhatsApp = String.fromEnvironment('MANABI_REPORT_WHATSAPP');
-const reportEmail = String.fromEnvironment('MANABI_REPORT_EMAIL');
+/// Where text-error reports go: the developer's contacts, unless a build sets
+/// `--dart-define=MANABI_REPORT_WHATSAPP=…` / `MANABI_REPORT_EMAIL=…` (an
+/// empty define, as CI passes when the variable is unset, keeps these).
+const _whatsAppDefine = String.fromEnvironment('MANABI_REPORT_WHATSAPP');
+const _emailDefine = String.fromEnvironment('MANABI_REPORT_EMAIL');
+const reportWhatsApp = _whatsAppDefine == '' ? '98766465848' : _whatsAppDefine;
+const reportEmail = _emailDefine == '' ? 'ElyasOmar100@gmail.com' : _emailDefine;
 
 /// The colour of a highlight that carries a comment.
 const commentColor = Color(0xFFB794F6);

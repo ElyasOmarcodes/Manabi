@@ -1643,4 +1643,35 @@ class AppLocalizationsAr extends AppLocalizations {
   String actChapter(String book, String chapter, String pages) {
     return 'قُرئ باب «$chapter» من «$book» ($pages صفحات)';
   }
+
+  @override
+  String get memory => 'الذاكرة';
+
+  @override
+  String get memorySub => 'ما يتذكّره المساعد عن طريقتك المفضّلة في الأجوبة';
+
+  @override
+  String get memoryOn => 'التذكّر والاستعمال';
+
+  @override
+  String get memoryOnSub =>
+      'إذا ذكرتَ كيف تريد الأجوبة («أجب باختصار»، «أنا حنفي») حُفظ هنا واتُّبع في المحادثات اللاحقة. يُحفظ على هذا الجهاز وحده.';
+
+  @override
+  String get memoryEmpty => 'لم يُحفظ شيء بعد.';
+
+  @override
+  String get memoryAdd => 'إضافة إلى الذاكرة';
+
+  @override
+  String get memoryHint => 'مثلًا: أجب باختصار، وابدأ بقول الحنفية';
+
+  @override
+  String get memoryClear => 'نسيان كل شيء';
+
+  @override
+  String get memoryClearConfirm => 'هل تريد نسيان كل ما يتذكّره المساعد؟';
+
+  @override
+  String get memorySaved => 'حُدّثت الذاكرة';
 }

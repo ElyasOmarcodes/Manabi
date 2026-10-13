@@ -891,8 +891,10 @@ class _ReaderScreenState extends State<ReaderScreen> {
         ]),
       ),
     );
-    final prev = tool(Icons.chevron_right_rounded, l.previousPage, () => _page > 1 ? _jump(_page - 1) : null);
-    final next = tool(Icons.chevron_left_rounded, l.nextPage, () => _exists(_page + 1) ? _jump(_page + 1) : null);
+    // Chevrons turn with the text direction: in this right-to-left bar "left"
+    // is drawn pointing right, toward the earlier pages.
+    final prev = tool(Icons.chevron_left_rounded, l.previousPage, () => _page > 1 ? _jump(_page - 1) : null);
+    final next = tool(Icons.chevron_right_rounded, l.nextPage, () => _exists(_page + 1) ? _jump(_page + 1) : null);
     final bottom = MediaQuery.paddingOf(context).bottom;
 
     if (wide) {

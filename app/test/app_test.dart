@@ -158,6 +158,8 @@ void main() {
       // The app language opens as a dialog.
       await tester.tap(find.byIcon(Icons.arrow_back_rounded));
       await settle(tester);
+      await tester.drag(find.byType(Scrollable).last, const Offset(0, 3000));
+      await settle(tester);
       await tester.tap(find.text('App language'));
       await settle(tester);
       expect(find.text('پښتو'), findsWidgets);

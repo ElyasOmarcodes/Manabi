@@ -3089,6 +3089,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Read the chapter “{chapter}” of {book} ({pages} pages)'**
   String actChapter(String book, String chapter, String pages);
+
+  /// No description provided for @memory.
+  ///
+  /// In en, this message translates to:
+  /// **'Memory'**
+  String get memory;
+
+  /// No description provided for @memorySub.
+  ///
+  /// In en, this message translates to:
+  /// **'What the assistant remembers about how you like answers'**
+  String get memorySub;
+
+  /// No description provided for @memoryOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Remember and use'**
+  String get memoryOn;
+
+  /// No description provided for @memoryOnSub.
+  ///
+  /// In en, this message translates to:
+  /// **'When you say how you want answers (\"answer briefly\", \"I follow the Hanafi school\"), it is kept here and followed in later chats. Kept only on this device.'**
+  String get memoryOnSub;
+
+  /// No description provided for @memoryEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing remembered yet.'**
+  String get memoryEmpty;
+
+  /// No description provided for @memoryAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add to memory'**
+  String get memoryAdd;
+
+  /// No description provided for @memoryHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. Answer briefly, with the Hanafi view first'**
+  String get memoryHint;
+
+  /// No description provided for @memoryClear.
+  ///
+  /// In en, this message translates to:
+  /// **'Forget everything'**
+  String get memoryClear;
+
+  /// No description provided for @memoryClearConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Forget everything the assistant remembers?'**
+  String get memoryClearConfirm;
+
+  /// No description provided for @memorySaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Memory updated'**
+  String get memorySaved;
 }
 
 class _AppLocalizationsDelegate
