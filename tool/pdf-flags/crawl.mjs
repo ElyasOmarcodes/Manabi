@@ -24,7 +24,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let coolUntil = 0;
 let cooldown = 20_000;
 const backOff = (retryAfter) => {
-  const wait = Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : cooldown;
+  // Turath's Retry-After can be an hour; never wait more than five minutes at a time.
+  const wait = Math.min(Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : cooldown, 300_000);
   coolUntil = Math.max(coolUntil, Date.now() + wait);
   cooldown = Math.min(cooldown * 2, 300_000);
 };
@@ -86,7 +87,8 @@ await Promise.all(
   Array.from({ length: WORKERS }, async () => {
     while (queue.length && timeLeft()) {
       if (Date.now() < coolUntil) {
-        const ms = coolUntil - Date.now();
+        // Not past the budget, so the run always ends in time to commit.
+        const ms = Math.min(coolUntil - Date.now(), BUDGET_MS - (Date.now() - started));
         waited += ms;
         await sleep(ms);
         continue;

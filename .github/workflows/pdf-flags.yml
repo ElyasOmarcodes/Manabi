@@ -31,6 +31,8 @@ jobs:
           node-version: "22"
       - name: Ask Turath which books have a PDF
         id: crawl
+        # A hard stop, so the commit below always has time to run.
+        timeout-minutes: 76
         # Saves as it goes and stops after 70 minutes; the next run goes on.
         run: node tool/pdf-flags/crawl.mjs ${{ (github.event_name == 'schedule' || github.event.inputs.full == 'true') && '--full' || '' }}
       - name: Commit the list when it changed
