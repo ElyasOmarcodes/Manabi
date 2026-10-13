@@ -29,6 +29,9 @@
 
   <title>Manabi · منابع</title>
   <link rel="manifest" href="manifest.json">
+  <!-- Start the app's code at once, while the page is still being read. -->
+  <link rel="preload" href="main.dart.js" as="script">
+  <link rel="preconnect" href="https://api.turath.io" crossorigin>
   
   
   <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport">
@@ -102,6 +105,23 @@
           }
     }
   </style>
+  <style id="manabi-loading-style">
+    #manabi-loading {
+      position: fixed; inset: 0; z-index: 9999;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+      background: #FFFFFF; color: #6B6880;
+      font: 14px/1.6 system-ui, -apple-system, "Segoe UI", Tahoma, sans-serif;
+      transition: opacity .25s ease;
+    }
+    #manabi-loading img { width: 84px; height: 84px; border-radius: 22px; }
+    #manabi-loading .bar { width: 160px; height: 4px; border-radius: 4px; background: #ECE9F7; overflow: hidden; }
+    #manabi-loading .bar i { display: block; width: 40%; height: 100%; border-radius: 4px; background: #6D4AFF; animation: manabi-slide 1.1s ease-in-out infinite; }
+    @keyframes manabi-slide { from { transform: translateX(-110%); } to { transform: translateX(260%); } }
+    @media (prefers-color-scheme: dark) {
+      #manabi-loading { background: #0F0F14; color: #A6A3B8; }
+      #manabi-loading .bar { background: #24222E; }
+    }
+  </style>
   <script id="splash-screen-script">
     function removeSplashFromWeb() {
       document.getElementById("splash")?.remove();
@@ -111,6 +131,12 @@
   </script>
 </head>
 <body>
+  <!-- Shown at once, in plain HTML, until the app draws its first frame. -->
+  <div id="manabi-loading" dir="rtl">
+    <img src="icons/Icon-192.png" alt="">
+    <div class="bar"><i></i></div>
+    <div>منابع · بارېږي…</div>
+  </div>
   
   
   
