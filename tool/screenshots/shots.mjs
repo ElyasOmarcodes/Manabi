@@ -194,12 +194,20 @@ const waitForAnswer = async (page, labels, timeout = 240_000) => {
 // A documented answer shows its "Sources (n)" button; other outcomes show a status pill.
 // Real end-to-end answers: the app talks to a Manabi server that has the
 // Gemini key and reaches Turath. Nothing here is mocked.
-const ask = async (name, { lang, question, width = 1440, height = 900, theme = "light", done, sources }) => {
+const ask = async (name, { lang, question, typed = false, width = 1440, height = 900, theme = "light", done, sources, scrolls = 3 }) => {
   await run(name, async () => {
     const { ctx, page } = await open({ width, height, lang, theme, prefs: { serverUrl: process.env.MANABI_SERVER_URL ?? "http://localhost:8787", mode: "server" } });
     await page.waitForTimeout(4000);
     await semantics(page);
-    await tap(page, question);
+    if (typed) {
+      // A question of one's own: a starter question fills the composer, then it is replaced.
+      await tap(page, typed);
+      await page.waitForTimeout(400);
+      await page.keyboard.press("Control+A");
+      await page.keyboard.type(question);
+    } else {
+      await tap(page, question);
+    }
     await page.waitForTimeout(500);
     await page.keyboard.press("Control+Enter");
     await page.waitForTimeout(2500);
@@ -214,7 +222,7 @@ const ask = async (name, { lang, question, width = 1440, height = 900, theme = "
     console.log(name, "status:", status);
     await page.waitForTimeout(1500);
     await shot(page, `${name}-answer`);
-    for (let i = 1; i <= 3; i += 1) {
+    for (let i = 1; i <= scrolls; i += 1) {
       await page.mouse.move(width / 2, height / 2);
       await page.mouse.wheel(0, height * 0.7);
       await page.waitForTimeout(900);
@@ -232,6 +240,18 @@ const ask = async (name, { lang, question, width = 1440, height = 900, theme = "
 await ask("live-1-ps", { lang: "ps", question: "د «إنما الأعمال بالنيات» حدیث چا روایت کړی دی؟", done: ["منابع (", "په نیمګړي ډول مستند", "مستند ځواب ونه موندل شو"], sources: "منابع (" });
 await ask("live-2-ar", { lang: "ar", question: "ماذا تقول كتب الفقه في مس الذكر ونقض الوضوء؟", done: ["المصادر (", "موثق جزئيًا", "لم يوجد جواب موثق"], sources: "المصادر (" });
 await ask("live-3-en-phone", { lang: "en", theme: "dark", width: 390, height: 844, question: "Who narrated the hadith «إنما الأعمال بالنيات»?", done: ["Sources (", "Partly documented", "No documented answer found"], sources: "Sources (" });
+
+// A scholar's view on a topic, asked as short posts with references (compared with Turath AI and Qaf).
+await ask("live-5-posts", {
+  lang: "ps",
+  width: 390,
+  height: 844,
+  typed: "د «إنما الأعمال بالنيات» حدیث چا روایت کړی دی؟",
+  question: "ابو حامد رحمه الله څه وایی چې توبه څومره اهمیت لري؟ د توبې په تړاو یې کوم بحث کړی؟ د توبې له مبحث یې مهم نقل قول او اقوال راته د حوالو سره ولیکه ترڅو یی اجتماعی رسنیو کی د کوچنیو پوستونو په څیر نشر کړم.",
+  done: ["منابع (", "په نیمګړي ډول مستند", "مستند ځواب ونه موندل شو"],
+  sources: "منابع (",
+  scrolls: 8,
+});
 
 // Library and reader (needs a server: demo-server.mjs offline, or the real one).
 await run("live-4-reader", async () => {
