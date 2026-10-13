@@ -74,6 +74,18 @@ liveTest("live: Hanafi ruling with several sources, then a follow-up naming two 
   assert.ok(books.includes("384") || books.includes("38056"), `requested books should be consulted, got ${second.sources.map((s) => s.bookTitle).join(" | ")}`);
 });
 
+liveTest("live: what al-Ghazali says on repentance, as short posts with references", 300_000, async () => {
+  const question = "ابو حامد رحمه الله څه وایی چې توبه څومره اهمیت لري ؟ د توبې په تړاو یې کوم بحث کړی؟ د توبې له مبحث یې مهم نقل قول او اقوال راته د حوالو سره ولیکه ترڅو یی اجتماعی رسنیو کی د کوچنیو پوستونو په څیر نشر کړم.";
+  const events = [];
+  const result = await pipeline.ask({ question, language: "ps" }, (e, d) => events.push([e, d]));
+  console.log("GHAZALI", JSON.stringify({ activity: events.filter(([e]) => e === "activity").map(([, d]) => d), answer: result.answer, sources: result.sources.map((s) => s.citation) }));
+  await check(result);
+  assert.notEqual(result.status, "insufficient");
+  assert.ok(result.sources.some((s) => s.bookId === "9472"), "إحياء علوم الدين is read");
+  assert.ok(events.some(([e, d]) => e === "activity" && d.kind === "chapter"), "the chapter on repentance is read");
+  assert.ok((result.answer.match(/^### /gm) ?? []).length >= 4, "the answer is written as posts");
+});
+
 // The AI's matn marking on real commentary pages (printed for review; the app
 // learns the book's rules from this marking).
 liveTest("layers: Gemini marks the matn of مرقاة المفاتيح and مراقي الفلاح", 180_000, async () => {

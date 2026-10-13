@@ -1643,4 +1643,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get readMore => 'Read more';
+
+  @override
+  String actChapter(String book, String chapter, String pages) {
+    return 'Read the chapter “$chapter” of $book ($pages pages)';
+  }
 }

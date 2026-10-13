@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { catalog } from "../src/catalog.mjs";
-import { createPipeline, INSUFFICIENT, limitsFor, namedMadhhabs, resolveBooks, searchPlan } from "../src/pipeline.mjs";
+import { chapterPages, createPipeline, findChapter, focusBooks, INSUFFICIENT, limitsFor, namedMadhhabs, relatedWorks, resolveAuthors, resolveBooks, searchPlan } from "../src/pipeline.mjs";
 import { normalizeArabic } from "../src/verify.mjs";
 import { fixtures, fixtureTurath, scriptedGemini } from "./helpers.mjs";
 
@@ -234,4 +234,74 @@ test("scope targets: each book, and each author within each category", async () 
   assert.deepEqual(scopeTargets({ bookIds: "x,0", authorIds: "" }), []);
   const plan = searchPlan({ queries: ["a", "b"], scope: [{ bookIds: ["5"] }, { bookIds: ["6"] }], userScoped: true });
   assert.deepEqual(plan.map((s) => [s.query, s.scope.bookIds[0]]), [["a", "5"], ["a", "6"], ["b", "5"], ["b", "6"]]);
+});
+
+test("the chapter on a topic is found in the table of contents", () => {
+  const toc = [
+    { title: "ربع العبادات", level: 1, page: 1 },
+    { title: "باب فضل التوبة في الحج", level: 3, page: 40 },
+    { title: "ربع المنجيات", level: 1, page: 1150 },
+    { title: "كتاب التوبة", level: 2, page: 1160 },
+    { title: "الركن الأول في نفس التوبة", level: 3, page: 1161 },
+    { title: "بيان حقيقة التوبة", level: 4, page: 1161 },
+    { title: "الركن الثاني فيما عنه التوبة", level: 3, page: 1175 },
+    { title: "الركن الثالث في تمام التوبة", level: 3, page: 1190 },
+    { title: "كتاب الصبر والشكر", level: 2, page: 1219 },
+  ];
+  const found = findChapter(toc, ["التوبة"]);
+  assert.equal(found.chapter.title, "كتاب التوبة");
+  assert.deepEqual(found.sections.map((x) => x.page), [1161, 1161, 1175, 1190]);
+  assert.deepEqual(chapterPages(found, 4), [1160, 1161, 1175, 1190]);
+  assert.deepEqual(chapterPages(found, 2), [1160, 1161]);
+  assert.equal(findChapter(toc, ["الزكاة"]), undefined);
+  assert.equal(findChapter(toc, []), undefined);
+});
+
+test("scholars resolve to authors, and their most found main book is read", () => {
+  const ids = resolveAuthors(["أبو حامد الغزالي"], catalog);
+  assert.equal(ids[0], "619");
+  const candidates = [
+    { bookId: "1", bookTitle: "مختصر كتاب", authorId: "619" },
+    { bookId: "1", bookTitle: "مختصر كتاب", authorId: "619" },
+    { bookId: "2", bookTitle: "إحياء علوم الدين", authorId: "619" },
+    { bookId: "3", bookTitle: "كتاب آخر", authorId: "7" },
+  ];
+  assert.deepEqual(focusBooks({ authorIds: ["619"], candidates }), ["2"]);
+  assert.deepEqual(focusBooks({ requestedBookIds: ["9"], authorIds: ["619"], candidates, max: 2 }), ["9", "2"]);
+});
+
+test("works built on a book are its abridgements, not its indexes", () => {
+  const ids = relatedWorks("9472", catalog);
+  assert.ok(ids.includes("22842"), "موعظة المؤمنين من إحياء علوم الدين");
+  assert.ok(!ids.includes("38171"), "تخريج أحاديث الإحياء is not an abridgement");
+  assert.ok(!ids.includes("9472"));
+});
+
+test("author searches join the plan", () => {
+  const p = searchPlan({ queries: ["a", "b"], requestedAuthorIds: ["619"], userScoped: false });
+  assert.ok(p.some((s) => s.kind === "requested" && s.scope.authorIds?.[0] === "619"));
+});
+
+test("a scoped book's chapter is read, the format and outline reach the writer", async () => {
+  const compose = (request) => {
+    assert.match(request.prompt, /FORMAT: posts/);
+    assert.match(request.prompt, /CHAPTER OUTLINE[^]*\[الأحاديث\]/);
+    const key = keyFor(request.prompt, 5, "S");
+    return { status: "answered", answer: `### 1 — نیت\nx [${key}]\n[[Q1]]`, citations: [{ id: "Q1", sourceId: key, quote: "إنما الأعمال بالنيات وإنما لكل امرئ ما نوى" }] };
+  };
+  const gemini = scriptedGemini(
+    plan({ chapterTerms: ["الأحاديث"], answerFormat: "posts", requestedAuthors: [] }),
+    (request) => {
+      assert.match(request.prompt, /Chapter read/);
+      return { selected: [], coverage: "full", followUpQueries: [], followUpBooks: [] };
+    },
+    compose,
+  );
+  const events = [];
+  const result = await createPipeline({ gemini, turath: fixtureTurath(), catalog }).ask(
+    { question: "q", language: "ps", scope: { bookIds: ["147927"] } },
+    (e, d) => events.push([e, d]),
+  );
+  assert.equal(result.status, "answered");
+  assert.ok(events.some(([e, d]) => e === "activity" && d.kind === "chapter" && d.chapter === "[الأحاديث]"));
 });

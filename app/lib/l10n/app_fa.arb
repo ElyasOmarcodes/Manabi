@@ -550,5 +550,6 @@
   "splitOtherBook": "مقایسه با کتابی دیگر",
   "splitClose": "بستن نمای دوبخشی",
   "bookCard": "شناسنامهٔ کتاب",
-  "readMore": "بیشتر بخوانید"
+  "readMore": "بیشتر بخوانید",
+  "actChapter": "فصل «{chapter}» از «{book}» خوانده شد ({pages} صفحه)"
 }

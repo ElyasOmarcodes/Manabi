@@ -3077,6 +3077,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Read more'**
   String get readMore;
+
+  /// No description provided for @actChapter.
+  ///
+  /// In en, this message translates to:
+  /// **'Read the chapter “{chapter}” of {book} ({pages} pages)'**
+  String actChapter(String book, String chapter, String pages);
 }
 
 class _AppLocalizationsDelegate

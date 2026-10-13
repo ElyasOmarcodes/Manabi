@@ -41,5 +41,6 @@ export const decodingTurath = (turath) => {
     };
   }
   if (typeof turath.getPage === "function") wrapped.getPage = async (...args) => decodePassage(await turath.getPage(...args));
+  if (typeof turath.getBook === "function") wrapped.getBook = (...args) => turath.getBook(...args);
   return wrapped;
 };

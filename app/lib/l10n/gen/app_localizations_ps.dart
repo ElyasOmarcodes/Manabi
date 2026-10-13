@@ -1636,4 +1636,9 @@ class AppLocalizationsPs extends AppLocalizations {
 
   @override
   String get readMore => 'نور ولوله';
+
+  @override
+  String actChapter(String book, String chapter, String pages) {
+    return 'د «$book» فصل «$chapter» ولوستل شو ($pages مخونه)';
+  }
 }

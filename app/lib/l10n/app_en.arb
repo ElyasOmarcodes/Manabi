@@ -781,5 +781,19 @@
   "splitOtherBook": "Compare with another book",
   "splitClose": "Close split view",
   "bookCard": "Book card",
-  "readMore": "Read more"
+  "readMore": "Read more",
+  "actChapter": "Read the chapter “{chapter}” of {book} ({pages} pages)",
+  "@actChapter": {
+    "placeholders": {
+      "book": {
+        "type": "String"
+      },
+      "chapter": {
+        "type": "String"
+      },
+      "pages": {
+        "type": "String"
+      }
+    }
+  }
 }

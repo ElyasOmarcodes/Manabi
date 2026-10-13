@@ -188,6 +188,7 @@ class TurathClient implements PassageSearch {
     return Narrator.fromJson(raw.cast<String, dynamic>());
   }
 
+  @override
   Future<BookDetails> getBook(String bookId) async {
     final raw = await _get('book', {'id': bookId, 'include': 'indexes', 'ver': 3});
     final meta = raw is Map ? raw['meta'] : null;

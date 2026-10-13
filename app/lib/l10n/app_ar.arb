@@ -550,5 +550,6 @@
   "splitOtherBook": "قارن بكتاب آخر",
   "splitClose": "إغلاق العرض المقسوم",
   "bookCard": "بطاقة الكتاب",
-  "readMore": "اقرأ المزيد"
+  "readMore": "اقرأ المزيد",
+  "actChapter": "قُرئ باب «{chapter}» من «{book}» ({pages} صفحات)"
 }

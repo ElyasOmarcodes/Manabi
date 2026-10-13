@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:manabi/core/catalog/catalog_service.dart';
 import 'package:manabi/core/models/answer.dart';
+import 'package:manabi/core/models/library.dart';
 import 'package:manabi/core/models/scope.dart';
 import 'package:manabi/core/pipeline/answer_pipeline.dart';
 import 'package:manabi/core/pipeline/quote_verifier.dart';
@@ -371,5 +372,72 @@ void main() {
   test('title search ignores punctuation', () {
     expect(normalizeForSearch('جمع الجوامع...'), 'جمع الجوامع');
     expect(normalizeForSearch('«الأربعون» (النووية)'), 'الاربعون النوويه');
+  });
+
+  group('chapters, scholars and related works', () {
+    test('the chapter on a topic is found in the table of contents', () {
+      const toc = [
+        TocEntry(title: 'ربع العبادات', level: 1, page: 1),
+        TocEntry(title: 'باب فضل التوبة في الحج', level: 3, page: 40),
+        TocEntry(title: 'ربع المنجيات', level: 1, page: 1150),
+        TocEntry(title: 'كتاب التوبة', level: 2, page: 1160),
+        TocEntry(title: 'الركن الأول في نفس التوبة', level: 3, page: 1161),
+        TocEntry(title: 'بيان حقيقة التوبة', level: 4, page: 1161),
+        TocEntry(title: 'الركن الثاني فيما عنه التوبة', level: 3, page: 1175),
+        TocEntry(title: 'الركن الثالث في تمام التوبة', level: 3, page: 1190),
+        TocEntry(title: 'كتاب الصبر والشكر', level: 2, page: 1219),
+      ];
+      final found = findChapter(toc, ['التوبة'])!;
+      expect(found.chapter.title, 'كتاب التوبة');
+      expect(found.sections.map((x) => x.page), [1161, 1161, 1175, 1190]);
+      expect(chapterPages(found, 4), [1160, 1161, 1175, 1190]);
+      expect(chapterPages(found, 2), [1160, 1161]);
+      expect(findChapter(toc, ['الزكاة']), isNull);
+    });
+
+    test('scholars resolve to authors; the main book they wrote is read; abridgements are related works', () {
+      expect(resolveAuthors(['أبو حامد الغزالي'], catalog).first, '619');
+      final found = [
+        (bookId: '1', bookTitle: 'مختصر كتاب', authorId: '619'),
+        (bookId: '1', bookTitle: 'مختصر كتاب', authorId: '619'),
+        (bookId: '2', bookTitle: 'إحياء علوم الدين', authorId: '619'),
+        (bookId: '3', bookTitle: 'كتاب آخر', authorId: '7'),
+      ];
+      expect(focusBooks(authorIds: ['619'], candidates: found), ['2']);
+      final related = relatedWorks('9472', catalog);
+      expect(related, contains('22842'));
+      expect(related, isNot(contains('38171')));
+      expect(searchPlan(queries: ['a'], requestedAuthorIds: ['619']).any((s) => s.kind == 'requested' && s.authorId == '619'), isTrue);
+    });
+
+    test('a scoped book\'s chapter is read; the format and outline reach the writer', () async {
+      String? rankPrompt;
+      String? composePrompt;
+      final model = ScriptedModel([
+        {...plan(), 'chapterTerms': ['الأحاديث'], 'answerFormat': 'posts', 'requestedAuthors': <String>[]},
+        (String prompt) {
+          rankPrompt = prompt;
+          return {'selected': <String>[], 'coverage': 'full', 'followUpQueries': [], 'followUpBooks': []};
+        },
+        (String prompt) {
+          composePrompt = prompt;
+          final key = keyFor(prompt, 5, 'S');
+          return {
+            'status': 'answered',
+            'answer': '### 1 — نیت\nx [$key]\n[[Q1]]',
+            'citations': [
+              {'id': 'Q1', 'sourceId': key, 'quote': 'إنما الأعمال بالنيات وإنما لكل امرئ ما نوى'}
+            ],
+          };
+        },
+      ]);
+      final pipeline = AnswerPipeline(model: model, turath: TurathClient(client: turathMock()), catalog: catalog);
+      final events = await pipeline.ask(AskRequest(question: 'q', language: 'ps', scope: SearchScope.all.withBook('147927', 'الأربعون'))).toList();
+      expect(rankPrompt, contains('Chapter read'));
+      expect(composePrompt, contains('FORMAT: posts'));
+      expect(composePrompt, matches(RegExp(r'CHAPTER OUTLINE[^]*\[الأحاديث\]')));
+      expect(events.whereType<AskActivityEvent>().any((e) => e.kind == 'chapter' && e.data['chapter'] == '[الأحاديث]'), isTrue);
+      expect((events.last as AskResultEvent).result.status, AnswerStatus.answered);
+    });
   });
 }

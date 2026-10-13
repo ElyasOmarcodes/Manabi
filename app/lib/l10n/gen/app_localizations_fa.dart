@@ -1638,4 +1638,9 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get readMore => 'بیشتر بخوانید';
+
+  @override
+  String actChapter(String book, String chapter, String pages) {
+    return 'فصل «$chapter» از «$book» خوانده شد ($pages صفحه)';
+  }
 }

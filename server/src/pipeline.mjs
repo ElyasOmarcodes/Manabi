@@ -62,6 +62,10 @@ export const LIMITS = {
   maxSelected: 14,
   continuationPages: 6,
   followUpRounds: 1,
+  requestedAuthors: 2,
+  focusBooks: 2,
+  chapterPages: 4,
+  relatedWorks: 2,
 };
 
 /**
@@ -69,9 +73,9 @@ export const LIMITS = {
  * quick reads fewer passages, deep searches wider and reads more pages.
  */
 export const DEPTHS = {
-  quick: { generalQueries: 3, hitsPerGeneral: 6, referenceBooks: 3, queriesPerMadhhab: 2, maxSearches: 18, maxCandidates: 32, maxSelected: 6, continuationPages: 2, followUpRounds: 0 },
+  quick: { generalQueries: 3, hitsPerGeneral: 6, referenceBooks: 3, queriesPerMadhhab: 2, maxSearches: 18, maxCandidates: 32, maxSelected: 6, continuationPages: 2, followUpRounds: 0, focusBooks: 1, chapterPages: 2, relatedWorks: 0 },
   standard: {},
-  deep: { generalQueries: 8, hitsPerGeneral: 10, referenceBooks: 6, queriesPerReference: 3, queriesPerMadhhab: 4, hitsPerMadhhab: 5, maxSearches: 64, maxCandidates: 96, maxSelected: 18, continuationPages: 10, followUpRounds: 2 },
+  deep: { generalQueries: 8, hitsPerGeneral: 10, referenceBooks: 6, queriesPerReference: 3, queriesPerMadhhab: 4, hitsPerMadhhab: 5, maxSearches: 64, maxCandidates: 96, maxSelected: 18, continuationPages: 10, followUpRounds: 2, chapterPages: 8, relatedWorks: 3 },
 };
 
 export const limitsFor = (depth) => ({ ...LIMITS, ...(DEPTHS[depth] ?? {}) });
@@ -222,6 +226,100 @@ export const resolveBooks = (titles, catalog, perTitle = 1) => {
   return ids;
 };
 
+/** Resolves scholars' names to catalog author ids (best match per name). */
+export const resolveAuthors = (names, catalog, max = LIMITS.requestedAuthors) => {
+  const ids = [];
+  for (const name of names) {
+    let found = [];
+    try {
+      found = catalog.findAuthors?.(name, { limit: 3 }) ?? [];
+      // "أبو حامد محمد الغزالي" → "الغزالي": the name most books are filed under.
+      const last = name.trim().split(/\s+/).pop();
+      if (!found.length && last && last !== name.trim()) found = catalog.findAuthors?.(last, { limit: 3 }) ?? [];
+    } catch {
+      found = [];
+    }
+    if (found[0] && !ids.includes(String(found[0].id))) ids.push(String(found[0].id));
+  }
+  return ids.slice(0, max);
+};
+
+/**
+ * The books whose own chapter on the topic should be read: the books the
+ * user asked for, then the books of the scholars asked about that the
+ * search found most often (main works before abridgements).
+ */
+export const focusBooks = ({ requestedBookIds = [], authorIds = [], candidates = [], max = LIMITS.focusBooks }) => {
+  const out = requestedBookIds.slice(0, max);
+  if (authorIds.length) {
+    const counts = new Map();
+    for (const c of candidates) {
+      if (!authorIds.includes(c.authorId) || DERIVATIVE.test(strip(c.bookTitle ?? ""))) continue;
+      counts.set(c.bookId, (counts.get(c.bookId) ?? 0) + 1);
+    }
+    for (const [id] of [...counts].sort((a, b) => b[1] - a[1])) if (out.length < max && !out.includes(id)) out.push(id);
+  }
+  return out;
+};
+
+const CHAPTER_LEAD = /^(كتاب|باب|القول في|فصل في|ربع|الباب)/u;
+
+/**
+ * Finds where a book treats a topic in its table of contents: the highest
+ * heading that names one of [terms], and the sections under it.
+ */
+export const findChapter = (toc = [], terms = []) => {
+  const words = terms.map((t) => strip(t).replace(/^(كتاب|باب|فصل)\s+/u, "")).filter((t) => t.length >= 2);
+  if (!words.length) return undefined;
+  let best;
+  toc.forEach((e, i) => {
+    if (!Number.isInteger(e?.page) || typeof e.title !== "string") return;
+    const t = strip(e.title);
+    if (!words.some((w) => t.includes(w))) return;
+    const score = (e.level ?? 1) * 3 + (CHAPTER_LEAD.test(t) ? 0 : 2) + t.length / 30;
+    if (!best || score < best.score) best = { i, score };
+  });
+  if (!best) return undefined;
+  const chapter = toc[best.i];
+  const sections = [];
+  for (let j = best.i + 1; j < toc.length && (toc[j].level ?? 1) > (chapter.level ?? 1); j += 1) sections.push(toc[j]);
+  return { chapter, sections };
+};
+
+/** Pages to read from a chapter: its opening, then the start of each section. */
+export const chapterPages = ({ chapter, sections }, n) => {
+  const pages = [];
+  const add = (p) => {
+    if (Number.isInteger(p) && p > 0 && !pages.includes(p) && pages.length < n) pages.push(p);
+  };
+  add(chapter.page);
+  add(chapter.page + 1);
+  const top = Math.min(...sections.map((x) => x.level ?? 1));
+  for (const x of sections) if ((x.level ?? 1) === top) add(x.page);
+  for (const x of sections) add(x.page);
+  return pages.sort((a, b) => a - b);
+};
+
+// Indexes and studies of a book are not its abridgements or explanations.
+const NOT_RELATED = /^(تخريج|فهرس|فهارس|دراسة)/u;
+
+/** Works built on a book (abridgements, commentaries): their titles contain its title. */
+export const relatedWorks = (bookId, catalog, max = LIMITS.relatedWorks) => {
+  const main = catalog.book(bookId);
+  const t = strip(main?.title ?? "");
+  if (t.length < 6 || max <= 0) return [];
+  let found = [];
+  try {
+    found = catalog.findBooks(main.title, { limit: 12 });
+  } catch {
+    found = [];
+  }
+  return found
+    .filter((b) => String(b.id) !== String(bookId) && strip(b.title).includes(t) && !NOT_RELATED.test(strip(b.title)))
+    .slice(0, max)
+    .map((b) => String(b.id));
+};
+
 const toCandidate = (passage, catalog) => {
   const bookId = String(passage.book.id);
   const catalogBook = catalog.book(bookId);
@@ -250,7 +348,7 @@ const toCandidate = (passage, catalog) => {
 };
 
 /** Builds the list of searches for one retrieval round. */
-export const searchPlan = ({ queries, scope, madhhabs = [], requestedBookIds = [], referenceBookIds = [], userScoped, limits: L = LIMITS }) => {
+export const searchPlan = ({ queries, scope, madhhabs = [], requestedBookIds = [], requestedAuthorIds = [], referenceBookIds = [], userScoped, limits: L = LIMITS }) => {
   const plan = [];
   // Several scope targets: every target gets the first query before any
   // gets the second, and the hits are shared out between them.
@@ -261,6 +359,9 @@ export const searchPlan = ({ queries, scope, madhhabs = [], requestedBookIds = [
   if (!userScoped) {
     for (const id of requestedBookIds.slice(0, L.requestedBooks)) {
       for (const q of queries.slice(0, L.queriesPerRequested)) plan.push({ query: q, scope: { bookIds: [id] }, take: L.hitsPerRequested, kind: "requested" });
+    }
+    for (const id of requestedAuthorIds.slice(0, L.requestedAuthors)) {
+      for (const q of queries.slice(0, L.queriesPerRequested)) plan.push({ query: q, scope: { authorIds: [id] }, take: L.hitsPerRequested, kind: "requested" });
     }
     for (const id of referenceBookIds.slice(0, L.referenceBooks)) {
       for (const q of queries.slice(0, L.queriesPerReference)) plan.push({ query: q, scope: { bookIds: [id] }, take: L.hitsPerReference, kind: "reference" });
@@ -306,6 +407,39 @@ export const collectCandidates = async ({ turath, catalog, plan, existing = [], 
   }
   return { candidates: pool, totalMatches, failed: plan.length > 0 && failures === plan.length };
 };
+
+/**
+ * Reads the chapter where each focus book treats the topic (found in its
+ * table of contents), so the answer rests on the author's own discussion
+ * and not only on pages that happen to match a search word.
+ */
+export const readChapters = async ({ turath, catalog, bookIds, terms, pages: n, onChapter }) => {
+  const candidates = [];
+  const outlines = [];
+  if (!terms.length || n <= 0 || typeof turath.getBook !== "function") return { candidates, outlines };
+  const books = await settleAll(bookIds.map((id) => () => turath.getBook(id)));
+  for (const [i, settled] of books.entries()) {
+    if (!settled?.ok) continue;
+    const book = settled.value;
+    const found = findChapter(book.toc ?? [], terms);
+    if (!found) continue;
+    const wanted = chapterPages(found, n);
+    const read = await settleAll(wanted.map((page) => () => turath.getPage(bookIds[i], page)));
+    let count = 0;
+    for (const r of read) {
+      if (!r?.ok || !r.value?.text?.trim()) continue;
+      candidates.push({ ...toCandidate(r.value, catalog), chapterRead: true });
+      count += 1;
+    }
+    if (!count) continue;
+    const title = book.title ?? catalog.book(bookIds[i])?.title ?? bookIds[i];
+    outlines.push({ book: title, chapter: found.chapter.title, sections: found.sections.slice(0, 24).map((x) => x.title) });
+    onChapter?.({ book: title, chapter: found.chapter.title, pages: count });
+  }
+  return { candidates, outlines };
+};
+
+const FORMATS = new Set(["standard", "posts", "quotes", "brief", "detailed"]);
 
 const MARKER = /\[\s*(S\d+(?:\s*[,،;]\s*S?\d+)*)\s*\]/gi;
 const QUOTE_MARKER = /\[\[\s*(Q\d+)\s*\]\]/gi;
@@ -472,10 +606,13 @@ export const createPipeline = ({ gemini, turath: client, catalog }) => {
     const madhhabs = [...new Set([...(Array.isArray(p.madhhabs) ? p.madhhabs : []), ...namedMadhhabs(question)])].filter((m) => MADHHAB_CATEGORY[m]);
     const requestedBookIds = resolveBooks(cleanTitles(p.requestedBooks, LIMITS.requestedBooks), catalog, 2);
     const referenceBookIds = resolveBooks(cleanTitles(p.referenceBooks, 6), catalog, 1).filter((id) => !requestedBookIds.includes(id));
+    const requestedAuthorIds = resolveAuthors(cleanTitles(p.requestedAuthors, L.requestedAuthors), catalog, L.requestedAuthors);
+    const chapterTerms = cleanTitles(p.chapterTerms, 3);
+    const format = FORMATS.has(p.answerFormat) ? p.answerFormat : "standard";
     const standalone = typeof p.standaloneQuestion === "string" && p.standaloneQuestion.trim() ? p.standaloneQuestion.trim() : question;
     const plannedBooks = [...requestedBookIds, ...referenceBookIds].map((id) => catalog.book(id)?.title).filter(Boolean);
     onEvent("plan", { queries, language, books: plannedBooks });
-    act("plan", { queries, books: plannedBooks, madhhabs });
+    act("plan", { queries, books: plannedBooks, madhhabs, authors: requestedAuthorIds.map((id) => catalog.authorName(id)).filter(Boolean), format });
 
     const done = (result, extra = {}) => ({ ...result, queries, language, depth, model: plan.model, elapsedMs: Date.now() - started, usage: { ...usage }, ...extra });
     if (!queries.length) return done(finalize({ composed: { status: "insufficient" }, sources: [], language }));
@@ -486,11 +623,37 @@ export const createPipeline = ({ gemini, turath: client, catalog }) => {
       turath,
       catalog,
       limits: L,
-      plan: searchPlan({ queries, scope: nususScope, madhhabs, requestedBookIds, referenceBookIds, userScoped: Boolean(nususScope), limits: L }),
+      plan: searchPlan({ queries, scope: nususScope, madhhabs, requestedBookIds, requestedAuthorIds, referenceBookIds, userScoped: Boolean(nususScope), limits: L }),
     });
     if (first.failed) throw error("TURATH_UNAVAILABLE", "The Turath library could not be reached");
-    let candidates = first.candidates.map((c, i) => ({ ...c, key: `C${i + 1}` }));
     let totalMatches = first.totalMatches;
+
+    // 2b. the author's own chapter on the topic, and the works built on his book
+    const scopedBooks = [...new Set((nususScope ?? []).flatMap((t) => t.bookIds ?? []))];
+    const focus = nususScope
+      ? scopedBooks.slice(0, L.focusBooks)
+      : focusBooks({ requestedBookIds, authorIds: requestedAuthorIds, candidates: first.candidates, max: L.focusBooks });
+    let chapters = { candidates: [], outlines: [] };
+    if (focus.length && chapterTerms.length) {
+      chapters = memo.get("chapters") ?? (await readChapters({ turath, catalog, bookIds: focus, terms: chapterTerms, pages: L.chapterPages, onChapter: (c) => act("chapter", c) }));
+      memo.set("chapters", chapters);
+    }
+    let related = { candidates: [], totalMatches: 0 };
+    const relatedIds = nususScope ? [] : [...new Set(focus.flatMap((id) => relatedWorks(id, catalog, L.relatedWorks)))].filter((id) => !referenceBookIds.includes(id)).slice(0, L.relatedWorks);
+    if (relatedIds.length) {
+      related = await collect("search0b", {
+        turath,
+        catalog,
+        limits: L,
+        existing: [...chapters.candidates, ...first.candidates],
+        plan: relatedIds.flatMap((id) => queries.slice(0, 2).map((q) => ({ query: q, scope: { bookIds: [id] }, take: 3, kind: "reference" }))),
+      });
+      totalMatches += related.totalMatches;
+    }
+    const seenIds = new Set();
+    let candidates = [...chapters.candidates, ...first.candidates, ...related.candidates]
+      .filter((c) => !seenIds.has(c.id) && seenIds.add(c.id))
+      .map((c, i) => ({ ...c, key: `C${i + 1}` }));
     onEvent("sources", { count: candidates.length, totalMatches });
     act("found", { count: candidates.length, total: totalMatches });
     if (!candidates.length) return done(finalize({ composed: { status: "insufficient" }, sources: [], language }), { totalMatches });
@@ -521,7 +684,7 @@ export const createPipeline = ({ gemini, turath: client, catalog }) => {
       onEvent("stage", { stage: "searching" });
       act("followup", { queries: followQueries, books: followBooks.map((id) => catalog.book(id)?.title).filter(Boolean) });
       const selectedFirst = new Set((ranking.selected ?? []).map((k) => String(k).toUpperCase()));
-      const keep = candidates.filter((c) => selectedFirst.has(c.key));
+      const keep = candidates.filter((c) => selectedFirst.has(c.key) || c.chapterRead);
       const extra = await collect(`search${round + 1}`, {
         turath,
         catalog,
@@ -548,6 +711,9 @@ export const createPipeline = ({ gemini, turath: client, catalog }) => {
     let selected = [...new Set((ranking.selected ?? []).map((k) => String(k).trim().toUpperCase()))].map((k) => byKey.get(k)).filter(Boolean);
     if (!selected.length && ranking.coverage !== "none") selected = candidates.slice(0, Math.min(6, candidates.length));
     selected = selected.slice(0, maxSources);
+    // The opening of the chapter asked about is always read.
+    const opening = candidates.filter((c) => c.chapterRead && !selected.includes(c)).slice(0, Math.max(0, 2 - selected.filter((c) => c.chapterRead).length));
+    if (opening.length) selected = [...opening, ...selected].slice(0, Math.max(maxSources, opening.length));
     if (!selected.length) {
       return done(finalize({ composed: { status: "insufficient" }, sources: candidates.slice(0, 6).map((c, i) => ({ ...c, key: `S${i + 1}` })), language }), { totalMatches });
     }
@@ -567,7 +733,7 @@ export const createPipeline = ({ gemini, turath: client, catalog }) => {
         if (draft) onEvent("draft", { text: draft });
       },
       system: composeSystem(LANGUAGES[language]),
-      prompt: composePrompt({ question: standalone, history, sources, languageName: LANGUAGES[language], missing: ranking.coverage === "full" ? "" : ranking.missing }),
+      prompt: composePrompt({ question: standalone, history, sources, languageName: LANGUAGES[language], missing: ranking.coverage === "full" ? "" : ranking.missing, format, outlines: chapters.outlines }),
       schema: COMPOSE_SCHEMA,
       temperature: 0.2,
     });

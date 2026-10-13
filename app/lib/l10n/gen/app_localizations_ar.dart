@@ -1635,4 +1635,9 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get readMore => 'اقرأ المزيد';
+
+  @override
+  String actChapter(String book, String chapter, String pages) {
+    return 'قُرئ باب «$chapter» من «$book» ($pages صفحات)';
+  }
 }

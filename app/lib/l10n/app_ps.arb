@@ -550,5 +550,6 @@
   "splitOtherBook": "بل کتاب ورسره پرتله کړه",
   "splitClose": "دوه اړخیز لید بندول",
   "bookCard": "د کتاب پېژندنه",
-  "readMore": "نور ولوله"
+  "readMore": "نور ولوله",
+  "actChapter": "د «{book}» فصل «{chapter}» ولوستل شو ({pages} مخونه)"
 }

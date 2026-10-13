@@ -34,10 +34,22 @@ const planSchema = {
       }
     },
     'requestedBooks': _strList,
+    'requestedAuthors': _strList,
+    'chapterTerms': _strList,
+    'answerFormat': {
+      'type': 'STRING',
+      'enum': ['standard', 'posts', 'quotes', 'brief', 'detailed']
+    },
     'referenceBooks': _strList,
   },
-  'required': ['standaloneQuestion', 'detectedLanguage', 'questionType', 'isIslamicStudies', 'queries', 'madhhabs', 'requestedBooks', 'referenceBooks'],
-  'propertyOrdering': ['standaloneQuestion', 'detectedLanguage', 'questionType', 'isIslamicStudies', 'queries', 'madhhabs', 'requestedBooks', 'referenceBooks'],
+  'required': [
+    'standaloneQuestion', 'detectedLanguage', 'questionType', 'isIslamicStudies', 'queries', 'madhhabs', //
+    'requestedBooks', 'requestedAuthors', 'chapterTerms', 'answerFormat', 'referenceBooks'
+  ],
+  'propertyOrdering': [
+    'standaloneQuestion', 'detectedLanguage', 'questionType', 'isIslamicStudies', 'queries', 'madhhabs', //
+    'requestedBooks', 'requestedAuthors', 'chapterTerms', 'answerFormat', 'referenceBooks'
+  ],
 };
 
 const rerankSchema = {
@@ -120,6 +132,7 @@ class PromptSource {
     this.volume,
     this.printedPage,
     this.headings = const [],
+    this.chapterRead = false,
   });
   final String key;
   final String bookTitle;
@@ -129,6 +142,9 @@ class PromptSource {
   final int? printedPage;
   final List<String> headings;
   final String text;
+
+  /// Read from the chapter of the book that treats the topic.
+  final bool chapterRead;
 }
 
 String _meta(PromptSource s) => [
@@ -138,6 +154,7 @@ String _meta(PromptSource s) => [
       if (s.volume != null && s.volume!.isNotEmpty) 'Volume: ${s.volume}',
       if (s.printedPage != null) 'Page: ${s.printedPage}',
       if (s.headings.isNotEmpty) 'Chapter: ${s.headings.skip(s.headings.length > 2 ? s.headings.length - 2 : 0).join(' > ')}',
+      if (s.chapterRead) 'Chapter read',
     ].join(' | ');
 
 String rerankPrompt({required String question, required List<PromptSource> candidates, required List<String> queries}) =>
@@ -145,14 +162,24 @@ String rerankPrompt({required String question, required List<PromptSource> candi
 
 String sourceBlock(List<PromptSource> sources) => sources.map((s) => '[${s.key}] ${_meta(s)}\n<<<\n${s.text}\n>>>').join('\n\n');
 
+/// A chapter read for the answer, with the sections under it (from the
+/// book's table of contents).
+typedef ChapterOutline = ({String book, String chapter, List<String> sections});
+
+String outlineBlock(List<ChapterOutline> outlines) => outlines.isEmpty
+    ? ''
+    : 'CHAPTER OUTLINE (the book\'s table of contents, not a source):\n${outlines.map((o) => '${o.book} > ${o.chapter}${o.sections.isNotEmpty ? '\n${o.sections.map((t) => '  - $t').join('\n')}' : ''}').join('\n')}\n\n';
+
 String composePrompt({
   required String question,
   List<HistoryTurn> history = const [],
   required List<PromptSource> sources,
   required String languageName,
   String missing = '',
+  String format = 'standard',
+  List<ChapterOutline> outlines = const [],
 }) =>
-    '${_historyBlock(history)}ANSWER LANGUAGE: $languageName\n${missing.isNotEmpty ? 'NOTE FROM THE READING STEP (what may be missing): $missing\n' : ''}\nSOURCES:\n${sourceBlock(sources)}\n\nUSER QUESTION:\n$question';
+    '${_historyBlock(history)}ANSWER LANGUAGE: $languageName\nFORMAT: $format\n${missing.isNotEmpty ? 'NOTE FROM THE READING STEP (what may be missing): $missing\n' : ''}\n${outlineBlock(outlines)}SOURCES:\n${sourceBlock(sources)}\n\nUSER QUESTION:\n$question';
 
 /// Mirrors LAYERS_SCHEMA in server/src/prompts.mjs.
 const layersSchema = {
