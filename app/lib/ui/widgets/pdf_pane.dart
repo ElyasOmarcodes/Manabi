@@ -67,6 +67,20 @@ class _PdfPaneState extends State<PdfPane> {
   int _attempt = 0;
   bool _partFailed = false;
 
+  /// Per page: done once its data has been read (a tiny render of it), when
+  /// the viewer's own drawing follows at once.
+  final _ready = <int, Future<void>>{};
+  final _readyDone = <int>{};
+
+  Future<void> _readPage(PdfPage page) async {
+    try {
+      final img = await page.render(fullWidth: 24, fullHeight: 32, width: 24, height: 32);
+      img?.dispose();
+      // Later passes over this page show it as it is, with no fade.
+      Future<void>.delayed(const Duration(seconds: 1), () => _readyDone.add(page.pageNumber));
+    } catch (_) {}
+  }
+
   void _onFailure() {
     if (_partFailed || !mounted) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -113,10 +127,20 @@ class _PdfPaneState extends State<PdfPane> {
               // Only the pages on screen are measured and read. Measuring every
               // page up front (the default) reads nearly the whole volume.
               behaviorControlParams: const PdfViewerBehaviorControlParams(loadPageDimensionsOnDemand: true),
-            // Under each page, until its scan is drawn over it: the shape of a
-            // page of text and its number, so a page still coming never looks
-            // like an empty one.
-            pageBackgroundPaintCallbacks: [_paintLoadingPage],
+              // Scans have no text to select; looking for it parses each page's
+              // content on the worker the drawing waits for.
+              textSelectionParams: const PdfTextSelectionParams(enabled: false),
+              // Over each page until its data is read: the outline of a page of
+              // text, breathing, so a page still coming never looks empty.
+              pageOverlaysBuilder: (context, rect, page) => [
+                if (!_readyDone.contains(page.pageNumber))
+                  _PageLoading(
+                    key: ValueKey('$_attempt:${page.pageNumber}'),
+                    ready: _ready.putIfAbsent(page.pageNumber, () => _readPage(page)),
+                    number: widget.digits(page.pageNumber),
+                    color: widget.muted,
+                  ),
+              ],
               onViewerReady: (doc, controller) {
                 if (mounted) setState(() => _count = doc.pages.length);
               },
@@ -268,29 +292,97 @@ class _PdfPaneState extends State<PdfPane> {
     );
   }
 
-  void _paintLoadingPage(Canvas canvas, Rect r, PdfPage page) {
-    final line = Paint()..color = widget.muted.withValues(alpha: 0.13);
-    final w = r.width;
-    final h = r.height;
-    final gap = h * 0.045;
-    final thick = (h * 0.012).clamp(3.0, 14.0);
-    final radius = Radius.circular(thick / 2);
-    for (var i = 0; i < 16; i++) {
-      final y = r.top + h * 0.12 + i * gap;
-      if (y > r.bottom - h * 0.1) break;
-      // Lines of a right-to-left page: flush right, the last of a paragraph shorter.
-      final len = w * (i % 5 == 4 ? 0.45 : 0.8);
-      canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(r.right - w * 0.1 - len, y, len, thick), radius), line);
-    }
-    final tp = TextPainter(
-      text: TextSpan(text: widget.digits(page.pageNumber), style: TextStyle(fontFamily: uiFont, fontSize: (w * 0.07).clamp(12.0, 40.0), color: widget.muted.withValues(alpha: 0.5), fontWeight: FontWeight.w700)),
-      textDirection: TextDirection.ltr,
-    )..layout();
-    tp.paint(canvas, Offset(r.center.dx - tp.width / 2, r.bottom - h * 0.07 - tp.height / 2));
-  }
-
   static String _size(int bytes) {
     if (bytes < 1024 * 1024) return '${(bytes / 1024).round()} KB';
     return '${(bytes / 1024 / 1024).toStringAsFixed(1)} MB';
   }
+}
+
+class _PageLoading extends StatefulWidget {
+  const _PageLoading({super.key, required this.ready, required this.number, required this.color});
+  final Future<void> ready;
+  final String number;
+  final Color color;
+  @override
+  State<_PageLoading> createState() => _PageLoadingState();
+}
+
+class _PageLoadingState extends State<_PageLoading> with SingleTickerProviderStateMixin {
+  late final AnimationController _breath = AnimationController(vsync: this, duration: const Duration(milliseconds: 1300))..repeat(reverse: true);
+  bool _done = false;
+  bool _gone = false;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.ready.whenComplete(() {
+      if (!mounted) return;
+      _breath.stop();
+      // A moment for the viewer to draw the page under the fading outline.
+      Future<void>.delayed(const Duration(milliseconds: 150), () {
+        if (mounted) setState(() => _done = true);
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _breath.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_gone) return const SizedBox.shrink();
+    return IgnorePointer(
+      child: AnimatedOpacity(
+        opacity: _done ? 0 : 1,
+        duration: const Duration(milliseconds: 280),
+        onEnd: () {
+          if (_done && mounted) setState(() => _gone = true);
+        },
+        child: ColoredBox(
+          color: Colors.white,
+          child: AnimatedBuilder(
+            animation: _breath,
+            builder: (context, _) => CustomPaint(painter: _SkeletonPainter(widget.color, 0.08 + 0.08 * _breath.value, widget.number)),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SkeletonPainter extends CustomPainter {
+  _SkeletonPainter(this.color, this.alpha, this.number);
+  final Color color;
+  final double alpha;
+  final String number;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+    final line = Paint()..color = color.withValues(alpha: alpha);
+    final gap = h * 0.045;
+    final thick = (h * 0.012).clamp(3.0, 14.0);
+    for (var i = 0; i < 17; i++) {
+      final y = h * 0.1 + i * gap;
+      if (y > h * 0.86) break;
+      // Lines of a right-to-left page: flush right, a paragraph's last one shorter.
+      final len = w * (i % 5 == 4 ? 0.42 : 0.8);
+      canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(w * 0.9 - len, y, len, thick), Radius.circular(thick / 2)), line);
+    }
+    final tp = TextPainter(
+      text: TextSpan(
+        text: number,
+        style: TextStyle(fontFamily: uiFont, fontSize: (w * 0.06).clamp(12.0, 36.0), fontWeight: FontWeight.w700, color: color.withValues(alpha: 0.45)),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    tp.paint(canvas, Offset(w / 2 - tp.width / 2, h * 0.93 - tp.height / 2));
+  }
+
+  @override
+  bool shouldRepaint(_SkeletonPainter old) => old.alpha != alpha || old.color != color || old.number != number;
 }

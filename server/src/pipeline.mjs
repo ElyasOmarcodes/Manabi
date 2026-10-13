@@ -648,7 +648,7 @@ export const createPipeline = ({ gemini, turath: client, catalog }) => {
     const remember = typeof p.remember === "string" ? p.remember.trim().slice(0, 240) : "";
     const done = (result, extra = {}) => ({ ...result, queries, language, depth, model: plan.model, elapsedMs: Date.now() - started, usage: { ...usage }, ...(remember ? { remember } : {}), ...extra });
     // Conversation ("who are you?", thanks): answered at once, nothing to research.
-    const chatReply = typeof p.chatReply === "string" ? p.chatReply.trim() : "";
+    const chatReply = typeof p.chatReply === "string" ? p.chatReply.trim().replace(/منبي|منابي|مانابي/g, "منابع") : "";
     if (chatReply && !queries.length) return done({ status: "answered", answer: chatReply, summary: chatReply.slice(0, 200), sources: [], related: [], opinions: [] });
     if (!queries.length) return done(finalize({ composed: { status: "insufficient" }, sources: [], language }));
 

@@ -1733,4 +1733,13 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get onbPermissionNote => 'هذا التنبيه وحده، بلا إعلانات ولا غيرها.';
+
+  @override
+  String get onbChipBrief => 'جواب مختصر';
+
+  @override
+  String get onbChipSchool => 'حنفي';
+
+  @override
+  String get onbChipPosts => 'منشورات';
 }

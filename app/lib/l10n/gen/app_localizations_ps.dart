@@ -1736,4 +1736,13 @@ class AppLocalizationsPs extends AppLocalizations {
 
   @override
   String get onbPermissionNote => 'یوازې همدا خبرتیا، نه اعلانونه او نه بل څه.';
+
+  @override
+  String get onbChipBrief => 'لنډ ځواب';
+
+  @override
+  String get onbChipSchool => 'حنفي';
+
+  @override
+  String get onbChipPosts => 'پوسټونه';
 }

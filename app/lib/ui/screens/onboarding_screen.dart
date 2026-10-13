@@ -1,4 +1,5 @@
 import 'dart:io' show Platform;
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
@@ -28,7 +29,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   int _page = 0;
   bool _asking = false;
 
-  int get _count => _asksPermission ? 3 : 2;
+  int get _count => _asksPermission ? 5 : 4;
 
   @override
   void dispose() {
@@ -81,8 +82,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 alignment: AlignmentDirectional.centerEnd,
                 child: AnimatedOpacity(
                   duration: const Duration(milliseconds: 200),
-                  opacity: _page == 0 ? 0 : 1,
-                  child: TextButton(onPressed: _page == 0 ? null : widget.onDone, child: Text(l.onbSkip, style: TextStyle(fontFamily: uiFont, color: a.muted))),
+                  opacity: _page == _count - 1 ? 0 : 1,
+                  child: TextButton(onPressed: _page == _count - 1 ? null : widget.onDone, child: Text(l.onbSkip, style: TextStyle(fontFamily: uiFont, color: a.muted))),
                 ),
               ),
             ),
@@ -92,7 +93,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 onPageChanged: (i) => setState(() => _page = i),
                 children: [
                   const _LanguagePage(),
-                  const _IntroPage(),
+                  _HeroPage(hero: const _AnswersHero(), title: l.onbFeatureAnswers, sub: l.onbFeatureAnswersSub),
+                  _HeroPage(hero: const _LibraryHero(), title: l.onbFeatureLibrary, sub: l.onbFeatureLibrarySub),
+                  _HeroPage(hero: const _MemoryHero(), title: l.onbFeatureMemory, sub: l.onbFeatureMemorySub),
                   if (_asksPermission) const _PermissionPage(),
                 ],
               ),
@@ -256,54 +259,245 @@ class _Choice extends StatelessWidget {
   }
 }
 
-class _IntroPage extends StatelessWidget {
-  const _IntroPage();
+/// A page with a large illustration, its title and a line under it.
+class _HeroPage extends StatelessWidget {
+  const _HeroPage({required this.hero, required this.title, required this.sub});
+  final Widget hero;
+  final String title;
+  final String sub;
+  @override
+  Widget build(BuildContext context) => _PageFrame(children: [
+        _Rise(child: Center(child: SizedBox(width: 260, height: 260, child: hero))),
+        const SizedBox(height: 30),
+        _Rise(delay: 120, child: _Title(title, sub)),
+      ]);
+}
+
+/// Something that drifts gently up and down, out of step with its neighbours.
+class _Float extends StatefulWidget {
+  const _Float({required this.child, this.phase = 0, this.distance = 6});
+  final Widget child;
+  final double phase;
+  final double distance;
+  @override
+  State<_Float> createState() => _FloatState();
+}
+
+class _FloatState extends State<_Float> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 3200))..repeat();
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+        animation: _c,
+        builder: (context, child) => Transform.translate(offset: Offset(0, widget.distance * math.sin((_c.value + widget.phase) * 2 * math.pi)), child: child),
+        child: widget.child,
+      );
+}
+
+/// The soft round stage every illustration stands on.
+class _Stage extends StatelessWidget {
+  const _Stage({required this.color, required this.children});
+  final Color color;
+  final List<Widget> children;
   @override
   Widget build(BuildContext context) {
-    final l = context.l;
-    final items = [
-      (Icons.auto_awesome_rounded, AuraHues.violet, l.onbFeatureAnswers, l.onbFeatureAnswersSub),
-      (Icons.local_library_rounded, AuraHues.teal, l.onbFeatureLibrary, l.onbFeatureLibrarySub),
-      (Icons.psychology_rounded, AuraHues.amber, l.onbFeatureMemory, l.onbFeatureMemorySub),
-    ];
-    return _PageFrame(children: [
-      _Rise(child: _Title(l.onbIntroTitle, l.onbIntroSub)),
-      const SizedBox(height: 24),
-      for (final (i, (icon, color, title, sub)) in items.indexed) _Rise(delay: 120 + i * 90, child: _Feature(icon: icon, color: color, title: title, sub: sub)),
+    final a = context.aura;
+    return Stack(clipBehavior: Clip.none, alignment: Alignment.center, children: [
+      Container(
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: RadialGradient(colors: [color.withValues(alpha: a.dark ? 0.32 : 0.18), color.withValues(alpha: a.dark ? 0.08 : 0.04)]),
+        ),
+      ),
+      Positioned.fill(
+        child: Padding(
+          padding: const EdgeInsets.all(26),
+          child: DecoratedBox(decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: color.withValues(alpha: 0.18), width: 1.2))),
+        ),
+      ),
+      ...children,
     ]);
   }
 }
 
-class _Feature extends StatelessWidget {
-  const _Feature({required this.icon, required this.color, required this.title, required this.sub});
-  final IconData icon;
-  final Color color;
-  final String title;
-  final String sub;
+class _Card extends StatelessWidget {
+  const _Card({required this.child, this.width, this.padding = const EdgeInsets.all(12)});
+  final Widget child;
+  final double? width;
+  final EdgeInsets padding;
   @override
   Widget build(BuildContext context) {
     final a = context.aura;
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: a.surface, borderRadius: BorderRadius.circular(20), border: Border.all(color: a.border)),
-      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(14)),
-          child: Icon(icon, color: color, size: 23),
+      width: width,
+      padding: padding,
+      decoration: BoxDecoration(
+        color: a.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: a.border),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: a.dark ? 0.3 : 0.08), blurRadius: 24, offset: const Offset(0, 10))],
+      ),
+      child: child,
+    );
+  }
+}
+
+Widget _bar(Color c, double w, {double h = 6}) => Container(width: w, height: h, decoration: BoxDecoration(color: c, borderRadius: BorderRadius.circular(h)));
+
+/// A quotation card with its verified seal and the page it comes from.
+class _AnswersHero extends StatelessWidget {
+  const _AnswersHero();
+  @override
+  Widget build(BuildContext context) {
+    final a = context.aura;
+    return _Stage(color: AuraHues.violet, children: [
+      _Float(
+        child: _Card(
+          width: 196,
+          child: Directionality(
+            textDirection: TextDirection.rtl,
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+              Row(children: [Icon(Icons.format_quote_rounded, size: 18, color: a.accent), const Spacer(), _bar(a.border, 46)]),
+              const SizedBox(height: 8),
+              Text('﴿وَتُوبُوا إِلَى اللَّهِ جَمِيعًا﴾', style: arabicStyle(context, size: 15).copyWith(fontFamily: 'Amiri', height: 1.7)),
+              const SizedBox(height: 6),
+              _bar(a.faint.withValues(alpha: 0.35), 150),
+              const SizedBox(height: 6),
+              _bar(a.faint.withValues(alpha: 0.35), 110),
+              const SizedBox(height: 10),
+              Row(children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(color: a.accentTint, borderRadius: BorderRadius.circular(8)),
+                  child: Text('٤/٢ · ١', style: TextStyle(fontFamily: uiFont, fontSize: 11, fontWeight: FontWeight.w700, color: a.accent)),
+                ),
+              ]),
+            ]),
+          ),
         ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(title, style: TextStyle(fontFamily: uiFont, fontSize: 15, fontWeight: FontWeight.w700, color: a.text)),
-            const SizedBox(height: 3),
-            Text(sub, style: TextStyle(fontFamily: uiFont, fontSize: 13, height: 1.65, color: a.muted)),
+      ),
+      Positioned(
+        top: 34,
+        right: 22,
+        child: _Float(
+          phase: 0.35,
+          child: Container(
+            width: 50,
+            height: 50,
+            decoration: BoxDecoration(
+              color: AuraHues.green,
+              shape: BoxShape.circle,
+              boxShadow: [BoxShadow(color: AuraHues.green.withValues(alpha: 0.35), blurRadius: 16, offset: const Offset(0, 6))],
+            ),
+            child: const Icon(Icons.verified_rounded, color: Colors.white, size: 28),
+          ),
+        ),
+      ),
+    ]);
+  }
+}
+
+/// Book spines on a shelf, one opened to its printed page.
+class _LibraryHero extends StatelessWidget {
+  const _LibraryHero();
+  @override
+  Widget build(BuildContext context) {
+    final a = context.aura;
+    final spines = [AuraHues.teal, AuraHues.violet, AuraHues.amber, AuraHues.green, AuraHues.blue];
+    return _Stage(color: AuraHues.teal, children: [
+      Positioned(
+        bottom: 62,
+        child: _Float(
+          distance: 3,
+          child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+            for (final (i, c) in spines.indexed)
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 2.5),
+                width: 22,
+                height: 92.0 + (i * 17 % 30),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(colors: [c, Color.lerp(c, Colors.black, 0.18)!], begin: Alignment.topLeft, end: Alignment.bottomRight),
+                  borderRadius: BorderRadius.circular(5),
+                ),
+                child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [_bar(Colors.white.withValues(alpha: 0.7), 12, h: 3), const SizedBox(height: 4), _bar(Colors.white.withValues(alpha: 0.5), 8, h: 3)]),
+              ),
           ]),
         ),
-      ]),
-    );
+      ),
+      Positioned(
+        top: 44,
+        left: 26,
+        child: _Float(
+          phase: 0.5,
+          child: _Card(
+            padding: const EdgeInsets.all(10),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.end, mainAxisSize: MainAxisSize.min, children: [
+              _bar(a.faint.withValues(alpha: 0.4), 54, h: 5),
+              const SizedBox(height: 5),
+              _bar(a.faint.withValues(alpha: 0.4), 70, h: 5),
+              const SizedBox(height: 5),
+              _bar(a.faint.withValues(alpha: 0.4), 40, h: 5),
+            ]),
+          ),
+        ),
+      ),
+      Positioned(
+        top: 30,
+        right: 34,
+        child: _Float(
+          phase: 0.2,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+            decoration: BoxDecoration(color: AuraHues.rose, borderRadius: BorderRadius.circular(12), boxShadow: [BoxShadow(color: AuraHues.rose.withValues(alpha: 0.3), blurRadius: 14, offset: const Offset(0, 6))]),
+            child: const Text('PDF', style: TextStyle(fontFamily: 'Vazirmatn', fontSize: 13, fontWeight: FontWeight.w800, color: Colors.white)),
+          ),
+        ),
+      ),
+    ]);
+  }
+}
+
+/// The wishes it keeps, as small notes around a light.
+class _MemoryHero extends StatelessWidget {
+  const _MemoryHero();
+  @override
+  Widget build(BuildContext context) {
+    final a = context.aura;
+    final l = context.l;
+    Widget chip(String text, IconData icon, Color c) => Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: a.surface,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: c.withValues(alpha: 0.35)),
+            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: a.dark ? 0.3 : 0.07), blurRadius: 16, offset: const Offset(0, 6))],
+          ),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Icon(icon, size: 15, color: c),
+            const SizedBox(width: 6),
+            Text(text, style: TextStyle(fontFamily: uiFont, fontSize: 12.5, fontWeight: FontWeight.w600, color: a.text)),
+          ]),
+        );
+    return _Stage(color: AuraHues.amber, children: [
+      Container(
+        width: 78,
+        height: 78,
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(colors: [AuraHues.amber, Color(0xFFF2C14E)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+          shape: BoxShape.circle,
+          boxShadow: [BoxShadow(color: AuraHues.amber.withValues(alpha: 0.4), blurRadius: 26, offset: const Offset(0, 10))],
+        ),
+        child: const Icon(Icons.lightbulb_rounded, color: Colors.white, size: 38),
+      ),
+      Positioned(top: 30, left: 10, child: _Float(phase: 0.1, child: chip(l.onbChipBrief, Icons.short_text_rounded, AuraHues.violet))),
+      Positioned(top: 60, right: 0, child: _Float(phase: 0.45, child: chip(l.onbChipSchool, Icons.account_balance_rounded, AuraHues.green))),
+      Positioned(bottom: 40, left: 26, child: _Float(phase: 0.7, child: chip(l.onbChipPosts, Icons.dashboard_customize_outlined, AuraHues.teal))),
+    ]);
   }
 }
 

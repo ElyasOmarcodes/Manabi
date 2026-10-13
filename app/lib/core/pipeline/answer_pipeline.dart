@@ -868,7 +868,7 @@ class AnswerPipeline {
         withMeta(finalizeAnswer(composed: const {'status': 'insufficient'}, sources: related, language: language), total: total);
 
     // Conversation ("who are you?", thanks): answered at once, nothing to research.
-    final chatReply = p['chatReply'] is String ? (p['chatReply'] as String).trim() : '';
+    final chatReply = p['chatReply'] is String ? (p['chatReply'] as String).trim().replaceAll(RegExp('منبي|منابي|مانابي'), 'منابع') : '';
     if (chatReply.isNotEmpty && queries.isEmpty) {
       emit(AskResultEvent(withMeta(AnswerResult(
         status: AnswerStatus.answered,

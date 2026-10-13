@@ -1736,4 +1736,13 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get onbPermissionNote => 'فقط همین اعلان، نه تبلیغ و نه چیز دیگر.';
+
+  @override
+  String get onbChipBrief => 'پاسخ کوتاه';
+
+  @override
+  String get onbChipSchool => 'حنفی';
+
+  @override
+  String get onbChipPosts => 'پست‌ها';
 }

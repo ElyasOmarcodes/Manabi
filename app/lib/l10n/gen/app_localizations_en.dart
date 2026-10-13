@@ -1742,4 +1742,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get onbPermissionNote => 'Only that note — no ads, nothing else.';
+
+  @override
+  String get onbChipBrief => 'Brief answers';
+
+  @override
+  String get onbChipSchool => 'Hanafi';
+
+  @override
+  String get onbChipPosts => 'As posts';
 }

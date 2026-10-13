@@ -3257,6 +3257,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Only that note — no ads, nothing else.'**
   String get onbPermissionNote;
+
+  /// No description provided for @onbChipBrief.
+  ///
+  /// In en, this message translates to:
+  /// **'Brief answers'**
+  String get onbChipBrief;
+
+  /// No description provided for @onbChipSchool.
+  ///
+  /// In en, this message translates to:
+  /// **'Hanafi'**
+  String get onbChipSchool;
+
+  /// No description provided for @onbChipPosts.
+  ///
+  /// In en, this message translates to:
+  /// **'As posts'**
+  String get onbChipPosts;
 }
 
 class _AppLocalizationsDelegate

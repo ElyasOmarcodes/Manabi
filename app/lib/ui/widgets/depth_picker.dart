@@ -84,6 +84,7 @@ class _GaugePainter extends CustomPainter {
     final stroke = size.width * (big ? 0.07 : 0.12);
     final radius = size.width / 2 - stroke / 2 - (big ? size.width * 0.02 : 0);
     final rect = Rect.fromCircle(center: center, radius: radius);
+    final capAngle = stroke / radius;
     final t = f.clamp(0.0, 1.05);
     canvas.drawArc(rect, start, sweep, false, Paint()
       ..color = track.withValues(alpha: 0.35)
@@ -91,9 +92,15 @@ class _GaugePainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..strokeWidth = stroke);
     canvas.drawArc(rect, start, sweep * t.clamp(0.0, 1.0), false, Paint()
-      // A sweep gradient covers one turn only, so it starts at 0 and is
-      // turned to the dial's start (start + sweep would pass 360°).
-      ..shader = SweepGradient(endAngle: sweep, colors: [color.withValues(alpha: 0.45), color], transform: const GradientRotation(start)).createShader(rect)
+      // A sweep gradient covers one turn only, so it is turned to the dial's
+      // start; it begins a little earlier so the round cap before the start
+      // takes the first colour, not the last (which showed as a break).
+      ..shader = SweepGradient(
+        endAngle: sweep + capAngle,
+        colors: [color.withValues(alpha: 0.45), color.withValues(alpha: 0.45), color],
+        stops: [0, capAngle / (sweep + capAngle), 1],
+        transform: GradientRotation(start - capAngle),
+      ).createShader(rect)
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
       ..strokeWidth = stroke);
