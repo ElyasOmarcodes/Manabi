@@ -62,7 +62,8 @@ const gemini = {
   resolveModel: async () => "gemini-3-flash",
   models: async () => chatModels(listed),
   generateJson: async (request) => {
-    await sleep(900);
+    // DEMO_DELAY: a slower model, to see the research progress.
+    await sleep(Number(process.env.DEMO_DELAY ?? 900));
     const reply = await scripted.generateJson(request);
     if (request.onText) {
       const text = JSON.stringify(reply.data);

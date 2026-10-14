@@ -32,12 +32,16 @@ class ChatScreen extends StatefulWidget {
 
 class _ChatScreenState extends State<ChatScreen> {
   final _scroll = ScrollController();
+
+  /// Whether the composer holds text: the starter cards make way for it.
+  final _typing = ValueNotifier(false);
   int _lastTurnCount = 0;
   String? _lastChatId;
 
   @override
   void dispose() {
     _scroll.dispose();
+    _typing.dispose();
     super.dispose();
   }
 
@@ -94,8 +98,14 @@ class _ChatScreenState extends State<ChatScreen> {
                   Positioned(top: 0, left: 0, right: 0, child: _TopBar(chat: chat, wide: wide)),
                 ]),
         ),
-        if (empty) const _Suggestions(),
-        _Composer(pending: pending),
+        if (empty)
+          ValueListenableBuilder<bool>(
+            valueListenable: _typing,
+            // The same gap above the composer as between two cards.
+            builder: (context, typing, child) => _Collapse(visible: !typing, child: child!),
+            child: const Padding(padding: EdgeInsets.only(bottom: 4), child: _Suggestions()),
+          ),
+        _Composer(pending: pending, typing: _typing),
         SizedBox(height: wide ? 12 : MediaQuery.paddingOf(context).bottom + 4),
       ]),
     );
@@ -103,6 +113,27 @@ class _ChatScreenState extends State<ChatScreen> {
 }
 
 const double _barHeight = 56;
+
+/// Shows or hides its child by folding it away softly, keeping its state.
+class _Collapse extends StatelessWidget {
+  const _Collapse({required this.visible, required this.child});
+  final bool visible;
+  final Widget child;
+  @override
+  Widget build(BuildContext context) => TweenAnimationBuilder<double>(
+        tween: Tween(end: visible ? 1 : 0),
+        duration: const Duration(milliseconds: 320),
+        curve: Curves.easeOutCubic,
+        child: child,
+        builder: (context, v, child) => ClipRect(
+          child: Align(
+            alignment: Alignment.bottomCenter,
+            heightFactor: v,
+            child: Opacity(opacity: v, child: IgnorePointer(ignoring: v < 0.5, child: child)),
+          ),
+        ),
+      );
+}
 
 class _TopBar extends StatelessWidget {
   const _TopBar({required this.chat, required this.wide});
@@ -137,7 +168,7 @@ class _TopBar extends StatelessWidget {
                       ),
                     ),
                   )
-                : (wide ? const SizedBox() : const Center(child: BrandLogo(height: 26, latin: false))),
+                : Align(alignment: wide ? AlignmentDirectional.centerStart : Alignment.center, child: const _AssistantChip()),
           ),
           const SizedBox(width: 10),
           if (hasTurns) ...[
@@ -156,6 +187,33 @@ class _TopBar extends StatelessWidget {
   }
 }
 
+/// The name with the research depth, like a model switch; opens the options.
+class _AssistantChip extends StatelessWidget {
+  const _AssistantChip();
+  @override
+  Widget build(BuildContext context) {
+    final l = context.l;
+    final a = context.aura;
+    final settings = context.watch<SettingsController>();
+    return Pressable(
+      onTap: () => showOptionsSheet(context),
+      child: Container(
+        padding: const EdgeInsetsDirectional.fromSTEB(12, 6, 8, 6),
+        decoration: BoxDecoration(borderRadius: BorderRadius.circular(18)),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Text(l.appName, style: TextStyle(fontFamily: uiFont, fontSize: 16, fontWeight: FontWeight.w700, color: a.text)),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(depthLabel(l, settings.researchDepth),
+                maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontFamily: uiFont, fontSize: 13.5, fontWeight: FontWeight.w500, color: a.muted)),
+          ),
+          Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: a.faint),
+        ]),
+      ),
+    );
+  }
+}
+
 class _Welcome extends StatelessWidget {
   const _Welcome({required this.configured});
   final bool configured;
@@ -166,31 +224,93 @@ class _Welcome extends StatelessWidget {
     return Center(
       child: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          const AnimatedBrandLogo(height: 64),
-          const SizedBox(height: 18),
-          Reveal(
-            delay: 80,
-            child: Text(l.welcomeQuestion, textAlign: TextAlign.center, style: TextStyle(fontFamily: uiFont, fontSize: 19, fontWeight: FontWeight.w600, color: a.text, height: 1.5)),
-          ),
-          if (!configured)
-            Padding(
-              padding: const EdgeInsets.only(top: 16),
-              child: Pressable(
-                onTap: () => openSection(context, Section.settings),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-                  decoration: BoxDecoration(color: a.accentTint, borderRadius: BorderRadius.circular(20)),
-                  child: Row(mainAxisSize: MainAxisSize.min, children: [
-                    Icon(Icons.link_rounded, size: 17, color: a.accent),
-                    const SizedBox(width: 8),
-                    Flexible(child: Text(l.notConfiguredTitle, style: TextStyle(fontFamily: uiFont, fontSize: 13.5, fontWeight: FontWeight.w600, color: a.accent))),
-                  ]),
-                ),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 460),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            // The logo on a soft halo of the brand colours.
+            Stack(alignment: Alignment.center, children: [
+              const _Halo(size: 170),
+              const AnimatedBrandLogo(height: 60),
+            ]),
+            const SizedBox(height: 6),
+            Reveal(
+              delay: 80,
+              child: ShaderMask(
+                blendMode: BlendMode.srcIn,
+                shaderCallback: (r) => LinearGradient(
+                  begin: AlignmentDirectional.centerStart.resolve(Directionality.of(context)),
+                  end: AlignmentDirectional.centerEnd.resolve(Directionality.of(context)),
+                  colors: [a.text, Color.lerp(a.text, a.accent, 0.75)!],
+                ).createShader(Offset.zero & r.size),
+                child: Text(l.welcomeQuestion,
+                    textAlign: TextAlign.center, style: TextStyle(fontFamily: uiFont, fontSize: 24, fontWeight: FontWeight.w700, height: 1.45, letterSpacing: -0.2)),
               ),
             ),
-        ]),
+            const SizedBox(height: 8),
+            Reveal(
+              delay: 160,
+              child: Text(l.welcomeSub, textAlign: TextAlign.center, style: TextStyle(fontFamily: uiFont, fontSize: 14, color: a.muted, height: 1.65)),
+            ),
+            if (!configured)
+              Padding(
+                padding: const EdgeInsets.only(top: 18),
+                child: Pressable(
+                  onTap: () => openSection(context, Section.settings),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                    decoration: BoxDecoration(color: a.accentTint, borderRadius: BorderRadius.circular(20)),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      Icon(Icons.link_rounded, size: 17, color: a.accent),
+                      const SizedBox(width: 8),
+                      Flexible(child: Text(l.notConfiguredTitle, style: TextStyle(fontFamily: uiFont, fontSize: 13.5, fontWeight: FontWeight.w600, color: a.accent))),
+                    ]),
+                  ),
+                ),
+              ),
+          ]),
+        ),
       ),
+    );
+  }
+}
+
+/// A slowly breathing glow in the brand colours.
+class _Halo extends StatefulWidget {
+  const _Halo({required this.size});
+  final double size;
+  @override
+  State<_Halo> createState() => _HaloState();
+}
+
+class _HaloState extends State<_Halo> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(seconds: 5))..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final a = context.aura;
+    return AnimatedBuilder(
+      animation: _c,
+      builder: (context, _) {
+        final t = Curves.easeInOutSine.transform(_c.value);
+        return Container(
+          width: widget.size * (0.92 + 0.08 * t),
+          height: widget.size * (0.92 + 0.08 * t),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: RadialGradient(colors: [
+              AuraHues.violet.withValues(alpha: (a.dark ? 0.24 : 0.17) + 0.05 * t),
+              AuraHues.amber.withValues(alpha: a.dark ? 0.06 : 0.05),
+              AuraHues.violet.withValues(alpha: 0),
+            ], stops: const [0, 0.55, 1]),
+          ),
+        );
+      },
     );
   }
 }
@@ -405,8 +525,9 @@ class _ErrorLine extends StatelessWidget {
 /// ChatGPT-style composer: + on one side, the text in the middle, research
 /// depth and send on the other; chosen options show as pills above the text.
 class _Composer extends StatefulWidget {
-  const _Composer({required this.pending});
+  const _Composer({required this.pending, required this.typing});
   final ChatTurn? pending;
+  final ValueNotifier<bool> typing;
   @override
   State<_Composer> createState() => _ComposerState();
 }
@@ -418,7 +539,10 @@ class _ComposerState extends State<_Composer> {
   @override
   void initState() {
     super.initState();
-    _controller.addListener(() => setState(() {}));
+    _controller.addListener(() {
+      setState(() {});
+      widget.typing.value = _controller.text.trim().isNotEmpty;
+    });
     _focus.addListener(() => setState(() {}));
   }
 

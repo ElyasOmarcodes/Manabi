@@ -3275,6 +3275,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'As posts'**
   String get onbChipPosts;
+
+  /// No description provided for @actWeb.
+  ///
+  /// In en, this message translates to:
+  /// **'Books named for this on the web: {books}'**
+  String actWeb(String books);
+
+  /// No description provided for @actExpand.
+  ///
+  /// In en, this message translates to:
+  /// **'Read on in “{chapter}” of {book} ({pages} pages)'**
+  String actExpand(String book, String chapter, String pages);
+
+  /// No description provided for @actSearches.
+  ///
+  /// In en, this message translates to:
+  /// **'Searched {count} times: {queries}'**
+  String actSearches(String count, String queries);
+
+  /// No description provided for @researchedFor.
+  ///
+  /// In en, this message translates to:
+  /// **'Researched for {seconds}s'**
+  String researchedFor(String seconds);
+
+  /// No description provided for @researchSteps.
+  ///
+  /// In en, this message translates to:
+  /// **'Research steps'**
+  String get researchSteps;
+
+  /// No description provided for @welcomeSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Answers drawn only from the classical books, every quote checked against its page.'**
+  String get welcomeSub;
 }
 
 class _AppLocalizationsDelegate

@@ -1751,4 +1751,31 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get onbChipPosts => 'As posts';
+
+  @override
+  String actWeb(String books) {
+    return 'Books named for this on the web: $books';
+  }
+
+  @override
+  String actExpand(String book, String chapter, String pages) {
+    return 'Read on in “$chapter” of $book ($pages pages)';
+  }
+
+  @override
+  String actSearches(String count, String queries) {
+    return 'Searched $count times: $queries';
+  }
+
+  @override
+  String researchedFor(String seconds) {
+    return 'Researched for ${seconds}s';
+  }
+
+  @override
+  String get researchSteps => 'Research steps';
+
+  @override
+  String get welcomeSub =>
+      'Answers drawn only from the classical books, every quote checked against its page.';
 }

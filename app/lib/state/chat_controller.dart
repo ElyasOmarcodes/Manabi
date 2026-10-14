@@ -4,6 +4,7 @@ import 'package:flutter/widgets.dart';
 import 'package:uuid/uuid.dart';
 
 import '../core/backend/backend.dart';
+import '../core/gemini/gemini_client.dart' show GeminiClient;
 import '../core/models/answer.dart';
 import '../core/models/chat.dart';
 import '../core/models/scope.dart';
@@ -37,7 +38,7 @@ class AskProgress {
 const _transientCodes = {'NETWORK', 'GEMINI_UNAVAILABLE', 'TURATH_UNAVAILABLE', 'INTERRUPTED', 'INTERNAL'};
 
 /// Waits before each automatic retry of an interrupted answer.
-const _defaultRetryDelays = [Duration(seconds: 2), Duration(seconds: 6), Duration(seconds: 15)];
+const _defaultRetryDelays = [Duration(seconds: 2), Duration(seconds: 5), Duration(seconds: 10), Duration(seconds: 20), Duration(seconds: 30)];
 
 class ChatController extends ChangeNotifier with WidgetsBindingObserver {
   ChatController(this._store, this._backend, {AnswerKeepAlive? keepAlive, List<Duration> retryDelays = _defaultRetryDelays})
@@ -119,9 +120,11 @@ class ChatController extends ChangeNotifier with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused || state == AppLifecycleState.hidden) {
+      if (!_inBackground) GeminiClient.appPaused();
       _inBackground = true;
       _sawBackground.addAll(_running.keys);
     } else if (state == AppLifecycleState.resumed) {
+      if (_inBackground) GeminiClient.appResumed();
       _inBackground = false;
       final queued = [..._resumeQueue];
       _resumeQueue.clear();
@@ -259,6 +262,7 @@ class ChatController extends ChangeNotifier with WidgetsBindingObserver {
           case AskResultEvent(:final result):
             turn
               ..result = result
+              ..steps = List.of(p.activity)
               ..state = MessageState.done;
             if (result.remember.isNotEmpty) onRemember?.call(result.remember);
         }
@@ -282,8 +286,11 @@ class ChatController extends ChangeNotifier with WidgetsBindingObserver {
     // A dropped connection (often the phone suspending the app): try again
     // with the same request id, which resumes from the finished steps.
     final attempt = _attempts[turn.id] ?? 0;
-    if (_transientCodes.contains(code) && attempt < _retryDelays.length) {
-      _attempts[turn.id] = attempt + 1;
+    // A failure while the app was away is the phone's doing, not the
+    // network's: it never uses up the attempts, so the answer always goes on.
+    final away = _inBackground || _sawBackground.contains(turn.id);
+    if (_transientCodes.contains(code) && (away || attempt < _retryDelays.length)) {
+      if (!away) _attempts[turn.id] = attempt + 1;
       final p = progress[turn.id];
       if (p != null) p.activity.add(AskActivityEvent('retry', {'code': code, 'attempt': attempt + 1}, DateTime.now().difference(p.startedAt).inMilliseconds));
       if (_inBackground || _sawBackground.contains(turn.id)) {
@@ -294,7 +301,7 @@ class ChatController extends ChangeNotifier with WidgetsBindingObserver {
           return;
         }
       }
-      final delay = _retryDelays[attempt];
+      final delay = away ? _retryDelays.first : _retryDelays[attempt.clamp(0, _retryDelays.length - 1)];
       p?.retryIn = delay.inSeconds;
       notifyListeners();
       _retryTimers[turn.id]?.cancel();

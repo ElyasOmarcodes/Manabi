@@ -16,7 +16,8 @@ class ChatTurn {
     this.errorCode,
     this.errorDetail,
     this.favorite = false,
-  });
+    List<AskActivityEvent>? steps,
+  }) : steps = steps ?? [];
 
   final String id;
   final String question;
@@ -33,6 +34,30 @@ class ChatTurn {
   String? errorDetail;
   bool favorite;
 
+  /// The research steps that led to the answer, shown above it on request.
+  List<AskActivityEvent> steps;
+
+  static List<AskActivityEvent> _steps(Object? v) => [
+        for (final e in v is List ? v : const [])
+          if (e is Map && e['k'] is String) AskActivityEvent(e['k'] as String, (e['d'] as Map?)?.cast<String, dynamic>() ?? const {}, (e['t'] as num?)?.toInt() ?? 0),
+      ];
+
+  static List<Map<String, dynamic>> _stepsJson(List<AskActivityEvent> steps) => [
+        for (final e in steps.length > 80 ? steps.sublist(steps.length - 80) : steps)
+          {'k': e.kind, 'd': _plain(e.data), 't': e.elapsedMs},
+      ];
+
+  /// Only what JSON can hold (strings, numbers, lists and maps of them).
+  static Map<String, dynamic> _plain(Map<String, dynamic> d) {
+    Object? clean(Object? v) => switch (v) {
+          String() || num() || bool() || null => v,
+          List() => [for (final x in v) clean(x)],
+          Map() => {for (final e in v.entries) '${e.key}': clean(e.value)},
+          _ => '$v',
+        };
+    return {for (final e in d.entries) e.key: clean(e.value)};
+  }
+
   factory ChatTurn.fromJson(Map<String, dynamic> j) => ChatTurn(
         id: j['id'] as String,
         question: j['question'] as String,
@@ -46,6 +71,7 @@ class ChatTurn {
         errorCode: j['errorCode'] as String? ?? (j['state'] == 'done' ? null : 'INTERRUPTED'),
         errorDetail: j['errorDetail'] as String?,
         favorite: j['favorite'] == true,
+        steps: _steps(j['steps']),
       );
 
   Map<String, dynamic> toJson() => {
@@ -59,6 +85,7 @@ class ChatTurn {
         if (errorCode != null) 'errorCode': errorCode,
         if (errorDetail != null) 'errorDetail': errorDetail,
         'favorite': favorite,
+        if (steps.isNotEmpty) 'steps': _stepsJson(steps),
       };
 }
 

@@ -583,5 +583,11 @@
   "onbPermissionNote": "یوازې همدا خبرتیا، نه اعلانونه او نه بل څه.",
   "onbChipBrief": "لنډ ځواب",
   "onbChipSchool": "حنفي",
-  "onbChipPosts": "پوسټونه"
+  "onbChipPosts": "پوسټونه",
+  "actWeb": "په ویب کې د دې لپاره یاد شوي کتابونه: {books}",
+  "actExpand": "د «{book}» په «{chapter}» کې نور ولوستل شول ({pages} مخونه)",
+  "actSearches": "{count} ځلې لټون: {queries}",
+  "researchedFor": "{seconds} ثانیې څېړنه",
+  "researchSteps": "د څېړنې پړاوونه",
+  "welcomeSub": "ځوابونه یوازې له معتبرو کلاسیکو کتابونو، او هر نقل له خپل مخ سره پرتله شوی."
 }

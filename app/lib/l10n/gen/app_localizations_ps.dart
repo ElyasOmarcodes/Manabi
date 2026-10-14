@@ -1745,4 +1745,31 @@ class AppLocalizationsPs extends AppLocalizations {
 
   @override
   String get onbChipPosts => 'پوسټونه';
+
+  @override
+  String actWeb(String books) {
+    return 'په ویب کې د دې لپاره یاد شوي کتابونه: $books';
+  }
+
+  @override
+  String actExpand(String book, String chapter, String pages) {
+    return 'د «$book» په «$chapter» کې نور ولوستل شول ($pages مخونه)';
+  }
+
+  @override
+  String actSearches(String count, String queries) {
+    return '$count ځلې لټون: $queries';
+  }
+
+  @override
+  String researchedFor(String seconds) {
+    return '$seconds ثانیې څېړنه';
+  }
+
+  @override
+  String get researchSteps => 'د څېړنې پړاوونه';
+
+  @override
+  String get welcomeSub =>
+      'ځوابونه یوازې له معتبرو کلاسیکو کتابونو، او هر نقل له خپل مخ سره پرتله شوی.';
 }

@@ -827,5 +827,48 @@
   "onbPermissionNote": "Only that note — no ads, nothing else.",
   "onbChipBrief": "Brief answers",
   "onbChipSchool": "Hanafi",
-  "onbChipPosts": "As posts"
+  "onbChipPosts": "As posts",
+  "actWeb": "Books named for this on the web: {books}",
+  "@actWeb": {
+    "placeholders": {
+      "books": {
+        "type": "String"
+      }
+    }
+  },
+  "actExpand": "Read on in “{chapter}” of {book} ({pages} pages)",
+  "@actExpand": {
+    "placeholders": {
+      "book": {
+        "type": "String"
+      },
+      "chapter": {
+        "type": "String"
+      },
+      "pages": {
+        "type": "String"
+      }
+    }
+  },
+  "actSearches": "Searched {count} times: {queries}",
+  "@actSearches": {
+    "placeholders": {
+      "count": {
+        "type": "String"
+      },
+      "queries": {
+        "type": "String"
+      }
+    }
+  },
+  "researchedFor": "Researched for {seconds}s",
+  "@researchedFor": {
+    "placeholders": {
+      "seconds": {
+        "type": "String"
+      }
+    }
+  },
+  "researchSteps": "Research steps",
+  "welcomeSub": "Answers drawn only from the classical books, every quote checked against its page."
 }

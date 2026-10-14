@@ -11,7 +11,7 @@ import '../screens/reader_screen.dart';
 import '../theme.dart';
 import 'answer_markdown.dart';
 import 'common.dart';
-import 'research_progress.dart' show formatTokens;
+import 'research_progress.dart' show ResearchSummary, formatTokens;
 
 /// Assistant reply in a clean chatbot style: plain text on the page, inline
 /// verified Arabic quotes, a quiet action row and a references sheet.
@@ -39,39 +39,13 @@ class AnswerCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Assistant header: mark, name, what the answer rests on.
+          // Assistant header: mark, name, how long the research took and,
+          // on a tap, every step it went through.
           Padding(
             padding: const EdgeInsets.only(bottom: 10),
             child: Directionality(
               textDirection: uiDirection,
-              child: Row(
-                children: [
-                  Container(
-                    width: 28,
-                    height: 28,
-                    decoration: BoxDecoration(gradient: a.brand, shape: BoxShape.circle),
-                    child: const Icon(Icons.auto_awesome_rounded, size: 15, color: Colors.white),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    l.appName,
-                    style: TextStyle(fontFamily: uiFont, fontSize: 14, fontWeight: FontWeight.w700, color: a.text),
-                  ),
-                  if (r.sources.isNotEmpty) ...[
-                    const SizedBox(width: 8),
-                    Flexible(
-                      child: Text(
-                        '· ${l.sourceCount(r.sources.length)}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontFamily: uiFont, fontSize: 12.5, color: a.muted),
-                      ),
-                    ),
-                  ],
-                  const Spacer(),
-                  if (r.status != AnswerStatus.answered) StatusPill(status: r.status),
-                ],
-              ),
+              child: ResearchSummary(steps: turn.steps, result: r, trailing: r.status != AnswerStatus.answered ? StatusPill(status: r.status) : null),
             ),
           ),
           AnswerMarkdown(markdown: r.answer, onCite: openRefs, quoteScale: scale),

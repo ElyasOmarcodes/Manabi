@@ -583,5 +583,11 @@
   "onbPermissionNote": "هذا التنبيه وحده، بلا إعلانات ولا غيرها.",
   "onbChipBrief": "جواب مختصر",
   "onbChipSchool": "حنفي",
-  "onbChipPosts": "منشورات"
+  "onbChipPosts": "منشورات",
+  "actWeb": "كتب ذُكرت لهذا على الويب: {books}",
+  "actExpand": "تابعتُ القراءة في «{chapter}» من «{book}» ({pages} صفحات)",
+  "actSearches": "{count} عمليات بحث: {queries}",
+  "researchedFor": "بحث {seconds} ثانية",
+  "researchSteps": "خطوات البحث",
+  "welcomeSub": "أجوبة من كتب التراث وحدها، وكلّ نقلٍ موثَّق بصفحته."
 }

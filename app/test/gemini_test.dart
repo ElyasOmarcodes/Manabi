@@ -117,6 +117,25 @@ void main() {
     expect(out.model, 'gemini-3.5-flash-lite');
   });
 
+  test('a call frozen while the app was in the background is reported as interrupted, and no model stays benched', () async {
+    var slow = true;
+    final client = MockClient((request) async {
+      if (request.url.path.endsWith('/models')) return _json(200, {'models': listed(['gemini-3.8-flash', 'gemini-3.5-flash-lite'])});
+      if (slow) {
+        GeminiClient.appPaused();
+        await Future<void>.delayed(const Duration(seconds: 2));
+      }
+      return ok();
+    });
+    const quick = TierLimits(Duration(milliseconds: 100), Duration(seconds: 5));
+    final gemini = GeminiClient(apiKey: 'k', client: client, limits: const {ModelTier.main: quick, ModelTier.fast: quick});
+    await expectLater(gemini.generateJson(system: 's', prompt: 'p', schema: const {}), throwsA(isA<GeminiException>().having((e) => e.code, 'code', 'NETWORK')));
+    GeminiClient.appResumed();
+    slow = false;
+    final out = await gemini.generateJson(system: 's', prompt: 'p', schema: const {});
+    expect(out.model, 'gemini-3.8-flash', reason: 'the best model is used again once the app is back');
+  });
+
   test('when every model is out of quota the quota error is reported', () async {
     final client = MockClient((request) async => request.url.path.endsWith('/models')
         ? _json(200, {'models': listed(['gemini-3.8-flash', 'gemini-3.5-flash-lite'])})

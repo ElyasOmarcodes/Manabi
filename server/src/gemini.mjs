@@ -321,6 +321,8 @@ export const createGemini = ({ apiKey, model, fetch: fetcher = fetch, timeoutMs 
    * always written from the library's pages). At most two models are tried.
    */
   const generateText = async ({ system, prompt, tier = "fast", search = false, temperature = 0.2 }) => {
+    // Keys without search quota (the free tier) are not asked again for an hour.
+    if (search && now() < searchOffUntil) throw new GeminiError("QUOTA", "Google Search grounding is not available for this key", { status: 429 });
     const limits = tierLimits[tier] ?? tierLimits.main;
     const tried = new Set();
     let lastError;
@@ -342,10 +344,15 @@ export const createGemini = ({ apiKey, model, fetch: fetcher = fetch, timeoutMs 
       } catch (error) {
         lastError = error;
         if (!(error instanceof GeminiError) || error.code === "AUTH") throw error;
+        if (search && error.code === "QUOTA") {
+          searchOffUntil = now() + 60 * 60_000;
+          throw error;
+        }
       }
     }
     throw lastError ?? new GeminiError("UNAVAILABLE", "No Gemini model is available right now");
   };
+  let searchOffUntil = 0;
 
   /** The text models the key can call (empty when they cannot be listed). */
   const models = async () => chatModels(await listModels());

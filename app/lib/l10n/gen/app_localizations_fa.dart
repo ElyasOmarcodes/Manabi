@@ -1745,4 +1745,31 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get onbChipPosts => 'پست‌ها';
+
+  @override
+  String actWeb(String books) {
+    return 'کتاب‌هایی که برای این در وب آمده‌اند: $books';
+  }
+
+  @override
+  String actExpand(String book, String chapter, String pages) {
+    return 'ادامهٔ «$chapter» در «$book» خوانده شد ($pages صفحه)';
+  }
+
+  @override
+  String actSearches(String count, String queries) {
+    return '$count جست‌وجو: $queries';
+  }
+
+  @override
+  String researchedFor(String seconds) {
+    return '$seconds ثانیه پژوهش';
+  }
+
+  @override
+  String get researchSteps => 'مراحل پژوهش';
+
+  @override
+  String get welcomeSub =>
+      'پاسخ‌ها فقط از کتاب‌های معتبر کهن، و هر نقل با صفحهٔ خودش سنجیده شده.';
 }

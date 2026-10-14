@@ -583,5 +583,11 @@
   "onbPermissionNote": "فقط همین اعلان، نه تبلیغ و نه چیز دیگر.",
   "onbChipBrief": "پاسخ کوتاه",
   "onbChipSchool": "حنفی",
-  "onbChipPosts": "پست‌ها"
+  "onbChipPosts": "پست‌ها",
+  "actWeb": "کتاب‌هایی که برای این در وب آمده‌اند: {books}",
+  "actExpand": "ادامهٔ «{chapter}» در «{book}» خوانده شد ({pages} صفحه)",
+  "actSearches": "{count} جست‌وجو: {queries}",
+  "researchedFor": "{seconds} ثانیه پژوهش",
+  "researchSteps": "مراحل پژوهش",
+  "welcomeSub": "پاسخ‌ها فقط از کتاب‌های معتبر کهن، و هر نقل با صفحهٔ خودش سنجیده شده."
 }

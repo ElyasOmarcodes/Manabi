@@ -154,7 +154,22 @@ class GeminiClient implements JsonModel, WebSearchModel {
   List<Map<String, dynamic>>? _listed;
 
   /// Models skipped until a time, with the error that benched them.
-  final _benched = <String, ({DateTime until, GeminiException error})>{};
+  final _benched = <String, ({DateTime until, DateTime at, GeminiException error})>{};
+
+  /// Told by the app when it goes to the background and comes back. While it
+  /// is away the phone or the browser freezes its connections, so a timeout
+  /// then says nothing about the model: the call is reported as interrupted
+  /// (and resumed when the app is back), and no model stays benched for it.
+  static int _pauses = 0;
+  static DateTime _resumedAt = DateTime.fromMillisecondsSinceEpoch(0);
+  static void appPaused() => _pauses++;
+  static void appResumed() => _resumedAt = DateTime.now();
+
+  bool _isBenched(String m, DateTime now) {
+    final b = _benched[m];
+    if (b == null || !b.until.isAfter(now)) return false;
+    return !((b.error.code == 'TIMEOUT' || b.error.code == 'NETWORK' || b.error.code == 'HTTP') && b.at.isBefore(_resumedAt));
+  }
 
   bool get _pinned => model != null && model!.isNotEmpty;
 
@@ -302,7 +317,7 @@ class GeminiClient implements JsonModel, WebSearchModel {
     final picked = prefer != null && chatModels(listed).any((m) => m.id == prefer);
     final unique = {if (picked) prefer, ...rankModels(listed, tier), if (listed.isEmpty) ..._fallback[tier]!}.toList();
     final now = DateTime.now();
-    return unique.where((m) => !(_benched[m]?.until.isAfter(now) ?? false)).toList();
+    return unique.where((m) => !_isBenched(m, now)).toList();
   }
 
   Future<String> resolveModel([ModelTier tier = ModelTier.main]) async {
@@ -386,11 +401,12 @@ class GeminiClient implements JsonModel, WebSearchModel {
     GeminiException? last;
     final tried = <String>{};
     var retries = 0;
+    final pausesAtStart = _pauses;
     while (true) {
       final name = (await _candidates(tier, prefer)).where((m) => !tried.contains(m)).firstOrNull;
       if (name == null) {
         // Nothing left: report the most telling reason (quota beats the rest).
-        final stored = [for (final b in _benched.values) b.error];
+        final stored = [for (final e in _benched.entries) if (_isBenched(e.key, DateTime.now())) e.value.error];
         throw stored.where((e) => e.code == 'QUOTA').firstOrNull ??
             last ??
             stored.firstOrNull ??
@@ -430,12 +446,16 @@ class GeminiClient implements JsonModel, WebSearchModel {
           tried.add(name);
           continue;
         }
+        // The app went to the background meanwhile: its connection was frozen.
+        if ((raw.code == 'TIMEOUT' || raw.code == 'NETWORK') && _pauses != pausesAtStart) {
+          throw GeminiException('NETWORK', 'The connection was interrupted while the app was in the background [$name]', retryable: true);
+        }
         // Keep the model name with the error so the UI can show what failed.
         final e = GeminiException(raw.code, '${raw.message} [$name]', retryable: raw.retryable, status: raw.status);
         last = e;
         final reason = _pinned ? null : _benchReason(raw);
         if (reason != null) {
-          _benched[name] = (until: DateTime.now().add(_cooldown[reason]!), error: e);
+          _benched[name] = (until: DateTime.now().add(_cooldown[reason]!), at: DateTime.now(), error: e);
           tried.add(name);
         } else if (!raw.retryable) {
           throw e; // bad key, blocked prompt, invalid request: another model will not help
@@ -459,6 +479,8 @@ class GeminiClient implements JsonModel, WebSearchModel {
   /// pages). At most two models are tried.
   @override
   Future<({String text, String model, TokenUsage usage})> searchWeb({required String system, required String prompt, ModelTier tier = ModelTier.fast}) async {
+    // Keys without search quota (the free tier) are not asked again for an hour.
+    if (_searchOffUntil.isAfter(DateTime.now())) throw const GeminiException('QUOTA', 'Google Search grounding is not available for this key', status: 429);
     final budget = limits[tier] ?? TierLimits.defaults[tier]!;
     final tried = <String>{};
     GeminiException? last;
@@ -499,8 +521,14 @@ class GeminiClient implements JsonModel, WebSearchModel {
       } on GeminiException catch (e) {
         last = e;
         if (e.code == 'AUTH') rethrow;
+        if (e.code == 'QUOTA') {
+          _searchOffUntil = DateTime.now().add(const Duration(hours: 1));
+          rethrow;
+        }
       }
     }
     throw last ?? const GeminiException('UNAVAILABLE', 'No Gemini model is available right now');
   }
+
+  DateTime _searchOffUntil = DateTime.fromMillisecondsSinceEpoch(0);
 }

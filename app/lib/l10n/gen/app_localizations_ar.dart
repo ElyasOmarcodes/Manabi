@@ -1742,4 +1742,31 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get onbChipPosts => 'منشورات';
+
+  @override
+  String actWeb(String books) {
+    return 'كتب ذُكرت لهذا على الويب: $books';
+  }
+
+  @override
+  String actExpand(String book, String chapter, String pages) {
+    return 'تابعتُ القراءة في «$chapter» من «$book» ($pages صفحات)';
+  }
+
+  @override
+  String actSearches(String count, String queries) {
+    return '$count عمليات بحث: $queries';
+  }
+
+  @override
+  String researchedFor(String seconds) {
+    return 'بحث $seconds ثانية';
+  }
+
+  @override
+  String get researchSteps => 'خطوات البحث';
+
+  @override
+  String get welcomeSub =>
+      'أجوبة من كتب التراث وحدها، وكلّ نقلٍ موثَّق بصفحته.';
 }
