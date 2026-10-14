@@ -374,7 +374,7 @@ class _ResearchProgressState extends State<ResearchProgress> {
                 children: [
                   const AssistantMark(busy: true),
                   const SizedBox(width: 10),
-                  Flexible(
+                  Expanded(
                     child: AnimatedSwitcher(
                       duration: const Duration(milliseconds: 380),
                       switchInCurve: Curves.easeOutCubic,
@@ -460,9 +460,9 @@ class _ResearchSummaryState extends State<ResearchSummary> {
             ),
           ),
         ],
-        if (canOpen) FoldChevron(open: _open),
         const Spacer(),
         ?widget.trailing,
+        if (canOpen) ...[const SizedBox(width: 6), FoldChevron(open: _open)],
       ],
     );
     return Column(

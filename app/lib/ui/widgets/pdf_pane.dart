@@ -125,10 +125,15 @@ class _PdfPaneState extends State<PdfPane> {
     _count = null;
   });
 
+  DateTime _reportedAt = DateTime.fromMillisecondsSinceEpoch(0);
+
   @override
   void didUpdateWidget(PdfPane old) {
     super.didUpdateWidget(old);
-    if (widget.page != _shown && _controller.isReady) {
+    // A page that comes back right after this view reported its own (the
+    // reader maps it to its page and back) is not a request to move.
+    final echo = DateTime.now().difference(_reportedAt) < const Duration(milliseconds: 1500);
+    if (widget.page != _shown && !echo && _controller.isReady) {
       final count = _controller.pageCount;
       _controller.goToPage(pageNumber: widget.page.clamp(1, count), duration: Duration.zero);
     }
@@ -242,6 +247,7 @@ class _PdfPaneState extends State<PdfPane> {
                     onPageChanged: (n) {
                       if (n == null || n == _shown) return;
                       _shown = n;
+                      _reportedAt = DateTime.now();
                       widget.onPage(n);
                       if (mounted) setState(() {});
                     },

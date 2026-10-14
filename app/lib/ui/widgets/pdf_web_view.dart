@@ -148,7 +148,10 @@ class _WebPdfPagesState extends State<WebPdfPages> {
       _open();
       return;
     }
-    if (widget.page != _shown && _scroll != null && _scroll!.hasClients && _extent > 0) {
+    // While the user scrolls (and just after), a page that comes back from
+    // the reader is the echo of this view's own report: never jump to it.
+    final busy = DateTime.now().difference(_scrolledAt) < const Duration(milliseconds: 1500) || (_scroll?.hasClients == true && _scroll!.position.isScrollingNotifier.value);
+    if (widget.page != _shown && !busy && _scroll != null && _scroll!.hasClients && _extent > 0) {
       _shown = widget.page;
       _scroll!.jumpTo((widget.page - 1).clamp(0, _count - 1) * _extent);
     }
@@ -188,8 +191,11 @@ class _WebPdfPagesState extends State<WebPdfPages> {
     }
   }
 
+  DateTime _scrolledAt = DateTime.fromMillisecondsSinceEpoch(0);
+
   void _onScroll() {
     if (_extent <= 0) return;
+    _scrolledAt = DateTime.now();
     final c = _scroll!;
     final n = ((c.offset + c.position.viewportDimension / 3) / _extent).floor() + 1;
     final page = n.clamp(1, _count);
