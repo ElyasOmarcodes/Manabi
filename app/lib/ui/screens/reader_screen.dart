@@ -497,11 +497,13 @@ class _ReaderScreenState extends State<ReaderScreen> {
     final reading = context.read<ReadingController>();
     final settings = context.read<SettingsController>();
     final viaServer = kIsWeb && settings.mode == ConnectionMode.server;
-    final url = pdfViewUrl(_book!.pdf!.url(_pdfVolume), web: kIsWeb, serverUrl: viaServer ? settings.serverUrl : null);
+    final direct = _book!.pdf!.url(_pdfVolume);
+    final url = pdfViewUrl(direct, web: kIsWeb, serverUrl: viaServer ? settings.serverUrl : null, site: kIsWeb ? Uri.base.origin : null);
     final token = settings.accessToken.trim();
     return PdfPane(
       key: ValueKey(url),
       url: url,
+      directUrl: direct,
       headers: viaServer && token.isNotEmpty ? {'authorization': 'Bearer $token'} : null,
       page: _pdfPage,
       onPage: _onPdfPage,
@@ -2446,6 +2448,10 @@ class BookSearchMemory {
   int total = 0;
   int page = 0;
   double scroll = 0;
+
+  /// Like Turath's: some words, all words or the words in order; other
+  /// forms of the words; footnotes too.
+  TextSearchOptions options = TextSearchOptions.standard;
 }
 
 class _BookSearchSheet extends StatefulWidget {
@@ -2466,6 +2472,12 @@ class _BookSearchSheetState extends State<_BookSearchSheet> {
   late int _page = widget.memory.page;
   bool _loading = false;
   String? _error;
+  late TextSearchOptions _options = widget.memory.options;
+
+  void _setOptions(TextSearchOptions o) {
+    setState(() => _options = widget.memory.options = o);
+    if (_field.text.trim().isNotEmpty) _search();
+  }
 
   @override
   void dispose() {
@@ -2492,7 +2504,7 @@ class _BookSearchSheetState extends State<_BookSearchSheet> {
       }
     });
     try {
-      final r = await widget.backend.search(q, page: _page + 1, scope: SearchScope.single(bookId: widget.bookId));
+      final r = await widget.backend.search(q, page: _page + 1, scope: SearchScope.single(bookId: widget.bookId), options: _options);
       setState(() {
         _items.addAll(r.items);
         _total = r.totalMatches;
@@ -2523,6 +2535,38 @@ class _BookSearchSheetState extends State<_BookSearchSheet> {
               Directionality(
                 textDirection: TextDirection.rtl,
                 child: SearchSuggestions(controller: _field, focus: _focus, bookId: widget.bookId, onPick: (_) => _search()),
+              ),
+              const SizedBox(height: 8),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(children: [
+                  for (final (v, label) in [(1, l.precisionSome), (2, l.precisionAll), (3, l.precisionOrder)])
+                    Padding(
+                      padding: const EdgeInsetsDirectional.only(end: 6),
+                      child: ChoiceChip(
+                        label: Text(label, style: TextStyle(fontFamily: uiFont, fontSize: 12.5)),
+                        selected: _options.precision == v,
+                        visualDensity: VisualDensity.compact,
+                        onSelected: (_) => _setOptions(_options.copyWith(precision: v)),
+                      ),
+                    ),
+                  Container(width: 1, height: 22, margin: const EdgeInsets.symmetric(horizontal: 4), color: a.border),
+                  Padding(
+                    padding: const EdgeInsetsDirectional.only(end: 6),
+                    child: FilterChip(
+                      label: Text(l.extendedSearch, style: TextStyle(fontFamily: uiFont, fontSize: 12.5)),
+                      selected: _options.stem,
+                      visualDensity: VisualDensity.compact,
+                      onSelected: (v) => _setOptions(_options.copyWith(stem: v)),
+                    ),
+                  ),
+                  FilterChip(
+                    label: Text(l.searchNotes, style: TextStyle(fontFamily: uiFont, fontSize: 12.5)),
+                    selected: _options.notes,
+                    visualDensity: VisualDensity.compact,
+                    onSelected: (v) => _setOptions(_options.copyWith(notes: v)),
+                  ),
+                ]),
               ),
             ]),
           ),

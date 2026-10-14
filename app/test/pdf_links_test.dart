@@ -39,5 +39,6 @@ void main() {
     expect(pdfViewUrl(turath, web: false, serverUrl: 'https://m.example'), turath);
     expect(pdfViewUrl(turath, web: true, serverUrl: 'https://m.example/'), 'https://m.example/api/pdf/shamela/roohm_04.pdf');
     expect(pdfViewUrl(turath, web: true), turath);
+    expect(pdfViewUrl(turath, web: true, site: 'https://manabi.example'), 'https://manabi.example/turath-pdf/shamela/roohm_04.pdf');
   });
 }

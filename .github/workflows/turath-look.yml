@@ -29,6 +29,7 @@ jobs:
       - name: Capture Turath pages
         working-directory: tool/turath-look
         run: |
+          node pdf_web_probe.mjs || true
           node pdf_probe.mjs || true
           node pdf_probe.mjs https://files.turath.io/pdf/shamela/roohm_09.pdf 350 || true
           [ "${{ github.event.inputs.network_only }}" = "true" ] || node network.mjs "$GITHUB_WORKSPACE/turath-shots"

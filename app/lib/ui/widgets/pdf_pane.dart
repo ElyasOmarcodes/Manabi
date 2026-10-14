@@ -1,18 +1,27 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:pdfrx/pdfrx.dart';
 
 import '../theme.dart';
 import 'common.dart';
 import 'pdf_open_web.dart' if (dart.library.io) 'pdf_open_native.dart';
+import 'pdf_skeleton.dart';
+import 'pdf_web_view_stub.dart' if (dart.library.js_interop) 'pdf_web_view.dart';
 
-/// Where the viewer reads a Turath PDF from. On the web a browser may not
-/// read Turath's range answers from another origin, so the Manabi server
-/// relays them (only the ranges asked for); apps read Turath directly.
-String pdfViewUrl(String turathUrl, {required bool web, String? serverUrl}) {
+/// Where the viewer reads a Turath PDF from. A browser may not read
+/// Turath's range answers from another site (no exposed Accept-Ranges /
+/// Content-Range), and its PDF reader then downloads the whole volume; so
+/// on the web the ranges come through the Manabi server, or else through
+/// the site's own relay ([site]/turath-pdf, a Pages Function). Apps read
+/// Turath directly.
+String pdfViewUrl(String turathUrl, {required bool web, String? serverUrl, String? site}) {
   const prefix = 'https://files.turath.io/pdf/';
+  if (!web || !turathUrl.startsWith(prefix)) return turathUrl;
+  final rest = turathUrl.substring(prefix.length);
   final server = serverUrl?.trim().replaceAll(RegExp(r'/+$'), '') ?? '';
-  if (!web || server.isEmpty || !turathUrl.startsWith(prefix)) return turathUrl;
-  return '$server/api/pdf/${turathUrl.substring(prefix.length)}';
+  if (server.isNotEmpty) return '$server/api/pdf/$rest';
+  final origin = site?.trim().replaceAll(RegExp(r'/+$'), '') ?? '';
+  return origin.isEmpty ? turathUrl : '$origin/turath-pdf/$rest';
 }
 
 /// The printed (scanned) edition of a volume, shown inside the reader.
@@ -35,8 +44,12 @@ class PdfPane extends StatefulWidget {
     required this.muted,
     required this.digits,
     this.headers,
+    this.directUrl,
   });
   final String url;
+
+  /// Turath's own address, tried when [url] (a relay) cannot be read.
+  final String? directUrl;
 
   /// Sent with every request (the server's access token, for its relay).
   final Map<String, String>? headers;
@@ -105,6 +118,8 @@ class _PdfPaneState extends State<PdfPane> {
   }
 
   void _again() => setState(() {
+    _ready.clear();
+    _readyDone.clear();
     _attempt++;
     _partFailed = false;
     _count = null;
@@ -119,6 +134,52 @@ class _PdfPaneState extends State<PdfPane> {
     }
   }
 
+  Widget _loadingBanner(int downloaded, int? total) {
+    final l = context.l;
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(width: 180, child: AuraProgress(value: total == null || total == 0 ? null : downloaded / total)),
+          const SizedBox(height: 10),
+          Text(
+            l.pdfLoadingBytes(_size(downloaded)),
+            style: TextStyle(fontFamily: uiFont, fontSize: 12.5, color: widget.muted),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _errorBanner(VoidCallback retry) {
+    final l = context.l;
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.cloud_off_rounded, color: AuraHues.rose, size: 34),
+          const SizedBox(height: 10),
+          Text(
+            errorText(l, 'NETWORK'),
+            textAlign: TextAlign.center,
+            style: TextStyle(fontFamily: uiFont, color: widget.text),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            alignment: WrapAlignment.center,
+            children: [
+              SoftButton(icon: Icons.refresh_rounded, label: l.retry, onTap: retry),
+              SoftButton(icon: Icons.open_in_new_rounded, label: l.pdfOpenOutside, onTap: () => openUrl('${widget.url}#page=${widget.page}')),
+              SoftButton(icon: Icons.notes_rounded, label: l.showText, onTap: widget.onShowText),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = context.l;
@@ -128,84 +189,66 @@ class _PdfPaneState extends State<PdfPane> {
           // Only the parts of the volume the shown pages need are fetched (HTTP
           // byte ranges), not the whole file; on phones and computers they are
           // kept on disk, so a page seen once opens again without the network.
-          child: PdfViewer(
-            PdfDocumentRefByLoader(
-              _open,
-              key: PdfDocumentRefKey(widget.url, [_attempt]),
-            ),
-            controller: _controller,
-            initialPageNumber: widget.page,
-            params: PdfViewerParams(
-              backgroundColor: widget.background,
-              margin: 10,
-              // Mouse wheels and trackpads move about as fast as in the text.
-              scrollByMouseWheel: 0.6,
-              // Only the pages on screen are measured and read. Measuring every
-              // page up front (the default) reads nearly the whole volume.
-              behaviorControlParams: const PdfViewerBehaviorControlParams(loadPageDimensionsOnDemand: true),
-              // Scans have no text to select; looking for it parses each page's
-              // content on the worker the drawing waits for.
-              textSelectionParams: const PdfTextSelectionParams(enabled: false),
-              // Over each page until its data is read: the outline of a page of
-              // text, breathing, so a page still coming never looks empty.
-              pageOverlaysBuilder: (context, rect, page) => [
-                if (!_readyDone.contains(page.pageNumber))
-                  _PageLoading(
-                    key: ValueKey('$_attempt:${page.pageNumber}'),
-                    ready: _ready.putIfAbsent(page.pageNumber, () => _readPage(page)),
-                    number: widget.digits(page.pageNumber),
-                    color: widget.muted,
+          child: kIsWeb
+              ? WebPdfPages(
+                  key: ValueKey('${widget.url}:$_attempt'),
+                  url: widget.url,
+                  fallbackUrl: widget.directUrl == widget.url ? null : widget.directUrl,
+                  headers: widget.headers,
+                  page: widget.page,
+                  onPage: (n) {
+                    _shown = n;
+                    widget.onPage(n);
+                    if (mounted) setState(() {});
+                  },
+                  onCount: (n) => WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted) setState(() => _count = n);
+                  }),
+                  background: widget.background,
+                  muted: widget.muted,
+                  digits: widget.digits,
+                  loading: (bytes) => _loadingBanner(bytes, null),
+                  error: (retry) => _errorBanner(retry),
+                )
+              : PdfViewer(
+                  PdfDocumentRefByLoader(_open, key: PdfDocumentRefKey(widget.url, [_attempt])),
+                  controller: _controller,
+                  initialPageNumber: widget.page,
+                  params: PdfViewerParams(
+                    backgroundColor: widget.background,
+                    margin: 10,
+                    // Mouse wheels and trackpads move about as fast as in the text.
+                    scrollByMouseWheel: 0.6,
+                    // Only the pages on screen are measured and read. Measuring every
+                    // page up front (the default) reads nearly the whole volume.
+                    behaviorControlParams: const PdfViewerBehaviorControlParams(loadPageDimensionsOnDemand: true),
+                    // Scans have no text to select; looking for it parses each page's
+                    // content on the worker the drawing waits for.
+                    textSelectionParams: const PdfTextSelectionParams(enabled: false),
+                    // Over each page until its data is read: the outline of a page of
+                    // text, breathing, so a page still coming never looks empty.
+                    pageOverlaysBuilder: (context, rect, page) => [
+                      if (!_readyDone.contains(page.pageNumber))
+                        _PageLoading(
+                          key: ValueKey('$_attempt:${page.pageNumber}'),
+                          ready: _ready.putIfAbsent(page.pageNumber, () => _readPage(page)),
+                          number: widget.digits(page.pageNumber),
+                          color: widget.muted,
+                        ),
+                    ],
+                    onViewerReady: (doc, controller) {
+                      if (mounted) setState(() => _count = doc.pages.length);
+                    },
+                    onPageChanged: (n) {
+                      if (n == null || n == _shown) return;
+                      _shown = n;
+                      widget.onPage(n);
+                      if (mounted) setState(() {});
+                    },
+                    loadingBannerBuilder: (context, downloaded, total) => _loadingBanner(downloaded, total),
+                    errorBannerBuilder: (context, error, stack, ref) => _errorBanner(_again),
                   ),
-              ],
-              onViewerReady: (doc, controller) {
-                if (mounted) setState(() => _count = doc.pages.length);
-              },
-              onPageChanged: (n) {
-                if (n == null || n == _shown) return;
-                _shown = n;
-                widget.onPage(n);
-                if (mounted) setState(() {});
-              },
-              loadingBannerBuilder: (context, downloaded, total) => Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    SizedBox(width: 180, child: AuraProgress(value: total == null || total == 0 ? null : downloaded / total)),
-                    const SizedBox(height: 10),
-                    Text(
-                      l.pdfLoadingBytes(_size(downloaded)),
-                      style: TextStyle(fontFamily: uiFont, fontSize: 12.5, color: widget.muted),
-                    ),
-                  ],
                 ),
-              ),
-              errorBannerBuilder: (context, error, stack, ref) => Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.cloud_off_rounded, color: AuraHues.rose, size: 34),
-                    const SizedBox(height: 10),
-                    Text(
-                      errorText(l, 'NETWORK'),
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontFamily: uiFont, color: widget.text),
-                    ),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      alignment: WrapAlignment.center,
-                      children: [
-                        SoftButton(icon: Icons.refresh_rounded, label: l.retry, onTap: _again),
-                        SoftButton(icon: Icons.open_in_new_rounded, label: l.pdfOpenOutside, onTap: () => openUrl('${widget.url}#page=${widget.page}')),
-                        SoftButton(icon: Icons.notes_rounded, label: l.showText, onTap: widget.onShowText),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
         ),
         if (_partFailed)
           Positioned(
@@ -323,8 +366,7 @@ class _PageLoading extends StatefulWidget {
   State<_PageLoading> createState() => _PageLoadingState();
 }
 
-class _PageLoadingState extends State<_PageLoading> with SingleTickerProviderStateMixin {
-  late final AnimationController _breath = AnimationController(vsync: this, duration: const Duration(milliseconds: 1300))..repeat(reverse: true);
+class _PageLoadingState extends State<_PageLoading> {
   bool _done = false;
   bool _gone = false;
 
@@ -333,18 +375,11 @@ class _PageLoadingState extends State<_PageLoading> with SingleTickerProviderSta
     super.initState();
     widget.ready.whenComplete(() {
       if (!mounted) return;
-      _breath.stop();
       // A moment for the viewer to draw the page under the fading outline.
       Future<void>.delayed(const Duration(milliseconds: 150), () {
         if (mounted) setState(() => _done = true);
       });
     });
-  }
-
-  @override
-  void dispose() {
-    _breath.dispose();
-    super.dispose();
   }
 
   @override
@@ -357,48 +392,8 @@ class _PageLoadingState extends State<_PageLoading> with SingleTickerProviderSta
         onEnd: () {
           if (_done && mounted) setState(() => _gone = true);
         },
-        child: ColoredBox(
-          color: Colors.white,
-          child: AnimatedBuilder(
-            animation: _breath,
-            builder: (context, _) => CustomPaint(painter: _SkeletonPainter(widget.color, 0.08 + 0.08 * _breath.value, widget.number)),
-          ),
-        ),
+        child: PdfPageSkeleton(number: widget.number, color: widget.color, breathe: !_done),
       ),
     );
   }
-}
-
-class _SkeletonPainter extends CustomPainter {
-  _SkeletonPainter(this.color, this.alpha, this.number);
-  final Color color;
-  final double alpha;
-  final String number;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-    final line = Paint()..color = color.withValues(alpha: alpha);
-    final gap = h * 0.045;
-    final thick = (h * 0.012).clamp(3.0, 14.0);
-    for (var i = 0; i < 17; i++) {
-      final y = h * 0.1 + i * gap;
-      if (y > h * 0.86) break;
-      // Lines of a right-to-left page: flush right, a paragraph's last one shorter.
-      final len = w * (i % 5 == 4 ? 0.42 : 0.8);
-      canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(w * 0.9 - len, y, len, thick), Radius.circular(thick / 2)), line);
-    }
-    final tp = TextPainter(
-      text: TextSpan(
-        text: number,
-        style: TextStyle(fontFamily: uiFont, fontSize: (w * 0.06).clamp(12.0, 36.0), fontWeight: FontWeight.w700, color: color.withValues(alpha: 0.45)),
-      ),
-      textDirection: TextDirection.ltr,
-    )..layout();
-    tp.paint(canvas, Offset(w / 2 - tp.width / 2, h * 0.93 - tp.height / 2));
-  }
-
-  @override
-  bool shouldRepaint(_SkeletonPainter old) => old.alpha != alpha || old.color != color || old.number != number;
 }
