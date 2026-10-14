@@ -9,6 +9,7 @@ import { createTurathClient } from "nusus/turath";
 import { catalog } from "../src/catalog.mjs";
 import { createGemini } from "../src/gemini.mjs";
 import { createPipeline } from "../src/pipeline.mjs";
+import { HINTS_SYSTEM, hintsPrompt } from "../src/prompts.mjs";
 import questions from "../eval/questions.json" with { type: "json" };
 
 const key = process.env.GEMINI_API_KEY || process.env.GEMINI_API_KYA;
@@ -23,6 +24,20 @@ const norm = (s) => String(s ?? "").replace(/[ً-ٰٟـ]/g, "").replace(/[أإآ
 
 const gemini = createGemini({ apiKey: key });
 const turath = createTurathClient({ timeout: 20_000 });
+const pause = Number(process.env.EVAL_PAUSE_MS ?? 12_000);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// The web step on its own first: which model answers, or why it cannot.
+for (const tier of ["fast", "main"]) {
+  const t = Date.now();
+  try {
+    const r = await gemini.generateText({ system: HINTS_SYSTEM, prompt: hintsPrompt(questions[0].question), tier, search: true });
+    console.log(`web probe ${tier}: ${r.model} ${Date.now() - t}ms ${JSON.stringify(r.text).slice(0, 400)}`);
+  } catch (error) {
+    console.log(`web probe ${tier}: FAILED ${error.code} ${error.status ?? ""} ${Date.now() - t}ms ${String(error.message).slice(0, 300)}`);
+  }
+}
+
 const modes = { agent: {}, ...(compare ? { old: { web: false, expand: false, limits: { followUpRounds: 1 } } } : {}) };
 
 const runOne = async (q, features) => {
@@ -59,6 +74,12 @@ for (const q of questions.slice(0, limit)) {
   const row = { id: q.id, kind: q.kind, question: q.question };
   for (const [mode, features] of Object.entries(modes)) {
     row[mode] = await runOne(q, features);
+    // Turath turns away bursts of searches: wait, and ask once more.
+    if (row[mode].status.includes("TURATH_UNAVAILABLE")) {
+      await sleep(60_000);
+      row[mode] = await runOne(q, features);
+    }
+    await sleep(pause);
     const r = row[mode];
     console.log(`#${q.id} ${mode.padEnd(5)} ${r.hit ? "HIT " : "miss"} ${r.status.padEnd(12)} ${String(r.ms).padStart(6)}ms ${String(r.input).padStart(6)}+${r.output} tok ${r.calls} calls ${r.searches} searches ${r.rounds} rounds ${r.expanded} expanded | ${r.found.join("، ") || "-"} | web: ${r.web.join("، ") || "-"}`);
   }
