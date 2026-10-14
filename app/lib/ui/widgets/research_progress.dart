@@ -192,7 +192,7 @@ class _ShimmerTextState extends State<ShimmerText> with SingleTickerProviderStat
 /// A chevron that points to where the line leads (the end of the line in
 /// the reading direction) and turns down when its panel is open.
 class FoldChevron extends StatelessWidget {
-  const FoldChevron({super.key, required this.open, this.size = 18, this.color});
+  const FoldChevron({super.key, required this.open, this.size = 22, this.color});
   final bool open;
   final double size;
   final Color? color;
@@ -203,7 +203,7 @@ class FoldChevron extends StatelessWidget {
       turns: open ? 0 : (rtl ? 0.25 : -0.25),
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeOutCubic,
-      child: Icon(Icons.keyboard_arrow_down_rounded, size: size, color: color ?? context.aura.faint),
+      child: Icon(Icons.keyboard_arrow_down_rounded, size: size, color: color ?? context.aura.muted),
     );
   }
 }
@@ -460,7 +460,7 @@ class _ResearchSummaryState extends State<ResearchSummary> {
             ),
           ),
         ],
-        if (canOpen) FoldChevron(open: _open, size: 17),
+        if (canOpen) FoldChevron(open: _open),
         const Spacer(),
         ?widget.trailing,
       ],

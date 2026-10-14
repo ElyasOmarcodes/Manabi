@@ -196,7 +196,7 @@ class _AssistantChip extends StatelessWidget {
     final a = context.aura;
     final settings = context.watch<SettingsController>();
     return Pressable(
-      onTap: () => showOptionsSheet(context),
+      onTap: () => showModelPicker(context),
       child: Container(
         padding: const EdgeInsetsDirectional.fromSTEB(12, 6, 8, 6),
         decoration: BoxDecoration(borderRadius: BorderRadius.circular(18)),
@@ -204,7 +204,7 @@ class _AssistantChip extends StatelessWidget {
           Text(l.appName, style: TextStyle(fontFamily: uiFont, fontSize: 16, fontWeight: FontWeight.w700, color: a.text)),
           const SizedBox(width: 6),
           Flexible(
-            child: Text(depthLabel(l, settings.researchDepth),
+            child: Text(settings.chatModel.isEmpty ? l.modelAuto : modelShortName(settings.chatModel),
                 maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontFamily: uiFont, fontSize: 13.5, fontWeight: FontWeight.w500, color: a.muted)),
           ),
           Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: a.faint),
@@ -230,7 +230,7 @@ class _Welcome extends StatelessWidget {
             // The logo on a soft halo of the brand colours.
             Stack(alignment: Alignment.center, children: [
               const _Halo(size: 170),
-              const AnimatedBrandLogo(height: 60),
+              const BrandLogo(height: 60),
             ]),
             const SizedBox(height: 6),
             Reveal(
@@ -283,7 +283,7 @@ class _Halo extends StatefulWidget {
 }
 
 class _HaloState extends State<_Halo> with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(seconds: 5))..repeat(reverse: true);
+  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(seconds: 5))..value = 0.5;
 
   @override
   void dispose() {

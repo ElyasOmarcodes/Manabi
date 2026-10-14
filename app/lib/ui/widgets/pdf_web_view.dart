@@ -243,21 +243,19 @@ class _WebPdfPagesState extends State<WebPdfPages> {
           }
           return widget.loading(_bytes);
         }
-        return InteractiveViewer(
-          minScale: 1,
-          maxScale: 4,
-          panEnabled: false,
-          child: ColoredBox(
-            color: widget.background,
-            child: ListView.builder(
-              controller: _scroll,
-              itemCount: _count,
-              itemExtent: _extent,
-              padding: const EdgeInsets.symmetric(horizontal: margin),
-              itemBuilder: (context, i) => Padding(
-                padding: const EdgeInsets.only(bottom: margin),
-                child: _WebPage(key: ValueKey(i), image: _image(i + 1), number: widget.digits(i + 1), muted: widget.muted),
-              ),
+        // A plain list: a zoom layer above it took the drags and the pages
+        // sprang back instead of scrolling.
+        return ColoredBox(
+          color: widget.background,
+          child: ListView.builder(
+            controller: _scroll,
+            physics: const ClampingScrollPhysics(),
+            itemCount: _count,
+            itemExtent: _extent,
+            padding: const EdgeInsets.symmetric(horizontal: margin),
+            itemBuilder: (context, i) => Padding(
+              padding: const EdgeInsets.only(bottom: margin),
+              child: _WebPage(key: ValueKey(i), image: _image(i + 1), number: widget.digits(i + 1), muted: widget.muted),
             ),
           ),
         );
