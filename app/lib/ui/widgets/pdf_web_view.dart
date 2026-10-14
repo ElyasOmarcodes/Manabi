@@ -135,6 +135,11 @@ class _WebPdfPagesState extends State<WebPdfPages> {
     }
   }
 
+  void _reopen() {
+    _dispose();
+    _open();
+  }
+
   @override
   void didUpdateWidget(WebPdfPages old) {
     super.didUpdateWidget(old);
@@ -173,9 +178,12 @@ class _WebPdfPagesState extends State<WebPdfPages> {
     if (pdf == null || id == null) return null;
     try {
       return (await pdf.render(id.toJS, n.toJS, _width.toJS).toDart).toDart;
-    } catch (_) {
+    } catch (e) {
+      // A range that did not come: pdf.js waits on it for good, so the
+      // volume is opened again from the banner's button.
       _images.remove(n);
       _order.remove(n);
+      if (mounted && id == _id) setState(() => _error = e);
       return null;
     }
   }
@@ -211,7 +219,7 @@ class _WebPdfPagesState extends State<WebPdfPages> {
 
   @override
   Widget build(BuildContext context) {
-    if (_error != null) return widget.error(_open);
+    if (_error != null) return widget.error(_reopen);
     if (_id == null) return widget.loading(_bytes);
     return LayoutBuilder(
       builder: (context, c) {
@@ -227,7 +235,7 @@ class _WebPdfPagesState extends State<WebPdfPages> {
           if (!_waiting) {
             _waiting = true;
             _image(target).then((_) {
-              if (!mounted || _ready) return;
+              if (!mounted || _ready || _error != null) return;
               _scroll = ScrollController(initialScrollOffset: (target - 1) * _extent)..addListener(_onScroll);
               setState(() => _ready = true);
               if (target < _count) _image(target + 1);
