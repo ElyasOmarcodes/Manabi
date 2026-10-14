@@ -7,7 +7,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../models/answer.dart' show TokenUsage;
-import '../pipeline/answer_pipeline.dart' show JsonModel, ModelReply, ModelTier;
+import '../pipeline/answer_pipeline.dart' show JsonModel, ModelReply, ModelTier, WebSearchModel;
 
 const _api = 'https://generativelanguage.googleapis.com/v1beta';
 
@@ -144,7 +144,7 @@ Map<String, dynamic> parseJsonReply(String text) {
 /// A 429 that names a daily/plan quota (as opposed to a short burst limit).
 bool _isExhausted(String message) => RegExp('quota|exceeded your current', caseSensitive: false).hasMatch(message);
 
-class GeminiClient implements JsonModel {
+class GeminiClient implements JsonModel, WebSearchModel {
   GeminiClient({required this.apiKey, this.model, http.Client? client, this.limits = TierLimits.defaults}) : _http = client ?? http.Client();
 
   final String apiKey;
@@ -452,5 +452,55 @@ class GeminiClient implements JsonModel {
         if (DateTime.now().isAfter(deadline)) throw e;
       }
     }
+  }
+
+  /// Plain text from one short call grounded in Google Search (only to learn
+  /// which books treat a question; the answer is written from the library's
+  /// pages). At most two models are tried.
+  @override
+  Future<({String text, String model, TokenUsage usage})> searchWeb({required String system, required String prompt, ModelTier tier = ModelTier.fast}) async {
+    final budget = limits[tier] ?? TierLimits.defaults[tier]!;
+    final tried = <String>{};
+    GeminiException? last;
+    for (var i = 0; i < 2; i++) {
+      final name = (await _candidates(tier)).where((m) => !tried.contains(m) && !isGemma(m)).firstOrNull;
+      if (name == null) break;
+      tried.add(name);
+      final thinking = _thinkingFor(name);
+      try {
+        final out = await _call(
+          'POST',
+          '$_api/models/${Uri.encodeComponent(name)}:generateContent',
+          timeout: budget.call,
+          body: {
+            'systemInstruction': {
+              'parts': [
+                {'text': system},
+              ],
+            },
+            'contents': [
+              {
+                'role': 'user',
+                'parts': [
+                  {'text': prompt},
+                ],
+              },
+            ],
+            'tools': [
+              {'google_search': <String, dynamic>{}},
+            ],
+            'generationConfig': {'temperature': 0.2, 'thinkingConfig': ?thinking},
+          },
+        );
+        final candidates = out['candidates'] as List? ?? const [];
+        final parts = candidates.isEmpty ? const [] : ((candidates.first as Map)['content'] as Map?)?['parts'] as List? ?? const [];
+        final text = parts.whereType<Map>().where((p) => p['text'] is String && p['thought'] != true).map((p) => p['text']).join();
+        return (text: text, model: name, usage: _usage(out['usageMetadata']));
+      } on GeminiException catch (e) {
+        last = e;
+        if (e.code == 'AUTH') rethrow;
+      }
+    }
+    throw last ?? const GeminiException('UNAVAILABLE', 'No Gemini model is available right now');
   }
 }

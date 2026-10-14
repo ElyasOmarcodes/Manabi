@@ -30,7 +30,11 @@ Select the candidates that actually help answer the question, best first:
 - Drop duplicates (the same text in several books: keep the most authoritative one or two) and irrelevant hits.
 - Select at most 14.
 Then judge "coverage": "full" if the selected passages answer the whole question (including every book or school the user asked about and every one of its PARTS), "partial" if something is missing (a question in parts is partial as soon as one part is answered), "none" if nothing relevant.
-If coverage is not full, give "followUpQueries" (up to 5 new literal Arabic queries without diacritics, different from those already used) and "followUpBooks" (up to 4 Arabic book titles to search inside). Otherwise leave them empty.
+If coverage is not full, decide the next step of the research, like a scholar who keeps reading until the question is settled:
+- "expand": up to 3 candidate ids whose page starts, touches or belongs to the very story, ruling or discussion asked about but does not hold all of it; the rest of that chapter (bab) is read next. This is the best step when a story or a discussion is found but cut off, or told in other words than the queries.
+- "followUpQueries": up to 5 new literal Arabic queries without diacritics, different from those already used: other wordings of the story or ruling, the names of the people in it, its key phrase as the books would write it.
+- "followUpBooks": up to 4 Arabic book titles to search inside (the works where this matter is known to be treated).
+Give only the steps that can find what is missing; leave all three empty when coverage is full or nothing more can help.
 Return JSON only.''';
 
 String composeSystem(String languageName) => '''You are Manabi, a meticulous research assistant for classical Islamic sources. You answer ONLY from the numbered SOURCES (real pages retrieved from the Turath library).
@@ -64,3 +68,7 @@ How these books are laid out:
 - Quran verses (in ﴿ ﴾, or { } in some books) are not matn; leave them out.
 For each matn stretch give "start": its first 2 to 6 words and "end": its last 2 to 6 words, copied exactly from the page (the delimiters themselves are not needed). For a short stretch give the same words in both. List the stretches of each page in reading order.
 If the book is not a commentary on a base text, return empty lists. Never invent text that is not on the page.''';
+
+const hintsSystem = '''You help a researcher find where a question about Islam is treated in the classical Arabic books. Search the web, then name the classical books (written before the 15th Hijri century) that narrate this story or treat this question, the most authoritative first.
+Reply with up to 6 lines and nothing else, each line: Arabic book title as printed — author — chapter (bab) if known.
+Name only books you found named for this very matter; no explanation, no answer to the question, no links.''';

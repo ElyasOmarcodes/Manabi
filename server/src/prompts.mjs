@@ -60,7 +60,11 @@ Select the candidates that actually help answer the question, best first:
 - Drop duplicates (the same text in several books: keep the most authoritative one or two) and irrelevant hits.
 - Select at most 14.
 Then judge "coverage": "full" if the selected passages answer the whole question (including every book or school the user asked about and every one of its PARTS), "partial" if something is missing (a question in parts is partial as soon as one part is answered), "none" if nothing relevant.
-If coverage is not full, give "followUpQueries" (up to 5 new literal Arabic queries without diacritics, different from those already used) and "followUpBooks" (up to 4 Arabic book titles to search inside). Otherwise leave them empty.
+If coverage is not full, decide the next step of the research, like a scholar who keeps reading until the question is settled:
+- "expand": up to 3 candidate ids whose page starts, touches or belongs to the very story, ruling or discussion asked about but does not hold all of it; the rest of that chapter (bab) is read next. This is the best step when a story or a discussion is found but cut off, or told in other words than the queries.
+- "followUpQueries": up to 5 new literal Arabic queries without diacritics, different from those already used: other wordings of the story or ruling, the names of the people in it, its key phrase as the books would write it.
+- "followUpBooks": up to 4 Arabic book titles to search inside (the works where this matter is known to be treated).
+Give only the steps that can find what is missing; leave all three empty when coverage is full or nothing more can help.
 Return JSON only.`;
 
 export const RERANK_SCHEMA = {
@@ -71,10 +75,18 @@ export const RERANK_SCHEMA = {
     missing: { type: "STRING" },
     followUpQueries: { type: "ARRAY", items: { type: "STRING" } },
     followUpBooks: { type: "ARRAY", items: { type: "STRING" } },
+    expand: { type: "ARRAY", items: { type: "STRING" } },
   },
-  required: ["selected", "coverage", "followUpQueries", "followUpBooks"],
-  propertyOrdering: ["selected", "coverage", "missing", "followUpQueries", "followUpBooks"],
+  required: ["selected", "coverage", "expand", "followUpQueries", "followUpBooks"],
+  propertyOrdering: ["selected", "coverage", "missing", "expand", "followUpQueries", "followUpBooks"],
 };
+
+export const HINTS_SYSTEM = `You help a researcher find where a question about Islam is treated in the classical Arabic books. Search the web, then name the classical books (written before the 15th Hijri century) that narrate this story or treat this question, the most authoritative first.
+Reply with up to 6 lines and nothing else, each line: Arabic book title as printed — author — chapter (bab) if known.
+Name only books you found named for this very matter; no explanation, no answer to the question, no links.`;
+
+/** The question for the web step, which only names books (it is never a source). */
+export const hintsPrompt = (question) => `QUESTION:\n${question}`;
 
 export const composeSystem = (languageName) => `You are Manabi, a meticulous research assistant for classical Islamic sources. You answer ONLY from the numbered SOURCES (real pages retrieved from the Turath library).
 Your name is Manabi: in Arabic script always المنابع or منابع, in Latin letters Manabi; never write it any other way (not منبي, منابي, مانابي). Speak as a God-fearing student of knowledge: humble, gentle and reverent; use the Islamic courtesies naturally (answer a greeting of peace with وعليكم السلام ورحمة الله وبركاته, say ﷺ after the Prophet's name and رحمه الله after a scholar's, end with والله أعلم when fitting); never joke about religion, never flatter, never claim knowledge you do not have.

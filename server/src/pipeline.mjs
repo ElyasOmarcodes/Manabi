@@ -1,7 +1,11 @@
 // Grounded answer pipeline (v2):
 //   1. plan     – Gemini: literal Arabic queries, schools, requested + reference books
 //   2. search   – Nusus/Turath: general, per-book, per-school searches → candidate pool
-//   3. read     – Gemini ranks the candidates; one follow-up search round if needed
+//   3. read     – Gemini ranks the candidates and, like a researcher, decides
+//                 the next step until the question is covered: read the rest
+//                 of the chapter around a hit, search with new words, or search
+//                 inside named books (books also named by a web search run
+//                 beside the plan; the web is never a source)
 //   4. compose  – Gemini answers only from the selected pages, quoting them inline
 //   5. verify   – every quote is located in the real page text; unverifiable
 //                 answers are downgraded to "insufficient".
@@ -11,6 +15,7 @@ import { partialJsonString } from "./partial.mjs";
 import { decodingTurath } from "./text.mjs";
 import {
   COMPOSE_SCHEMA,
+  HINTS_SYSTEM,
   LANGUAGES,
   PLAN_SCHEMA,
   PLAN_SYSTEM,
@@ -18,6 +23,7 @@ import {
   RERANK_SYSTEM,
   composePrompt,
   composeSystem,
+  hintsPrompt,
   planPrompt,
   rerankPrompt,
 } from "./prompts.mjs";
@@ -61,11 +67,17 @@ export const LIMITS = {
   sourceChars: 2400,
   maxSelected: 14,
   continuationPages: 6,
-  followUpRounds: 1,
+  followUpRounds: 2,
   requestedAuthors: 2,
   focusBooks: 2,
   chapterPages: 4,
   relatedWorks: 2,
+  // Hits whose chapter is read further per round, and the pages read around each.
+  expandHits: 3,
+  expandPages: 3,
+  // Books named by the web step, and how long the search waits for it after the plan.
+  webBooks: 3,
+  webWaitMs: 4_000,
 };
 
 /**
@@ -73,9 +85,9 @@ export const LIMITS = {
  * quick reads fewer passages, deep searches wider and reads more pages.
  */
 export const DEPTHS = {
-  quick: { generalQueries: 3, hitsPerGeneral: 6, referenceBooks: 3, queriesPerMadhhab: 2, maxSearches: 18, maxCandidates: 32, maxSelected: 6, continuationPages: 2, followUpRounds: 0, focusBooks: 1, chapterPages: 2, relatedWorks: 0 },
+  quick: { generalQueries: 3, hitsPerGeneral: 6, referenceBooks: 3, queriesPerMadhhab: 2, maxSearches: 18, maxCandidates: 32, maxSelected: 6, continuationPages: 2, followUpRounds: 0, focusBooks: 1, chapterPages: 2, relatedWorks: 0, expandHits: 0, webBooks: 0 },
   standard: {},
-  deep: { generalQueries: 8, hitsPerGeneral: 10, referenceBooks: 6, queriesPerReference: 3, queriesPerMadhhab: 4, hitsPerMadhhab: 5, maxSearches: 64, maxCandidates: 96, maxSelected: 18, continuationPages: 10, followUpRounds: 2, chapterPages: 8, relatedWorks: 3 },
+  deep: { generalQueries: 8, hitsPerGeneral: 10, referenceBooks: 6, queriesPerReference: 3, queriesPerMadhhab: 4, hitsPerMadhhab: 5, maxSearches: 64, maxCandidates: 96, maxSelected: 18, continuationPages: 10, followUpRounds: 3, chapterPages: 8, relatedWorks: 3, expandPages: 5, webBooks: 4, webWaitMs: 6_000 },
 };
 
 export const limitsFor = (depth) => ({ ...LIMITS, ...(DEPTHS[depth] ?? {}) });
@@ -376,7 +388,7 @@ export const searchPlan = ({ queries, scope, madhhabs = [], requestedBookIds = [
 };
 
 /** Runs searches and merges their hits into a de-duplicated, interleaved candidate pool. */
-export const collectCandidates = async ({ turath, catalog, plan, existing = [], limits: L = LIMITS, onSearch }) => {
+export const collectCandidates = async ({ turath, catalog, plan, existing = [], skip = [], limits: L = LIMITS, onSearch }) => {
   const settled = await settleAll(
     plan.map((s) => async () => {
       const value = await turath.search(s.query, { ...s.scope });
@@ -387,7 +399,8 @@ export const collectCandidates = async ({ turath, catalog, plan, existing = [], 
   const failures = settled.filter((r) => !r.ok).length;
   const lists = settled.map((r, i) => (r.ok ? r.value.items.slice(0, plan[i].take) : []));
   const totalMatches = settled.reduce((sum, r) => sum + (r.ok ? r.value.totalMatches : 0), 0);
-  const seen = new Set(existing.map((c) => c.id));
+  // Pages already judged (kept or dropped) are not read again.
+  const seen = new Set([...existing.map((c) => c.id), ...skip]);
   const pool = [];
   // Requested books first, then interleave every list by rank.
   const order = [...plan.keys()].sort((a, b) => Number(plan[b].kind === "requested") - Number(plan[a].kind === "requested"));
@@ -438,6 +451,89 @@ export const readChapters = async ({ turath, catalog, bookIds, terms, pages: n, 
   }
   return { candidates, outlines };
 };
+
+/**
+ * The chapter (bab or section) a page belongs to, from the book's table of
+ * contents: the last heading at or before the page, ending before the next
+ * heading of the same or a higher level.
+ */
+export const chapterSpan = (toc = [], page) => {
+  let at = -1;
+  toc.forEach((e, i) => {
+    if (!Number.isInteger(e?.page) || e.page > page) return;
+    if (at < 0 || e.page > toc[at].page || (e.page === toc[at].page && (e.level ?? 1) >= (toc[at].level ?? 1))) at = i;
+  });
+  if (at < 0) return undefined;
+  const head = toc[at];
+  let end;
+  for (let j = at + 1; j < toc.length; j += 1) {
+    const e = toc[j];
+    if (!Number.isInteger(e?.page) || e.page <= head.page) continue;
+    if ((e.level ?? 1) <= (head.level ?? 1)) {
+      end = e.page - 1;
+      break;
+    }
+  }
+  return { title: head.title, start: head.page, end };
+};
+
+/** Pages read around a hit: from the page before it, within its chapter. */
+export const expansionPages = (span, page, n) => {
+  const pages = [];
+  const from = span ? Math.max(span.start, page - 1) : page - 1;
+  const to = span?.end !== undefined ? Math.max(span.end, page) : page + n;
+  for (let p = from; p <= to && pages.length < n; p += 1) if (p > 0 && p !== page) pages.push(p);
+  // A one-page section: the pages on either side.
+  for (const p of [page - 1, page + 1]) if (pages.length < Math.min(2, n) && p > 0 && !pages.includes(p)) pages.push(p);
+  return pages.sort((a, b) => a - b);
+};
+
+/**
+ * Reads the rest of the chapter around each hit the reader asked to expand
+ * (a story or discussion found but cut off by the page). [have] holds the
+ * ids already in the pool; tables of contents are fetched once per book.
+ */
+export const expandHits = async ({ turath, catalog, hits, pages: n, have, books = new Map(), onExpand }) => {
+  if (!hits.length || n <= 0 || typeof turath.getPage !== "function") return [];
+  const read = await settleAll(
+    hits.map((c) => async () => {
+      if (!Number.isInteger(c.internalPage)) return [];
+      if (!books.has(c.bookId)) books.set(c.bookId, typeof turath.getBook === "function" ? turath.getBook(c.bookId).catch(() => undefined) : Promise.resolve(undefined));
+      const span = chapterSpan((await books.get(c.bookId))?.toc ?? [], c.internalPage);
+      const wanted = expansionPages(span, c.internalPage, n).filter((p) => !have.has(`${c.bookId}:${p}`));
+      const pages = await settleAll(wanted.map((p) => () => turath.getPage(c.bookId, p)));
+      const found = pages.filter((r) => r?.ok && r.value?.text?.trim()).map((r) => toCandidate(r.value, catalog));
+      if (found.length) onExpand?.({ book: c.bookTitle, chapter: span?.title, pages: found.length });
+      return found;
+    }),
+    3,
+  );
+  const out = [];
+  for (const r of read) {
+    for (const c of r?.ok ? r.value : []) {
+      if (have.has(c.id)) continue;
+      have.add(c.id);
+      out.push(c);
+    }
+  }
+  return out;
+};
+
+/** Book titles named by the web step: one "title — author — chapter" per line. */
+export const hintTitles = (text, max = 6) =>
+  cleanTitles(
+    String(text ?? "")
+      .split(/\n+/)
+      .map((line) => line.replace(/^[\s*•\-\d.)]+/u, "").split(/\s+[—–-]\s+|\s*[|:،]\s*/u)[0].replace(/[«»"*\[\]]/g, "").trim())
+      .filter((t) => t.length >= 3 && t.length <= 80 && /[\u0600-\u06FF]/u.test(t)),
+    max,
+  );
+
+/** Resolves after [ms] with undefined unless [promise] settles first. */
+const within = (promise, ms) => new Promise((resolve) => {
+  const timer = setTimeout(() => resolve(undefined), ms);
+  promise.then((v) => { clearTimeout(timer); resolve(v); }, () => { clearTimeout(timer); resolve(undefined); });
+});
 
 const FORMATS = new Set(["standard", "posts", "quotes", "brief", "detailed"]);
 
@@ -577,12 +673,20 @@ const error = (code, message) => Object.assign(new Error(message), { code });
 /** Gemini output (or search) steps kept per request, so a retry resumes where it stopped. */
 export const createMemo = () => new Map();
 
-export const createPipeline = ({ gemini, turath: client, catalog }) => {
+export const createPipeline = ({ gemini, turath: client, catalog, features = {} }) => {
   const turath = decodingTurath(client);
   const ask = async (input, onEvent = () => {}, memo = createMemo()) => {
     const started = Date.now();
     const usage = { input: 0, output: 0, thoughts: 0, calls: 0, peak: 0 };
     const act = (kind, data = {}) => onEvent("activity", { kind, t: Date.now() - started, ...data });
+    const count = (u) => {
+      usage.input += u?.input ?? 0;
+      usage.output += u?.output ?? 0;
+      usage.thoughts += u?.thoughts ?? 0;
+      usage.calls += 1;
+      usage.peak = Math.max(usage.peak, u?.input ?? 0);
+      onEvent("usage", { ...usage });
+    };
     const generate = async (key, request) => {
       if (memo.has(key)) {
         act("resumed", { step: key });
@@ -591,12 +695,7 @@ export const createPipeline = ({ gemini, turath: client, catalog }) => {
       // The user's model writes the answer; the quick steps keep the fast tier.
       const prefer = typeof input?.model === "string" && request.tier !== "fast" ? input.model : undefined;
       const result = await gemini.generateJson(prefer ? { ...request, prefer } : request);
-      usage.input += result.usage?.input ?? 0;
-      usage.output += result.usage?.output ?? 0;
-      usage.thoughts += result.usage?.thoughts ?? 0;
-      usage.calls += 1;
-      usage.peak = Math.max(usage.peak, result.usage?.input ?? 0);
-      onEvent("usage", { ...usage });
+      count(result.usage);
       memo.set(key, result);
       return result;
     };
@@ -616,8 +715,26 @@ export const createPipeline = ({ gemini, turath: client, catalog }) => {
     const history = Array.isArray(input.history) ? input.history.slice(-3) : [];
     const memory = (Array.isArray(input.memory) ? input.memory : []).filter((m) => typeof m === "string" && m.trim()).slice(0, 30).map((m) => m.trim().slice(0, 240));
     const depth = DEPTHS[input.depth] ? input.depth : "standard";
-    const L = limitsFor(depth);
+    // features.limits: for measuring against older settings (scripts/eval.mjs).
+    const L = { ...limitsFor(depth), ...(features.limits ?? {}) };
     const maxSources = clampInt(input.maxSources, 3, L.maxSelected, L.maxSelected);
+
+    // 0. beside the plan: which books the web says treat this (a story, a
+    // hadith, a scholar's view); only their names are used.
+    const webWanted = features.web !== false && L.webBooks > 0 && !nususScope && typeof gemini.generateText === "function" && question.split(/\s+/).length >= 4;
+    const web = !webWanted
+      ? Promise.resolve(undefined)
+      : memo.has("web")
+        ? Promise.resolve(memo.get("web"))
+        : gemini
+            .generateText({ system: HINTS_SYSTEM, prompt: hintsPrompt(question), tier: "fast", search: true })
+            .then((r) => {
+              count(r.usage);
+              memo.set("web", r);
+              return r;
+            })
+            .catch(() => undefined);
+    const webBooks = (reply, exclude) => resolveBooks(hintTitles(reply?.text), catalog, 1).filter((id) => !exclude.includes(id)).slice(0, L.webBooks);
 
     // 1. plan
     onEvent("stage", { stage: "planning" });
@@ -636,7 +753,7 @@ export const createPipeline = ({ gemini, turath: client, catalog }) => {
     const language = requested ?? detected ?? (LANG_CODES.has(input.fallbackLanguage) ? input.fallbackLanguage : "en");
     const madhhabs = [...new Set([...(Array.isArray(p.madhhabs) ? p.madhhabs : []), ...namedMadhhabs(question)])].filter((m) => MADHHAB_CATEGORY[m]);
     const requestedBookIds = resolveBooks(cleanTitles(p.requestedBooks, LIMITS.requestedBooks), catalog, 2);
-    const referenceBookIds = resolveBooks(cleanTitles(p.referenceBooks, 6), catalog, 1).filter((id) => !requestedBookIds.includes(id));
+    let referenceBookIds = resolveBooks(cleanTitles(p.referenceBooks, 6), catalog, 1).filter((id) => !requestedBookIds.includes(id));
     const requestedAuthorIds = resolveAuthors(cleanTitles(p.requestedAuthors, L.requestedAuthors), catalog, L.requestedAuthors);
     const chapterTerms = cleanTitles(p.chapterTerms, 3);
     const format = FORMATS.has(p.answerFormat) ? p.answerFormat : "standard";
@@ -654,6 +771,16 @@ export const createPipeline = ({ gemini, turath: client, catalog }) => {
     const chatReply = typeof p.chatReply === "string" ? p.chatReply.trim().replace(/منبي|منابي|مانابي/g, "منابع") : "";
     if (chatReply && !queries.length) return done({ status: "answered", answer: chatReply, summary: chatReply.slice(0, 200), sources: [], related: [], opinions: [] });
     if (!queries.length) return done(finalize({ composed: { status: "insufficient" }, sources: [], language }));
+
+    // The web's books are searched first among the reference books; an
+    // answer that comes late joins the first follow-up round.
+    const webReply = await within(web, L.webWaitMs);
+    let lateWeb = webWanted && webReply === undefined ? web : undefined;
+    const fromWeb = webBooks(webReply, requestedBookIds);
+    if (fromWeb.length) {
+      act("web", { books: fromWeb.map((id) => catalog.book(id)?.title).filter(Boolean) });
+      referenceBookIds = [...fromWeb, ...referenceBookIds.filter((id) => !fromWeb.includes(id))];
+    }
 
     // 2. search
     onEvent("stage", { stage: "searching" });
@@ -714,33 +841,53 @@ export const createPipeline = ({ gemini, turath: client, catalog }) => {
     };
     let usedQueries = [...queries];
     let ranking = await rank("rank0", candidates, usedQueries);
-    // Follow-up rounds: the reader names what is still missing (deeper research allows more rounds).
+    const seenPages = new Set(candidates.map((c) => c.id));
+    const tocs = new Map();
+    // The research goes on while something is missing: each round the reader
+    // names its next steps (deeper research allows more rounds).
     for (let round = 0; round < L.followUpRounds && ranking.coverage !== "full"; round += 1) {
       const followQueries = cleanQueries(ranking.followUpQueries, 5).filter((q) => !usedQueries.includes(q));
-      const followBooks = resolveBooks(cleanTitles(ranking.followUpBooks, 4), catalog, 1);
-      if (!followQueries.length && !followBooks.length) break;
+      let followBooks = resolveBooks(cleanTitles(ranking.followUpBooks, 4), catalog, 1);
+      if (lateWeb) {
+        const late = await within(lateWeb, 0);
+        lateWeb = undefined;
+        const more = webBooks(late, [...requestedBookIds, ...referenceBookIds]);
+        if (more.length) act("web", { books: more.map((id) => catalog.book(id)?.title).filter(Boolean) });
+        followBooks = [...new Set([...more, ...followBooks])];
+      }
+      const byKeyNow = new Map(candidates.map((c) => [c.key, c]));
+      const toExpand = features.expand === false ? [] : [...new Set(cleanTitles(ranking.expand, L.expandHits).map((k) => k.toUpperCase()))].map((k) => byKeyNow.get(k)).filter(Boolean);
+      if (!followQueries.length && !followBooks.length && !toExpand.length) break;
       onEvent("stage", { stage: "searching" });
-      act("followup", { queries: followQueries, books: followBooks.map((id) => catalog.book(id)?.title).filter(Boolean) });
+      act("followup", { queries: followQueries, books: followBooks.map((id) => catalog.book(id)?.title).filter(Boolean), expand: toExpand.map((c) => c.bookTitle) });
       const selectedFirst = new Set((ranking.selected ?? []).map((k) => String(k).toUpperCase()));
-      const keep = candidates.filter((c) => selectedFirst.has(c.key) || c.chapterRead);
-      const extra = await collect(`search${round + 1}`, {
-        turath,
-        catalog,
-        existing: keep,
-        limits: L,
-        plan: searchPlan({
-          queries: followQueries.length ? followQueries : queries.slice(0, 3),
-          scope: nususScope,
-          requestedBookIds: followBooks,
-          madhhabs: [],
-          userScoped: Boolean(nususScope),
-          limits: L,
-        }),
-      });
+      const keep = candidates.filter((c) => selectedFirst.has(c.key) || c.chapterRead || toExpand.includes(c));
+      const around = memo.get(`expand${round + 1}`) ?? (await expandHits({ turath, catalog, hits: toExpand, pages: L.expandPages, have: seenPages, books: tocs, onExpand: (e) => act("expand", e) }));
+      memo.set(`expand${round + 1}`, around);
+      const extra =
+        followQueries.length || followBooks.length
+          ? await collect(`search${round + 1}`, {
+              turath,
+              catalog,
+              existing: [...keep, ...around],
+              skip: [...seenPages],
+              limits: L,
+              plan: searchPlan({
+                queries: followQueries.length ? followQueries : queries.slice(0, 3),
+                scope: nususScope,
+                requestedBookIds: followBooks,
+                madhhabs: [],
+                userScoped: Boolean(nususScope),
+                limits: L,
+              }),
+            })
+          : { candidates: [], totalMatches: 0 };
       totalMatches += extra.totalMatches;
-      if (!extra.candidates.length) break;
+      for (const c of extra.candidates) seenPages.add(c.id);
+      const fresh = [...around, ...extra.candidates];
+      if (!fresh.length) break;
       usedQueries = [...usedQueries, ...followQueries];
-      candidates = [...keep, ...extra.candidates].map((c, i) => ({ ...c, key: `C${i + 1}` }));
+      candidates = [...keep, ...fresh].map((c, i) => ({ ...c, key: `C${i + 1}` }));
       onEvent("sources", { count: candidates.length, totalMatches });
       onEvent("stage", { stage: "reading" });
       ranking = await rank(`rank${round + 1}`, candidates, usedQueries);

@@ -75,6 +75,55 @@ class ScriptedModel implements JsonModel {
   }
 }
 
+/// A model that also answers the web step.
+class WebModel extends ScriptedModel implements WebSearchModel {
+  WebModel(super.outputs, this.web);
+  final String web;
+  var webAsked = 0;
+  @override
+  Future<({String text, String model, TokenUsage usage})> searchWeb({required String system, required String prompt, ModelTier tier = ModelTier.fast}) async {
+    webAsked++;
+    return (text: web, model: 'test-model', usage: const TokenUsage(input: 10, output: 5, calls: 1));
+  }
+}
+
+/// A small book: chapter "فتح المدائن" on pages 9-13 with a section from 10, the next chapter from 14.
+class StoryBook implements PassageSearch {
+  final reads = <int>[];
+  final searchedIn = <String?>[];
+  PagePassage _page(int page) => PagePassage(
+    bookId: '900001',
+    bookTitle: 'تاريخ الرسل والملوك',
+    authorName: 'الطبري',
+    internalPage: page,
+    printedPage: page,
+    url: '',
+    text: 'صفحة $page: فلما رأى أهل المدائن الخيل تعبر دجلة قالوا ديوان آمد ديوان آمد ثم هربوا وتركوا المدائن ودخلها المسلمون.',
+  );
+  @override
+  Future<SearchHits> searchHits(String query, {String? bookId, String? authorId, String? categoryId}) async {
+    searchedIn.add(bookId);
+    return SearchHits([_page(10)], [null], 1);
+  }
+
+  @override
+  Future<PagePassage> getPage(String bookId, int page) async {
+    reads.add(page);
+    return _page(page);
+  }
+
+  @override
+  Future<BookDetails> getBook(String bookId) async => const BookDetails(
+    id: '900001',
+    title: 'تاريخ الرسل والملوك',
+    toc: [
+      TocEntry(title: 'ذكر فتح المدائن', page: 9),
+      TocEntry(title: 'عبور دجلة', page: 10, level: 2),
+      TocEntry(title: 'ذكر جلولاء', page: 14),
+    ],
+  );
+}
+
 Map<String, dynamic> plan({String type = 'hadith', String lang = 'ps'}) => {
       'standaloneQuestion': 'q',
       'detectedLanguage': lang,
@@ -373,6 +422,90 @@ void main() {
     await AnswerPipeline(model: model, turath: TurathClient(client: turathMock()), catalog: catalog).ask(const AskRequest(question: 'q')).toList();
     expect(RegExp(r'\[S1\] Book: [^\n]*Page: 5\b').hasMatch(composePromptText), isTrue);
     expect(RegExp(r'\[S2\] Book: [^\n]*Page: 6\b').hasMatch(composePromptText), isTrue);
+  });
+
+  test('chapter of a page from the table of contents, and the pages read around a hit', () {
+    const toc = [
+      TocEntry(title: 'كتاب المغازي', page: 1),
+      TocEntry(title: 'باب غزوة أحد', page: 9, level: 2),
+      TocEntry(title: 'فصل', page: 9, level: 3),
+      TocEntry(title: 'باب الخندق', page: 14, level: 2),
+    ];
+    expect(chapterSpan(toc, 11), (title: 'فصل', start: 9, end: 13));
+    expect(chapterSpan(toc, 3), (title: 'كتاب المغازي', start: 1, end: null));
+    expect(chapterSpan(toc.sublist(1), 3), isNull);
+    expect(expansionPages((title: '', start: 9, end: 13), 11, 3), [10, 12, 13]);
+    expect(expansionPages((title: '', start: 11, end: 11), 11, 3), [10, 12]);
+    expect(expansionPages(null, 5, 2), [4, 6]);
+  });
+
+  test('book titles from the web step', () {
+    const text =
+        '1. تاريخ الرسل والملوك — الطبري — ذكر فتح المدائن\n- «البداية والنهاية» — ابن كثير\n* الكامل في التاريخ | ابن الأثير\nThis is about the conquest.\n';
+    expect(hintTitles(text), ['تاريخ الرسل والملوك', 'البداية والنهاية', 'الكامل في التاريخ']);
+  });
+
+  test('the reader asks for the rest of a chapter: its pages are read and judged in the next round', () async {
+    final book = StoryBook();
+    final events = <AskEvent>[];
+    final model = ScriptedModel([
+      {
+        ...plan(),
+        'queries': ['ديوان آمد'],
+      },
+      {
+        'selected': ['C1'],
+        'coverage': 'partial',
+        'missing': 'the rest',
+        'expand': ['C1'],
+        'followUpQueries': [],
+        'followUpBooks': [],
+      },
+      (String prompt) {
+        for (final page in [11, 12, 13]) {
+          keyFor(prompt, page, 'C');
+        }
+        return {
+          'selected': ['C1', 'C2'],
+          'coverage': 'full',
+          'expand': [],
+          'followUpQueries': [],
+          'followUpBooks': [],
+        };
+      },
+      {'status': 'insufficient', 'answer': '', 'citations': []},
+    ]);
+    events.addAll(await AnswerPipeline(model: model, turath: book, catalog: catalog).ask(const AskRequest(question: 'q')).toList());
+    expect(model.prompts.length, 4);
+    expect(book.reads.where((p) => p != 10).take(3), [11, 12, 13]);
+    expect(events.whereType<AskActivityEvent>().any((e) => e.kind == 'expand' && e.data['chapter'] == 'عبور دجلة' && e.data['pages'] == 3), isTrue);
+  });
+
+  test('books named by the web step are searched; the web call runs beside the plan', () async {
+    final book = StoryBook();
+    final model = WebModel([
+      {
+        ...plan(),
+        'queries': ['ديوان آمد'],
+      },
+      {
+        'selected': ['C1'],
+        'coverage': 'full',
+        'expand': [],
+        'followUpQueries': [],
+        'followUpBooks': [],
+      },
+      {'status': 'insufficient', 'answer': '', 'citations': []},
+    ], 'صحيح البخاري — البخاري');
+    final events = await AnswerPipeline(
+      model: model,
+      turath: book,
+      catalog: catalog,
+    ).ask(const AskRequest(question: 'د سعد د دجلې د تېرېدو کیسه څه ده')).toList();
+    expect(model.webAsked, 1);
+    final bukhari = resolveBooks(['صحيح البخاري'], catalog).first;
+    expect(book.searchedIn, contains(bukhari));
+    expect(events.whereType<AskResultEvent>().single.result.usage.calls, 4);
   });
 
   test('schools named in the question are detected', () {

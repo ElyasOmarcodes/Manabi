@@ -1,6 +1,8 @@
 // Grounded answer pipeline (v2) – Dart port of server/src/pipeline.mjs (keep in sync).
-//   plan → search (general, per book, per school) → read & rank (+1 follow-up
-//   round) → compose with inline quotes → verify every quote.
+//   plan (+ books named by a web search beside it) → search (general, per
+//   book, per school) → read & rank, then the reader's next steps until the
+//   question is covered (read the rest of a hit's chapter, new words, named
+//   books) → compose with inline quotes → verify every quote.
 import 'dart:async';
 import 'dart:math';
 
@@ -16,7 +18,8 @@ const insufficientMessages = {
   'ps': 'په موندل شویو منابعو کې د دې پوښتنې لپاره مستند ځواب ونه موندل شو. مهرباني وکړئ پوښتنه په بل ډول ولیکئ، یا د لټون ساحه (کتاب، مؤلف یا ډله) بدله کړئ.',
   'ar': 'لم يُعثر في المصادر المسترجعة على جواب موثَّق لهذا السؤال. جرّب صياغة أخرى للسؤال أو غيّر نطاق البحث (كتاب أو مؤلف أو تصنيف).',
   'fa': 'در منابع یافت‌شده پاسخ مستندی برای این پرسش پیدا نشد. لطفاً پرسش را به شکل دیگری بنویسید یا دامنهٔ جست‌وجو (کتاب، مؤلف یا دسته) را تغییر دهید.',
-  'en': 'No documented answer to this question was found in the retrieved sources. Try rephrasing the question or changing the search scope (book, author or category).',
+  'en':
+      'No documented answer to this question was found in the retrieved sources. Try rephrasing the question or changing the search scope (book, author or category).',
 };
 
 const madhhabCategory = {'hanafi': '14', 'maliki': '15', 'shafii': '16', 'hanbali': '17'};
@@ -29,7 +32,10 @@ final _madhhabNames = {
 };
 
 /// Schools the question names explicitly (a safety net for the planner).
-List<String> namedMadhhabs(String text) => [for (final e in _madhhabNames.entries) if (e.value.hasMatch(text)) e.key];
+List<String> namedMadhhabs(String text) => [
+  for (final e in _madhhabNames.entries)
+    if (e.value.hasMatch(text)) e.key,
+];
 
 /// How widely a question is researched; port of LIMITS / DEPTHS in
 /// server/src/pipeline.mjs.
@@ -49,11 +55,15 @@ class Limits {
     this.maxCandidates = 64,
     this.maxSelected = 14,
     this.continuationPages = 6,
-    this.followUpRounds = 1,
+    this.followUpRounds = 2,
     this.requestedAuthors = 2,
     this.focusBooks = 2,
     this.chapterPages = 4,
     this.relatedWorks = 2,
+    this.expandHits = 3,
+    this.expandPages = 3,
+    this.webBooks = 3,
+    this.webWait = const Duration(seconds: 4),
   });
   final int generalQueries;
   final int hitsPerGeneral;
@@ -78,32 +88,58 @@ class Limits {
   final int chapterPages;
   final int relatedWorks;
 
+  /// Hits whose chapter is read further per round, and the pages read around each.
+  final int expandHits;
+  final int expandPages;
+
+  /// Books named by the web step, and how long the search waits for it after the plan.
+  final int webBooks;
+  final Duration webWait;
+
   static const excerptChars = 650;
   static const sourceChars = 2400;
 
   static const standard = Limits();
   static const quick = Limits(
-      generalQueries: 3, hitsPerGeneral: 6, referenceBooks: 3, queriesPerMadhhab: 2, maxSearches: 18, maxCandidates: 32, maxSelected: 6, continuationPages: 2, followUpRounds: 0, focusBooks: 1, chapterPages: 2, relatedWorks: 0);
+    generalQueries: 3,
+    hitsPerGeneral: 6,
+    referenceBooks: 3,
+    queriesPerMadhhab: 2,
+    maxSearches: 18,
+    maxCandidates: 32,
+    maxSelected: 6,
+    continuationPages: 2,
+    followUpRounds: 0,
+    focusBooks: 1,
+    chapterPages: 2,
+    relatedWorks: 0,
+    expandHits: 0,
+    webBooks: 0,
+  );
   static const deep = Limits(
-      generalQueries: 8,
-      hitsPerGeneral: 10,
-      referenceBooks: 6,
-      queriesPerReference: 3,
-      queriesPerMadhhab: 4,
-      hitsPerMadhhab: 5,
-      maxSearches: 64,
-      maxCandidates: 96,
-      maxSelected: 18,
-      continuationPages: 10,
-      followUpRounds: 2,
-      chapterPages: 8,
-      relatedWorks: 3);
+    generalQueries: 8,
+    hitsPerGeneral: 10,
+    referenceBooks: 6,
+    queriesPerReference: 3,
+    queriesPerMadhhab: 4,
+    hitsPerMadhhab: 5,
+    maxSearches: 64,
+    maxCandidates: 96,
+    maxSelected: 18,
+    continuationPages: 10,
+    followUpRounds: 3,
+    chapterPages: 8,
+    relatedWorks: 3,
+    expandPages: 5,
+    webBooks: 4,
+    webWait: Duration(seconds: 6),
+  );
 
   static Limits forDepth(String? depth) => switch (depth) {
-        'quick' => quick,
-        'deep' => deep,
-        _ => standard,
-      };
+    'quick' => quick,
+    'deep' => deep,
+    _ => standard,
+  };
 }
 
 /// `fast` is used for planning and ranking, `main` for writing the answer.
@@ -114,14 +150,21 @@ typedef ModelReply = ({Map<String, dynamic> data, String model, TokenUsage usage
 
 abstract interface class JsonModel {
   /// With [onText] the reply is streamed and its raw text reported as it grows.
-  Future<ModelReply> generateJson(
-      {required String system,
-      required String prompt,
-      required Map<String, dynamic> schema,
-      double temperature = 0.2,
-      ModelTier tier = ModelTier.main,
-      void Function(String text)? onText,
-      String? prefer});
+  Future<ModelReply> generateJson({
+    required String system,
+    required String prompt,
+    required Map<String, dynamic> schema,
+    double temperature = 0.2,
+    ModelTier tier = ModelTier.main,
+    void Function(String text)? onText,
+    String? prefer,
+  });
+}
+
+/// A model that can also answer from a Google Search (the web step only
+/// names books; the web is never a source).
+abstract interface class WebSearchModel {
+  Future<({String text, String model, TokenUsage usage})> searchWeb({required String system, required String prompt, ModelTier tier = ModelTier.fast});
 }
 
 class SearchHits {
@@ -182,19 +225,19 @@ class AskRequest {
   final String? model;
 
   Map<String, dynamic> toJson() => {
-        'question': question,
-        'language': language,
-        'fallbackLanguage': fallbackLanguage,
-        'scope': scope.toRequest(),
-        'history': [
-          for (final h in history) {'question': h.question, 'summary': h.summary, 'books': h.books}
-        ],
-        'maxSources': ?maxSources,
-        'depth': depth,
-        'requestId': ?requestId,
-        'model': ?model,
-        if (memory.isNotEmpty) 'memory': memory,
-      };
+    'question': question,
+    'language': language,
+    'fallbackLanguage': fallbackLanguage,
+    'scope': scope.toRequest(),
+    'history': [
+      for (final h in history) {'question': h.question, 'summary': h.summary, 'books': h.books},
+    ],
+    'maxSources': ?maxSources,
+    'depth': depth,
+    'requestId': ?requestId,
+    'model': ?model,
+    if (memory.isNotEmpty) 'memory': memory,
+  };
 }
 
 List<String> cleanQueries(Object? queries, {int max = 8}) {
@@ -202,11 +245,7 @@ List<String> cleanQueries(Object? queries, {int max = 8}) {
   final out = <String>[];
   for (final raw in queries is List ? queries : const []) {
     if (raw is! String) continue;
-    final q = raw
-        .replaceAll(RegExp('[ً-ٰٟ]'), '')
-        .replaceAll(RegExp('["\'«»()\\[\\]{}]'), ' ')
-        .replaceAll(RegExp(r'\s+'), ' ')
-        .trim();
+    final q = raw.replaceAll(RegExp('[ً-ٰٟ]'), '').replaceAll(RegExp('["\'«»()\\[\\]{}]'), ' ').replaceAll(RegExp(r'\s+'), ' ').trim();
     if (q.isEmpty || q.length > 60 || !seen.add(q)) continue;
     out.add(q);
   }
@@ -217,11 +256,7 @@ List<String> _titles(Object? v, int max) =>
     (v is List ? v : const []).whereType<String>().map((t) => t.trim()).where((t) => t.isNotEmpty).toSet().take(max).toList();
 
 final _derivative = RegExp(r'^(تكملة|مختصر|تهذيب|فهرس|فهارس|تخريج|ترتيب|زوائد|منتخب|تلخيص|قرة عيون|دراسة|التعليق)');
-String _strip(String s) => s
-    .replaceAll(RegExp('[ً-ٰٟـ]'), '')
-    .replaceAll(RegExp('[أإآٱ]'), 'ا')
-    .replaceAll('ى', 'ي')
-    .trim();
+String _strip(String s) => s.replaceAll(RegExp('[ً-ٰٟـ]'), '').replaceAll(RegExp('[أإآٱ]'), 'ا').replaceAll('ى', 'ي').trim();
 
 /// Resolves free-text book titles to catalog ids, preferring main works over
 /// supplements/abridgements (same ranking as the server).
@@ -238,7 +273,9 @@ List<String> resolveBooks(List<String> titles, CatalogService catalog, {int perT
       for (var i = 0; i < found.length; i++)
         (
           found[i],
-          i + (!wantDerivative && _derivative.hasMatch(_strip(found[i].title)) ? 100 : 0) + ((_strip(found[i].title).length - _strip(title).length).clamp(0, 10000)) / 40
+          i +
+              (!wantDerivative && _derivative.hasMatch(_strip(found[i].title)) ? 100 : 0) +
+              ((_strip(found[i].title).length - _strip(title).length).clamp(0, 10000)) / 40,
         ),
     ]..sort((a, b) => a.$2.compareTo(b.$2));
     for (final (b, _) in ranked.take(perTitle)) {
@@ -264,7 +301,12 @@ List<String> resolveAuthors(List<String> names, CatalogService catalog, {int max
 /// The books whose own chapter on the topic should be read: the books the
 /// user asked for, then the books of the scholars asked about that the
 /// search found most often (main works before abridgements).
-List<String> focusBooks({List<String> requestedBookIds = const [], List<String> authorIds = const [], List<({String bookId, String bookTitle, String? authorId})> candidates = const [], int max = 2}) {
+List<String> focusBooks({
+  List<String> requestedBookIds = const [],
+  List<String> authorIds = const [],
+  List<({String bookId, String bookTitle, String? authorId})> candidates = const [],
+  int max = 2,
+}) {
   final out = requestedBookIds.take(max).toList();
   if (authorIds.isNotEmpty) {
     final counts = <String, int>{};
@@ -327,6 +369,57 @@ List<int> chapterPages(({TocEntry chapter, List<TocEntry> sections}) found, int 
   }
   return pages..sort();
 }
+
+/// The chapter (bab or section) a page belongs to, from the book's table of
+/// contents: the last heading at or before the page, ending before the next
+/// heading of the same or a higher level.
+({String title, int start, int? end})? chapterSpan(List<TocEntry> toc, int page) {
+  var at = -1;
+  for (var i = 0; i < toc.length; i++) {
+    final p = toc[i].page;
+    if (p == null || p > page) continue;
+    if (at < 0 || p > toc[at].page! || (p == toc[at].page && toc[i].level >= toc[at].level)) at = i;
+  }
+  if (at < 0) return null;
+  final head = toc[at];
+  int? end;
+  for (var j = at + 1; j < toc.length; j++) {
+    final p = toc[j].page;
+    if (p == null || p <= head.page!) continue;
+    if (toc[j].level <= head.level) {
+      end = p - 1;
+      break;
+    }
+  }
+  return (title: head.title, start: head.page!, end: end);
+}
+
+/// Pages read around a hit: from the page before it, within its chapter.
+List<int> expansionPages(({String title, int start, int? end})? span, int page, int n) {
+  final pages = <int>[];
+  final from = span == null ? page - 1 : max(span.start, page - 1);
+  final to = span?.end != null ? max(span!.end!, page) : page + n;
+  for (var p = from; p <= to && pages.length < n; p++) {
+    if (p > 0 && p != page) pages.add(p);
+  }
+  // A one-page section: the pages on either side.
+  for (final p in [page - 1, page + 1]) {
+    if (pages.length < min(2, n) && p > 0 && !pages.contains(p)) pages.add(p);
+  }
+  return pages..sort();
+}
+
+/// Book titles named by the web step: one "title — author — chapter" per line.
+List<String> hintTitles(String? text, {int max = 6}) => _titles(
+  [
+    for (final line in (text ?? '').split(RegExp(r'\n+')))
+      line.replaceFirst(RegExp(r'^[\s*•\-\d.)]+'), '').split(RegExp(r'\s+[—–-]\s+|\s*[|:،]\s*')).first.replaceAll(RegExp(r'[«»"*\[\]]'), '').trim(),
+  ].where((t) => t.length >= 3 && t.length <= 80 && RegExp('[\u0600-\u06FF]').hasMatch(t)).toList(),
+  max,
+);
+
+/// [future]'s value, or null once [wait] has passed (or when it fails).
+Future<T?> _within<T>(Future<T?> future, Duration wait) => future.timeout(wait, onTimeout: () => null).catchError((Object _) => null);
 
 // Indexes and studies of a book are not its abridgements or explanations.
 final _notRelated = RegExp(r'^(تخريج|فهرس|فهارس|دراسة)');
@@ -426,60 +519,62 @@ class PipelineSource {
   final bool chapterRead;
 
   PipelineSource asChapter() => PipelineSource(
-      id: id,
-      passage: passage,
-      excerpt: excerpt,
-      text: text,
-      authorId: authorId,
-      authorName: authorName,
-      categoryId: categoryId,
-      categoryTitle: categoryTitle,
-      key: key,
-      chapterRead: true);
+    id: id,
+    passage: passage,
+    excerpt: excerpt,
+    text: text,
+    authorId: authorId,
+    authorName: authorName,
+    categoryId: categoryId,
+    categoryTitle: categoryTitle,
+    key: key,
+    chapterRead: true,
+  );
 
   PipelineSource withKey(String k) => PipelineSource(
-      id: id,
-      passage: passage,
-      excerpt: excerpt,
-      text: text,
-      authorId: authorId,
-      authorName: authorName,
-      categoryId: categoryId,
-      categoryTitle: categoryTitle,
-      key: k,
-      chapterRead: chapterRead);
+    id: id,
+    passage: passage,
+    excerpt: excerpt,
+    text: text,
+    authorId: authorId,
+    authorName: authorName,
+    categoryId: categoryId,
+    categoryTitle: categoryTitle,
+    key: k,
+    chapterRead: chapterRead,
+  );
 
   PromptSource prompt({required bool full}) => PromptSource(
-        key: key,
-        bookTitle: passage.bookTitle,
-        authorName: authorName,
-        categoryTitle: categoryTitle,
-        volume: passage.volume,
-        printedPage: passage.printedPage,
-        headings: passage.headings,
-        text: full ? text : excerpt,
-        chapterRead: chapterRead,
-      );
+    key: key,
+    bookTitle: passage.bookTitle,
+    authorName: authorName,
+    categoryTitle: categoryTitle,
+    volume: passage.volume,
+    printedPage: passage.printedPage,
+    headings: passage.headings,
+    text: full ? text : excerpt,
+    chapterRead: chapterRead,
+  );
 
   AnswerSource toPublic(int n, List<SourceQuote> quotes) => AnswerSource(
-        n: n,
-        bookId: passage.bookId,
-        bookTitle: passage.bookTitle,
-        authorId: authorId,
-        authorName: authorName,
-        categoryId: categoryId,
-        categoryTitle: categoryTitle,
-        volume: passage.volume,
-        printedPage: passage.printedPage,
-        internalPage: passage.internalPage,
-        headings: passage.headings,
-        url: passage.url,
-        shamelaUrl: passage.shamelaUrl,
-        citation: passage.citation,
-        quotes: quotes,
-        // The passage around the search match, shown when no quote was verified.
-        excerpt: (excerpt.trim().isNotEmpty ? excerpt : text).let((s) => s.length <= 700 ? s : s.substring(0, 700)),
-      );
+    n: n,
+    bookId: passage.bookId,
+    bookTitle: passage.bookTitle,
+    authorId: authorId,
+    authorName: authorName,
+    categoryId: categoryId,
+    categoryTitle: categoryTitle,
+    volume: passage.volume,
+    printedPage: passage.printedPage,
+    internalPage: passage.internalPage,
+    headings: passage.headings,
+    url: passage.url,
+    shamelaUrl: passage.shamelaUrl,
+    citation: passage.citation,
+    quotes: quotes,
+    // The passage around the search match, shown when no quote was verified.
+    excerpt: (excerpt.trim().isNotEmpty ? excerpt : text).let((s) => s.length <= 700 ? s : s.substring(0, 700)),
+  );
 }
 
 extension _Let<T> on T {
@@ -507,9 +602,9 @@ final _marker = RegExp(r'\[\s*(S\d+(?:\s*[,،;]\s*S?\d+)*)\s*\]', caseSensitive:
 final _quoteMarker = RegExp(r'\[\[\s*(Q\d+)\s*\]\]', caseSensitive: false);
 
 List<String> _sourceKeys(String inner) => [
-      for (var part in inner.split(RegExp('[,،;]')))
-        if ((part = part.trim().toUpperCase()).isNotEmpty) part.startsWith('S') ? part : 'S$part',
-    ];
+  for (var part in inner.split(RegExp('[,،;]')))
+    if ((part = part.trim().toUpperCase()).isNotEmpty) part.startsWith('S') ? part : 'S$part',
+];
 
 /// Puts each quotation in the part of the answer that cites its source. The
 /// writer sometimes numbers its quotations in a different order than the
@@ -527,14 +622,16 @@ String realignQuotes(String answer, Map<String, String> sourceOf) {
   ];
   final used = {for (final p in parts) ...p.quotes.where((q) => p.cited.contains(sourceOf[q]))};
   return parts
-      .map((p) => p.text.replaceAllMapped(_quoteMarker, (m) {
-            final q = m.group(1)!.toUpperCase();
-            if (p.cited.isEmpty || !sourceOf.containsKey(q) || p.cited.contains(sourceOf[q])) return m.group(0)!;
-            final better = sourceOf.entries.where((e) => !used.contains(e.key) && p.cited.contains(e.value)).firstOrNull;
-            if (better == null) return m.group(0)!;
-            used.add(better.key);
-            return '[[${better.key}]]';
-          }))
+      .map(
+        (p) => p.text.replaceAllMapped(_quoteMarker, (m) {
+          final q = m.group(1)!.toUpperCase();
+          if (p.cited.isEmpty || !sourceOf.containsKey(q) || p.cited.contains(sourceOf[q])) return m.group(0)!;
+          final better = sourceOf.entries.where((e) => !used.contains(e.key) && p.cited.contains(e.value)).firstOrNull;
+          if (better == null) return m.group(0)!;
+          used.add(better.key);
+          return '[[${better.key}]]';
+        }),
+      )
       .join();
 }
 
@@ -630,13 +727,19 @@ class AnswerPipeline {
     return [
       if (scope.books.isNotEmpty) '${scope.books.length > 1 ? 'books' : 'book'} ${names(scope.books, (id) => catalog.book(id)?.title)}',
       if (scope.authors.isNotEmpty) '${scope.authors.length > 1 ? 'authors' : 'author'} ${names(scope.authors, (id) => catalog.author(id)?.name)}',
-      if (scope.categories.isNotEmpty) '${scope.categories.length > 1 ? 'categories' : 'category'} ${names(scope.categories, (id) => catalog.category(id)?.title)}',
+      if (scope.categories.isNotEmpty)
+        '${scope.categories.length > 1 ? 'categories' : 'category'} ${names(scope.categories, (id) => catalog.category(id)?.title)}',
     ].join('; ');
   }
 
   /// Runs searches (bounded concurrency 6) and merges hits into a de-duplicated pool.
-  Future<({List<PipelineSource> candidates, int total, bool failed})> _collect(List<PlannedSearch> plan,
-      {List<PipelineSource> existing = const [], Limits limits = Limits.standard, void Function(PlannedSearch search, SearchHits hits)? onSearch}) async {
+  Future<({List<PipelineSource> candidates, int total, bool failed})> _collect(
+    List<PlannedSearch> plan, {
+    List<PipelineSource> existing = const [],
+    Iterable<String> skip = const [],
+    Limits limits = Limits.standard,
+    void Function(PlannedSearch search, SearchHits hits)? onSearch,
+  }) async {
     final results = List<SearchHits?>.filled(plan.length, null);
     var failures = 0;
     var cursor = 0;
@@ -656,7 +759,8 @@ class AnswerPipeline {
     await Future.wait(List.generate(plan.length < 6 ? plan.length : 6, (_) => worker()));
     final total = results.fold<int>(0, (sum, r) => sum + (r?.totalMatches ?? 0));
     final order = [for (var i = 0; i < plan.length; i++) i]..sort((a, b) => (plan[b].kind == 'requested' ? 1 : 0) - (plan[a].kind == 'requested' ? 1 : 0));
-    final seen = {for (final c in existing) c.id};
+    // Pages already judged (kept or dropped) are not read again.
+    final seen = {for (final c in existing) c.id, ...skip};
     final pool = <PipelineSource>[];
     for (var round = 0; existing.length + pool.length < limits.maxCandidates; round++) {
       var any = false;
@@ -679,8 +783,7 @@ class AnswerPipeline {
     final have = {for (final c in selected) c.id};
     final targets = selected.where((c) => c.passage.internalPage != null).take(limit).toList();
     final next = await Future.wait([
-      for (final c in targets)
-        turath.getPage(c.passage.bookId, c.passage.internalPage! + 1).then<PagePassage?>((p) => p).catchError((Object _) => null),
+      for (final c in targets) turath.getPage(c.passage.bookId, c.passage.internalPage! + 1).then<PagePassage?>((p) => p).catchError((Object _) => null),
     ]);
     final out = <PipelineSource>[];
     for (final c in selected) {
@@ -690,16 +793,18 @@ class AnswerPipeline {
       if (page == null || page.text.trim().isEmpty) continue;
       final candidate = _candidate(page, null, catalog);
       if (!have.add(candidate.id)) continue;
-      out.add(PipelineSource(
-        id: candidate.id,
-        passage: candidate.passage,
-        excerpt: candidate.excerpt,
-        text: boundText(page.text, 1600, null),
-        authorId: candidate.authorId,
-        authorName: candidate.authorName,
-        categoryId: candidate.categoryId,
-        categoryTitle: candidate.categoryTitle,
-      ));
+      out.add(
+        PipelineSource(
+          id: candidate.id,
+          passage: candidate.passage,
+          excerpt: candidate.excerpt,
+          text: boundText(page.text, 1600, null),
+          authorId: candidate.authorId,
+          authorName: candidate.authorName,
+          categoryId: candidate.categoryId,
+          categoryTitle: candidate.categoryTitle,
+        ),
+      );
     }
     return out;
   }
@@ -707,8 +812,12 @@ class AnswerPipeline {
   /// Reads the chapter where each focus book treats the topic (found in its
   /// table of contents), so the answer rests on the author's own discussion
   /// and not only on pages that happen to match a search word.
-  Future<({List<PipelineSource> candidates, List<ChapterOutline> outlines})> _readChapters(List<String> bookIds, List<String> terms, int n,
-      {void Function(String book, String chapter, int pages)? onChapter}) async {
+  Future<({List<PipelineSource> candidates, List<ChapterOutline> outlines})> _readChapters(
+    List<String> bookIds,
+    List<String> terms,
+    int n, {
+    void Function(String book, String chapter, int pages)? onChapter,
+  }) async {
     final candidates = <PipelineSource>[];
     final outlines = <ChapterOutline>[];
     if (terms.isEmpty || n <= 0) return (candidates: candidates, outlines: outlines);
@@ -733,6 +842,42 @@ class AnswerPipeline {
     return (candidates: candidates, outlines: outlines);
   }
 
+  /// Reads the rest of the chapter around each hit the reader asked to expand
+  /// (a story or discussion found but cut off by the page). [have] holds the
+  /// ids already in the pool; tables of contents are fetched once per book.
+  Future<List<PipelineSource>> _expandHits(
+    List<PipelineSource> hits,
+    int n,
+    Set<String> have,
+    Map<String, Future<BookDetails?>> books, {
+    void Function(String book, String? chapter, int pages)? onExpand,
+  }) async {
+    if (hits.isEmpty || n <= 0) return const [];
+    final read = await Future.wait([
+      for (final c in hits)
+        () async {
+          final page = c.passage.internalPage;
+          if (page == null) return const <PipelineSource>[];
+          final bookId = c.passage.bookId;
+          final book = await books.putIfAbsent(bookId, () => turath.getBook(bookId).then<BookDetails?>((b) => b).catchError((Object _) => null));
+          final span = chapterSpan(book?.toc ?? const [], page);
+          final wanted = expansionPages(span, page, n).where((p) => !have.contains('$bookId:$p'));
+          final pages = await Future.wait([for (final p in wanted) turath.getPage(bookId, p).then<PagePassage?>((x) => x).catchError((Object _) => null)]);
+          final found = [
+            for (final x in pages)
+              if (x != null && x.text.trim().isNotEmpty) _candidate(x, null, catalog),
+          ];
+          if (found.isNotEmpty) onExpand?.call(c.passage.bookTitle, span?.title, found.length);
+          return found;
+        }(),
+    ]);
+    return [
+      for (final list in read)
+        for (final c in list)
+          if (have.add(c.id)) c,
+    ];
+  }
+
   /// Finished steps per request id, so a retry after a dropped connection
   /// resumes where it stopped instead of starting over.
   static final _memos = <String, ({DateTime at, Map<String, Object> steps})>{};
@@ -747,10 +892,13 @@ class AnswerPipeline {
   /// Streams progress events, the draft answer and finally the result.
   Stream<AskEvent> ask(AskRequest request) {
     final controller = StreamController<AskEvent>();
-    _ask(request, controller.add).then((_) => controller.close(), onError: (Object e, StackTrace st) {
-      controller.addError(e, st);
-      controller.close();
-    });
+    _ask(request, controller.add).then(
+      (_) => controller.close(),
+      onError: (Object e, StackTrace st) {
+        controller.addError(e, st);
+        controller.close();
+      },
+    );
     return controller.stream;
   }
 
@@ -766,7 +914,15 @@ class AnswerPipeline {
     int elapsed() => DateTime.now().difference(started).inMilliseconds;
     void act(String kind, [Map<String, dynamic> data = const {}]) => emit(AskActivityEvent(kind, data, elapsed()));
 
-    Future<ModelReply> generate(String key, {required String system, required String prompt, required Map<String, dynamic> schema, double temperature = 0.2, ModelTier tier = ModelTier.main, void Function(String)? onText}) async {
+    Future<ModelReply> generate(
+      String key, {
+      required String system,
+      required String prompt,
+      required Map<String, dynamic> schema,
+      double temperature = 0.2,
+      ModelTier tier = ModelTier.main,
+      void Function(String)? onText,
+    }) async {
       final kept = memo[key];
       if (kept is ModelReply) {
         act('resumed', {'step': key});
@@ -774,35 +930,67 @@ class AnswerPipeline {
       }
       // The user's model writes the answer; the quick steps keep the fast tier.
       final prefer = tier == ModelTier.main ? request.model : null;
-      final reply = await model.generateJson(system: system, prompt: prompt, schema: schema, temperature: temperature, tier: tier, onText: onText, prefer: prefer);
+      final reply = await model.generateJson(
+        system: system,
+        prompt: prompt,
+        schema: schema,
+        temperature: temperature,
+        tier: tier,
+        onText: onText,
+        prefer: prefer,
+      );
       usage = usage + reply.usage;
       emit(AskUsageEvent(usage));
       memo[key] = reply;
       return reply;
     }
 
-    void onSearch(PlannedSearch s, SearchHits hits) => act('search', {
-          'query': s.query,
-          'within': s.kind,
-          if (s.bookId != null) 'book': catalog.book(s.bookId)?.title,
-          'hits': hits.totalMatches,
-        });
-    Future<({List<PipelineSource> candidates, int total, bool failed})> collect(String key, List<PlannedSearch> plan, {List<PipelineSource> existing = const []}) async {
+    // 0. beside the plan: which books the web says treat this (a story, a
+    // hadith, a scholar's view); only their names are used.
+    final webModel = model is WebSearchModel ? model as WebSearchModel : null;
+    final webWanted = webModel != null && limits.webBooks > 0 && scope.isAll && question.split(RegExp(r'\s+')).length >= 4;
+    Future<String?> webAsk() async {
+      final kept = memo['web'];
+      if (kept is String) return kept;
+      try {
+        final r = await webModel!.searchWeb(system: hintsSystem, prompt: 'QUESTION:\n$question');
+        usage = usage + r.usage;
+        emit(AskUsageEvent(usage));
+        memo['web'] = r.text;
+        return r.text;
+      } catch (_) {
+        return null;
+      }
+    }
+
+    final web = webWanted ? webAsk() : Future<String?>.value(null);
+    List<String> webBooks(String? text, List<String> exclude) =>
+        resolveBooks(hintTitles(text), catalog).where((id) => !exclude.contains(id)).take(limits.webBooks).toList();
+
+    void onSearch(PlannedSearch s, SearchHits hits) =>
+        act('search', {'query': s.query, 'within': s.kind, if (s.bookId != null) 'book': catalog.book(s.bookId)?.title, 'hits': hits.totalMatches});
+    Future<({List<PipelineSource> candidates, int total, bool failed})> collect(
+      String key,
+      List<PlannedSearch> plan, {
+      List<PipelineSource> existing = const [],
+      Iterable<String> skip = const [],
+    }) async {
       final kept = memo[key];
       if (kept is ({List<PipelineSource> candidates, int total, bool failed})) return kept;
-      final result = await _collect(plan, existing: existing, limits: limits, onSearch: onSearch);
+      final result = await _collect(plan, existing: existing, skip: skip, limits: limits, onSearch: onSearch);
       if (!result.failed) memo[key] = result;
       return result;
     }
 
     Future<Map<String, dynamic>> rank(String key, String question, List<PipelineSource> pool, List<String> queries) async {
       act('rank', {'pool': pool.length});
-      final ranked = (await generate(key,
-              system: rerankSystem,
-              prompt: rerankPrompt(question: question, candidates: [for (final c in pool) c.prompt(full: false)], queries: queries),
-              schema: rerankSchema,
-              temperature: 0.1))
-          .data;
+      final ranked = (await generate(
+        key,
+        system: rerankSystem,
+        prompt: rerankPrompt(question: question, candidates: [for (final c in pool) c.prompt(full: false)], queries: queries),
+        schema: rerankSchema,
+        temperature: 0.1,
+      )).data;
       act('ranked', {
         'selected': (ranked['selected'] as List?)?.length ?? 0,
         'coverage': ranked['coverage'],
@@ -823,16 +1011,19 @@ class AnswerPipeline {
     );
     final p = plan.data;
     final queries = cleanQueries(p['queries'], max: 10);
-    final parts = [for (final x in p['parts'] as List? ?? const []) if (x is String && x.trim().isNotEmpty) x.trim()].take(5).toList();
+    final parts = [
+      for (final x in p['parts'] as List? ?? const [])
+        if (x is String && x.trim().isNotEmpty) x.trim(),
+    ].take(5).toList();
     final detected = p['detectedLanguage'];
     final language = languageNames.containsKey(request.language)
         ? request.language
         : languageNames.containsKey(detected)
-            ? detected as String
-            : (languageNames.containsKey(request.fallbackLanguage) ? request.fallbackLanguage : 'en');
+        ? detected as String
+        : (languageNames.containsKey(request.fallbackLanguage) ? request.fallbackLanguage : 'en');
     final madhhabs = {...(p['madhhabs'] as List? ?? const []).whereType<String>(), ...namedMadhhabs(question)}.where(madhhabCategory.containsKey).toList();
     final requestedIds = resolveBooks(_titles(p['requestedBooks'], limits.requestedBooks), catalog, perTitle: 2);
-    final referenceIds = resolveBooks(_titles(p['referenceBooks'], 6), catalog).where((id) => !requestedIds.contains(id)).toList();
+    var referenceIds = resolveBooks(_titles(p['referenceBooks'], 6), catalog).where((id) => !requestedIds.contains(id)).toList();
     final authorIds = resolveAuthors(_titles(p['requestedAuthors'], limits.requestedAuthors), catalog, max: limits.requestedAuthors);
     final chapterTerms = _titles(p['chapterTerms'], 3);
     final format = const {'standard', 'posts', 'quotes', 'brief', 'detailed'}.contains(p['answerFormat']) ? p['answerFormat'] as String : 'standard';
@@ -842,7 +1033,9 @@ class AnswerPipeline {
     emit(AskPlanEvent(queries));
     act('plan', {
       'queries': queries,
-      'books': [for (final id in [...requestedIds, ...referenceIds]) ?catalog.book(id)?.title],
+      'books': [
+        for (final id in [...requestedIds, ...referenceIds]) ?catalog.book(id)?.title,
+      ],
       'madhhabs': madhhabs,
       'authors': [for (final id in authorIds) ?catalog.author(id)?.name],
       'format': format,
@@ -851,33 +1044,35 @@ class AnswerPipeline {
     // A lasting wish the user just stated, for the app to keep.
     final remember = p['remember'] is String ? (p['remember'] as String).trim() : '';
     AnswerResult withMeta(AnswerResult r, {int? total, String? modelName}) => AnswerResult(
-          remember: remember.length > 240 ? remember.substring(0, 240) : remember,
-          status: r.status,
-          answer: r.answer,
-          summary: r.summary,
-          notes: r.notes,
-          detail: r.detail,
-          sources: r.sources,
-          related: r.related,
-          opinions: r.opinions,
-          queries: queries,
-          language: language,
-          model: modelName ?? plan.model,
-          totalMatches: total,
-          elapsedMs: elapsed(),
-          usage: usage,
-        );
-    AnswerResult nothing({int? total, List<PipelineSource> related = const []}) =>
-        withMeta(finalizeAnswer(composed: const {'status': 'insufficient'}, sources: related, language: language), total: total);
+      remember: remember.length > 240 ? remember.substring(0, 240) : remember,
+      status: r.status,
+      answer: r.answer,
+      summary: r.summary,
+      notes: r.notes,
+      detail: r.detail,
+      sources: r.sources,
+      related: r.related,
+      opinions: r.opinions,
+      queries: queries,
+      language: language,
+      model: modelName ?? plan.model,
+      totalMatches: total,
+      elapsedMs: elapsed(),
+      usage: usage,
+    );
+    AnswerResult nothing({int? total, List<PipelineSource> related = const []}) => withMeta(
+      finalizeAnswer(composed: const {'status': 'insufficient'}, sources: related, language: language),
+      total: total,
+    );
 
     // Conversation ("who are you?", thanks): answered at once, nothing to research.
     final chatReply = p['chatReply'] is String ? (p['chatReply'] as String).trim().replaceAll(RegExp('منبي|منابي|مانابي'), 'منابع') : '';
     if (chatReply.isNotEmpty && queries.isEmpty) {
-      emit(AskResultEvent(withMeta(AnswerResult(
-        status: AnswerStatus.answered,
-        answer: chatReply,
-        summary: chatReply.length > 200 ? chatReply.substring(0, 200) : chatReply,
-      ))));
+      emit(
+        AskResultEvent(
+          withMeta(AnswerResult(status: AnswerStatus.answered, answer: chatReply, summary: chatReply.length > 200 ? chatReply.substring(0, 200) : chatReply)),
+        ),
+      );
       return;
     }
     if (queries.isEmpty) {
@@ -885,12 +1080,33 @@ class AnswerPipeline {
       return;
     }
 
+    // The web's books are searched first among the reference books; an
+    // answer that comes late joins the first follow-up round.
+    var webDone = false;
+    final webText = await _within(web.whenComplete(() => webDone = true), limits.webWait);
+    var lateWeb = webWanted && !webDone ? web : null;
+    final fromWeb = webBooks(webText, requestedIds);
+    if (fromWeb.isNotEmpty) {
+      act('web', {
+        'books': [for (final id in fromWeb) ?catalog.book(id)?.title],
+      });
+      referenceIds = [...fromWeb, ...referenceIds.where((id) => !fromWeb.contains(id))];
+    }
+
     // 2. search
     emit(const AskStageEvent(AskStage.searching));
     final first = await collect(
-        'search0',
-        searchPlan(
-            queries: queries, scope: scope, madhhabs: madhhabs, requestedBookIds: requestedIds, requestedAuthorIds: authorIds, referenceBookIds: referenceIds, limits: limits));
+      'search0',
+      searchPlan(
+        queries: queries,
+        scope: scope,
+        madhhabs: madhhabs,
+        requestedBookIds: requestedIds,
+        requestedAuthorIds: authorIds,
+        referenceBookIds: referenceIds,
+        limits: limits,
+      ),
+    );
     if (first.failed) throw const PipelineException('TURATH_UNAVAILABLE', 'The Turath library could not be reached');
     var total = first.total;
 
@@ -901,20 +1117,36 @@ class AnswerPipeline {
             requestedBookIds: requestedIds,
             authorIds: authorIds,
             candidates: [for (final c in first.candidates) (bookId: c.passage.bookId, bookTitle: c.passage.bookTitle, authorId: c.authorId)],
-            max: limits.focusBooks);
+            max: limits.focusBooks,
+          );
     var chapters = (candidates: <PipelineSource>[], outlines: <ChapterOutline>[]);
     if (focus.isNotEmpty && chapterTerms.isNotEmpty) {
       final kept = memo['chapters'];
       chapters = kept is ({List<PipelineSource> candidates, List<ChapterOutline> outlines})
           ? kept
-          : await _readChapters(focus, chapterTerms, limits.chapterPages, onChapter: (book, chapter, pages) => act('chapter', {'book': book, 'chapter': chapter, 'pages': pages}));
+          : await _readChapters(
+              focus,
+              chapterTerms,
+              limits.chapterPages,
+              onChapter: (book, chapter, pages) => act('chapter', {'book': book, 'chapter': chapter, 'pages': pages}),
+            );
       memo['chapters'] = chapters;
     }
-    final relatedIds = !scope.isAll ? const <String>[] : {for (final id in focus) ...relatedWorks(id, catalog, max: limits.relatedWorks)}.where((id) => !referenceIds.contains(id)).take(limits.relatedWorks).toList();
+    final relatedIds = !scope.isAll
+        ? const <String>[]
+        : {
+            for (final id in focus) ...relatedWorks(id, catalog, max: limits.relatedWorks),
+          }.where((id) => !referenceIds.contains(id)).take(limits.relatedWorks).toList();
     var relatedFound = const <PipelineSource>[];
     if (relatedIds.isNotEmpty) {
-      final r = await collect('search0b', [for (final id in relatedIds) for (final q in queries.take(2)) PlannedSearch(q, 3, 'reference', bookId: id)],
-          existing: [...chapters.candidates, ...first.candidates]);
+      final r = await collect(
+        'search0b',
+        [
+          for (final id in relatedIds)
+            for (final q in queries.take(2)) PlannedSearch(q, 3, 'reference', bookId: id),
+        ],
+        existing: [...chapters.candidates, ...first.candidates],
+      );
       total += r.total;
       relatedFound = r.candidates;
     }
@@ -932,30 +1164,76 @@ class AnswerPipeline {
     emit(const AskStageEvent(AskStage.reading));
     var used = [...queries];
     var ranking = await rank('rank0', standalone, candidates, used);
+    final seenPages = {for (final c in candidates) c.id};
+    final tocs = <String, Future<BookDetails?>>{};
+    // The research goes on while something is missing: each round the reader
+    // names its next steps (deeper research allows more rounds).
     for (var round = 0; round < limits.followUpRounds && ranking['coverage'] != 'full'; round++) {
       final followQueries = cleanQueries(ranking['followUpQueries'], max: 5).where((q) => !used.contains(q)).toList();
-      final followBooks = resolveBooks(_titles(ranking['followUpBooks'], 4), catalog);
-      if (followQueries.isEmpty && followBooks.isEmpty) break;
+      var followBooks = resolveBooks(_titles(ranking['followUpBooks'], 4), catalog);
+      if (lateWeb != null) {
+        final late = await _within(lateWeb, Duration.zero);
+        lateWeb = null;
+        final more = webBooks(late, [...requestedIds, ...referenceIds]);
+        if (more.isNotEmpty) {
+          act('web', {
+            'books': [for (final id in more) ?catalog.book(id)?.title],
+          });
+        }
+        followBooks = {...more, ...followBooks}.toList();
+      }
+      final byKeyNow = {for (final c in candidates) c.key: c};
+      final toExpand = _titles(
+        ranking['expand'],
+        limits.expandHits,
+      ).map((k) => k.toUpperCase()).toSet().map((k) => byKeyNow[k]).whereType<PipelineSource>().toList();
+      if (followQueries.isEmpty && followBooks.isEmpty && toExpand.isEmpty) break;
       emit(const AskStageEvent(AskStage.searching));
-      act('followup', {'queries': followQueries, 'books': [for (final id in followBooks) ?catalog.book(id)?.title]});
+      act('followup', {
+        'queries': followQueries,
+        'books': [for (final id in followBooks) ?catalog.book(id)?.title],
+        'expand': [for (final c in toExpand) c.passage.bookTitle],
+      });
       final keepKeys = (ranking['selected'] as List? ?? const []).map((k) => '$k'.toUpperCase()).toSet();
-      final keep = candidates.where((c) => keepKeys.contains(c.key) || c.chapterRead).toList();
-      final extra = await collect(
-        'search${round + 1}',
-        searchPlan(queries: followQueries.isNotEmpty ? followQueries : queries.take(3).toList(), scope: scope, requestedBookIds: followBooks, limits: limits),
-        existing: keep,
-      );
+      final keep = candidates.where((c) => keepKeys.contains(c.key) || c.chapterRead || toExpand.contains(c)).toList();
+      final keptAround = memo['expand${round + 1}'];
+      final around = keptAround is List<PipelineSource>
+          ? keptAround
+          : await _expandHits(
+              toExpand,
+              limits.expandPages,
+              seenPages,
+              tocs,
+              onExpand: (book, chapter, pages) => act('expand', {'book': book, 'chapter': ?chapter, 'pages': pages}),
+            );
+      memo['expand${round + 1}'] = around;
+      var extra = (candidates: const <PipelineSource>[], total: 0, failed: false);
+      if (followQueries.isNotEmpty || followBooks.isNotEmpty) {
+        extra = await collect(
+          'search${round + 1}',
+          searchPlan(queries: followQueries.isNotEmpty ? followQueries : queries.take(3).toList(), scope: scope, requestedBookIds: followBooks, limits: limits),
+          existing: [...keep, ...around],
+          skip: seenPages,
+        );
+      }
       total += extra.total;
-      if (extra.candidates.isEmpty) break;
+      seenPages.addAll(extra.candidates.map((c) => c.id));
+      final fresh = [...around, ...extra.candidates];
+      if (fresh.isEmpty) break;
       used = [...used, ...followQueries];
-      final merged = [...keep, ...extra.candidates];
+      final merged = [...keep, ...fresh];
       candidates = [for (var i = 0; i < merged.length; i++) merged[i].withKey('C${i + 1}')];
       emit(AskSourcesEvent(candidates.length, total));
       emit(const AskStageEvent(AskStage.reading));
       ranking = await rank('rank${round + 1}', standalone, candidates, used);
     }
     final byKey = {for (final c in candidates) c.key: c};
-    var selected = (ranking['selected'] as List? ?? const []).map((k) => '$k'.trim().toUpperCase()).toSet().map((k) => byKey[k]).whereType<PipelineSource>().toList();
+    var selected = (ranking['selected'] as List? ?? const [])
+        .map((k) => '$k'.trim().toUpperCase())
+        .toSet()
+        .map((k) => byKey[k])
+        .whereType<PipelineSource>()
+        .toList();
     if (selected.isEmpty && ranking['coverage'] != 'none') selected = candidates.take(6).toList();
     final maxSources = (request.maxSources ?? limits.maxSelected).clamp(3, limits.maxSelected);
     selected = selected.take(maxSources).toList();
@@ -968,7 +1246,10 @@ class AnswerPipeline {
     }
     final expanded = await _withContinuations(selected, limits.continuationPages);
     final sources = [for (var i = 0; i < expanded.length; i++) expanded[i].withKey('S${i + 1}')];
-    act('read', {'books': {for (final s in sources) s.passage.bookTitle}.take(8).toList(), 'pages': sources.length});
+    act('read', {
+      'books': {for (final s in sources) s.passage.bookTitle}.take(8).toList(),
+      'pages': sources.length,
+    });
 
     // 4. compose (streamed: the draft is shown while it is written)
     emit(const AskStageEvent(AskStage.composing));
@@ -1002,7 +1283,15 @@ class AnswerPipeline {
     // 5. verify
     emit(const AskStageEvent(AskStage.verifying));
     act('verify');
-    emit(AskResultEvent(withMeta(finalizeAnswer(composed: composed.data, sources: sources, language: language), total: total, modelName: composed.model)));
+    emit(
+      AskResultEvent(
+        withMeta(
+          finalizeAnswer(composed: composed.data, sources: sources, language: language),
+          total: total,
+          modelName: composed.model,
+        ),
+      ),
+    );
   }
 }
 

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { catalog } from "../src/catalog.mjs";
-import { chapterPages, createPipeline, findChapter, focusBooks, INSUFFICIENT, limitsFor, namedMadhhabs, relatedWorks, resolveAuthors, resolveBooks, searchPlan } from "../src/pipeline.mjs";
+import { chapterPages, chapterSpan, createPipeline, expansionPages, findChapter, hintTitles, focusBooks, INSUFFICIENT, limitsFor, namedMadhhabs, relatedWorks, resolveAuthors, resolveBooks, searchPlan } from "../src/pipeline.mjs";
 import { normalizeArabic } from "../src/verify.mjs";
 import { fixtures, fixtureTurath, scriptedGemini } from "./helpers.mjs";
 
@@ -316,4 +316,84 @@ test("each post keeps the quotation of the source it cites", async () => {
   assert.equal(realignQuotes(fixed, sourceOf), fixed);
   // A part citing a source with no quote keeps what it has.
   assert.equal(realignQuotes("### x\nمتن [S9]\n[[Q1]]", sourceOf), "### x\nمتن [S9]\n[[Q1]]");
+});
+
+// A small book: chapter "فتح المدائن" on pages 9-13, the next chapter from 14.
+const storyTurath = () => {
+  const reads = [];
+  const passage = (page) => ({
+    book: { id: 900001, title: "تاريخ الرسل والملوك" },
+    author: { id: 7, name: "الطبري" },
+    location: { internalPage: page, printedPage: page },
+    text: `صفحة ${page}: فلما رأى أهل المدائن الخيل تعبر دجلة قالوا ديوان آمد ديوان آمد ثم هربوا وتركوا المدائن ودخلها المسلمون.`,
+    headings: [],
+    citation: `الطبري ${page}`,
+  });
+  return {
+    reads,
+    search: async () => ({ items: [passage(10)], totalMatches: 1 }),
+    getPage: async (_id, page) => {
+      reads.push(page);
+      return passage(page);
+    },
+    getBook: async () => ({ title: "تاريخ الرسل والملوك", toc: [{ title: "ذكر فتح المدائن", page: 9, level: 1 }, { title: "عبور دجلة", page: 10, level: 2 }, { title: "ذكر جلولاء", page: 14, level: 1 }] }),
+  };
+};
+
+test("chapter of a page from the table of contents, and the pages read around a hit", () => {
+  const toc = [{ title: "كتاب المغازي", page: 1, level: 1 }, { title: "باب غزوة أحد", page: 9, level: 2 }, { title: "فصل", page: 9, level: 3 }, { title: "باب الخندق", page: 14, level: 2 }];
+  assert.deepEqual(chapterSpan(toc, 11), { title: "فصل", start: 9, end: 13 });
+  assert.deepEqual(chapterSpan(toc, 3), { title: "كتاب المغازي", start: 1, end: undefined });
+  assert.equal(chapterSpan(toc.slice(1), 3), undefined);
+  assert.deepEqual(expansionPages({ start: 9, end: 13 }, 11, 3), [10, 12, 13]);
+  assert.deepEqual(expansionPages({ start: 11, end: 11 }, 11, 3), [10, 12], "a one-page section reads its neighbours");
+  assert.deepEqual(expansionPages(undefined, 5, 2), [4, 6]);
+});
+
+test("book titles from the web step", () => {
+  const text = "1. تاريخ الرسل والملوك — الطبري — ذكر فتح المدائن\n- «البداية والنهاية» — ابن كثير\n* الكامل في التاريخ | ابن الأثير\nThis is about the conquest.\n";
+  assert.deepEqual(hintTitles(text), ["تاريخ الرسل والملوك", "البداية والنهاية", "الكامل في التاريخ"]);
+});
+
+test("the reader asks for the rest of a chapter: its pages are read and judged in the next round", async () => {
+  const turath = storyTurath();
+  const gemini = scriptedGemini(
+    plan({ queries: ["ديوان آمد"] }),
+    { selected: ["C1"], coverage: "partial", missing: "the rest of the story", expand: ["C1"], followUpQueries: [], followUpBooks: [] },
+    (request) => {
+      for (const page of [11, 12, 13]) keyFor(request.prompt, page, "C");
+      return { selected: ["C1", "C2"], coverage: "full", expand: [], followUpQueries: [], followUpBooks: [] };
+    },
+    { status: "insufficient", answer: "", citations: [] },
+  );
+  const acts = [];
+  await createPipeline({ gemini, turath, catalog }).ask({ question: "د سعد د دجلې د تېرېدو کیسه", language: "ps" }, (event, data) => event === "activity" && acts.push(data));
+  assert.equal(gemini.prompts.length, 4, "plan, two rankings, compose");
+  assert.deepEqual(turath.reads.filter((p) => p !== 10).slice(0, 3), [11, 12, 13], "the section of the hit, after it");
+  assert.ok(acts.some((a) => a.kind === "expand" && a.chapter === "عبور دجلة" && a.pages === 3));
+
+  const off = scriptedGemini(plan({ queries: ["ديوان آمد"] }), { selected: ["C1"], coverage: "partial", expand: ["C1"], followUpQueries: [], followUpBooks: [] }, { status: "insufficient", answer: "", citations: [] });
+  await createPipeline({ gemini: off, turath: storyTurath(), catalog, features: { expand: false } }).ask({ question: "q", language: "ps" });
+  assert.equal(off.prompts.length, 3, "without expansion there is no next step");
+});
+
+test("books named by the web step are searched; the web call runs beside the plan", async () => {
+  const turath = storyTurath();
+  const searched = [];
+  const search = turath.search;
+  turath.search = async (q, scope) => {
+    searched.push(scope?.bookIds?.[0]);
+    return search(q, scope);
+  };
+  const gemini = scriptedGemini(plan({ queries: ["ديوان آمد"] }), { selected: ["C1"], coverage: "full", expand: [], followUpQueries: [], followUpBooks: [] }, { status: "insufficient", answer: "", citations: [] });
+  let webAsked;
+  gemini.generateText = async (request) => {
+    webAsked = request;
+    return { text: "صحيح البخاري — البخاري", model: "test-model", usage: { input: 10, output: 5 } };
+  };
+  const result = await createPipeline({ gemini, turath, catalog }).ask({ question: "د سعد د دجلې د تېرېدو کیسه څه ده", language: "ps" });
+  assert.equal(webAsked.search, true);
+  const bukhari = resolveBooks(["صحيح البخاري"], catalog)[0];
+  assert.ok(bukhari && searched.includes(bukhari), "the named book was searched");
+  assert.equal(result.usage.calls, 4, "the web call is counted");
 });

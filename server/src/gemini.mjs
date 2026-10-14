@@ -315,8 +315,40 @@ export const createGemini = ({ apiKey, model, fetch: fetcher = fetch, timeoutMs 
     }
   };
 
+  /**
+   * Plain text from one short call, optionally grounded in Google Search
+   * (used only to learn which books treat a question; the answer itself is
+   * always written from the library's pages). At most two models are tried.
+   */
+  const generateText = async ({ system, prompt, tier = "fast", search = false, temperature = 0.2 }) => {
+    const limits = tierLimits[tier] ?? tierLimits.main;
+    const tried = new Set();
+    let lastError;
+    for (let i = 0; i < 2; i += 1) {
+      const name = (await candidates(tier)).find((m) => !tried.has(m) && !isGemma(m));
+      if (!name) break;
+      tried.add(name);
+      const thinkingConfig = thinkingFor(name);
+      const body = {
+        systemInstruction: { parts: [{ text: system }] },
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        ...(search ? { tools: [{ google_search: {} }] } : {}),
+        generationConfig: { temperature, ...(thinkingConfig ? { thinkingConfig } : {}) },
+      };
+      try {
+        const result = await call(`${API}/models/${encodeURIComponent(name)}:generateContent`, { method: "POST", body: JSON.stringify(body) }, limits.callMs);
+        const text = (result.candidates?.[0]?.content?.parts ?? []).filter((p) => typeof p.text === "string" && !p.thought).map((p) => p.text).join("");
+        return { text, model: name, usage: usageOf(result.usageMetadata) };
+      } catch (error) {
+        lastError = error;
+        if (!(error instanceof GeminiError) || error.code === "AUTH") throw error;
+      }
+    }
+    throw lastError ?? new GeminiError("UNAVAILABLE", "No Gemini model is available right now");
+  };
+
   /** The text models the key can call (empty when they cannot be listed). */
   const models = async () => chatModels(await listModels());
 
-  return { generateJson, resolveModel, models };
+  return { generateJson, generateText, resolveModel, models };
 };

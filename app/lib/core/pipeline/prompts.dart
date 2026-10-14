@@ -67,9 +67,10 @@ const rerankSchema = {
     'missing': _str,
     'followUpQueries': _strList,
     'followUpBooks': _strList,
+    'expand': _strList,
   },
-  'required': ['selected', 'coverage', 'followUpQueries', 'followUpBooks'],
-  'propertyOrdering': ['selected', 'coverage', 'missing', 'followUpQueries', 'followUpBooks'],
+  'required': ['selected', 'coverage', 'expand', 'followUpQueries', 'followUpBooks'],
+  'propertyOrdering': ['selected', 'coverage', 'missing', 'expand', 'followUpQueries', 'followUpBooks'],
 };
 
 const composeSchema = {

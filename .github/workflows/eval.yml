@@ -1,0 +1,48 @@
+name: Evaluate research (live Gemini + Turath)
+
+# Manual only: spends Gemini requests from the shared key (about 6 per
+# question, twice that with compare).
+on:
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: How many questions of server/eval/questions.json
+        required: false
+        default: "10"
+      depth:
+        description: quick, standard or deep
+        required: false
+        default: standard
+      compare:
+        description: Also run the old pipeline for a side-by-side table (true/false)
+        required: false
+        default: "true"
+
+permissions:
+  contents: read
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || secrets.GEMINI_API_KYA }}
+      EVAL_LIMIT: ${{ github.event.inputs.limit }}
+      EVAL_DEPTH: ${{ github.event.inputs.depth }}
+      EVAL_COMPARE: ${{ github.event.inputs.compare }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Run the questions
+        working-directory: server
+        run: |
+          npm ci
+          node scripts/eval.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eval-report
+          path: server/eval-report.json
+          retention-days: 30
