@@ -73,7 +73,7 @@ const site = process.env.SITE || "https://manabi-app-7di.pages.dev";
   let bytes = 0, n = 0;
   p.on("requestfinished", async (r) => { if (r.url().includes("/turath-pdf/")) { n++; try { bytes += (await r.sizes()).responseBodySize; } catch {} } });
   try {
-    await p.goto(`${site}/pdfjs/LICENSE`);
+    await p.goto(`${site}/manifest.json`);
     const r = await p.evaluate(async ([file, page]) => {
       await import("/pdfjs/manabi_pdf.mjs");
       const t = performance.now();
