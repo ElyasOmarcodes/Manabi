@@ -254,7 +254,9 @@ class ChatController extends ChangeNotifier with WidgetsBindingObserver {
           case AskSourcesEvent(:final count):
             p.sourcesFound = count;
           case AskActivityEvent():
-            p.activity.add(event);
+            // A resumed answer replays its finished steps: each is shown once.
+            final same = p.activity.any((e) => e.kind == 'retry') && p.activity.any((e) => e.kind == event.kind && '${e.data}' == '${event.data}');
+            if (!same && event.kind != 'resumed') p.activity.add(event);
           case AskUsageEvent(:final usage):
             p.usage = usage;
           case AskDraftEvent(:final text):
@@ -292,7 +294,7 @@ class ChatController extends ChangeNotifier with WidgetsBindingObserver {
     if (_transientCodes.contains(code) && (away || attempt < _retryDelays.length)) {
       if (!away) _attempts[turn.id] = attempt + 1;
       final p = progress[turn.id];
-      if (p != null) p.activity.add(AskActivityEvent('retry', {'code': code, 'attempt': attempt + 1}, DateTime.now().difference(p.startedAt).inMilliseconds));
+      if (p != null) p.activity.add(AskActivityEvent('retry', {'code': code, 'attempt': attempt + 1, 'detail': ?detail}, DateTime.now().difference(p.startedAt).inMilliseconds));
       if (_inBackground || _sawBackground.contains(turn.id)) {
         _sawBackground.remove(turn.id);
         if (_inBackground) {

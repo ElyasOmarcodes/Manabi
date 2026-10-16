@@ -1772,4 +1772,8 @@ class AppLocalizationsFa extends AppLocalizations {
   @override
   String get welcomeSub =>
       'پاسخ‌ها فقط از کتاب‌های معتبر کهن، و هر نقل با صفحهٔ خودش سنجیده شده.';
+
+  @override
+  String get actFollowupFailed =>
+      'خواندن بیشتر ممکن نشد؛ پاسخ از صفحه‌های خوانده‌شده نوشته می‌شود';
 }

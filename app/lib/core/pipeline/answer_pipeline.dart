@@ -1222,10 +1222,21 @@ class AnswerPipeline {
       if (fresh.isEmpty) break;
       used = [...used, ...followQueries];
       final merged = [...keep, ...fresh];
+      final before = (candidates: candidates, ranking: ranking);
       candidates = [for (var i = 0; i < merged.length; i++) merged[i].withKey('C${i + 1}')];
       emit(AskSourcesEvent(candidates.length, total));
       emit(const AskStageEvent(AskStage.reading));
-      ranking = await rank('rank${round + 1}', standalone, candidates, used);
+      try {
+        ranking = await rank('rank${round + 1}', standalone, candidates, used);
+      } on Exception catch (e) {
+        // A further reading that fails costs only itself: the answer is
+        // written from what was read before, not given up.
+        if (e is PipelineException || '$e'.contains('AUTH')) rethrow;
+        act('followupFailed', {'error': '$e'.length > 160 ? '$e'.substring(0, 160) : '$e'});
+        candidates = before.candidates;
+        ranking = before.ranking;
+        break;
+      }
     }
     final byKey = {for (final c in candidates) c.key: c};
     var selected = (ranking['selected'] as List? ?? const [])

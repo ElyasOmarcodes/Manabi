@@ -40,7 +40,8 @@ String activityText(AppLocalizations l, AskActivityEvent e) {
     'compose' => l.actCompose(n('sources')),
     'verify' => l.actVerify,
     'resumed' => l.actResumed,
-    'retry' => l.actRetry(n('attempt')),
+    'retry' => d['code'] == null || d['code'] == 'INTERRUPTED' ? l.actRetry(n('attempt')) : '${l.actRetry(n('attempt'))} · ${d['code']}',
+    'followupFailed' => l.actFollowupFailed,
     _ => e.kind,
   };
 }
@@ -52,7 +53,7 @@ List<({String kind, String text, int ms})> researchSteps(AppLocalizations l, Lis
   for (var i = 0; i < events.length; i++) {
     final e = events[i];
     final emptyFollowup = e.kind == 'followup' && (e.data['queries'] as List? ?? const []).isEmpty && (e.data['books'] as List? ?? const []).isEmpty;
-    if (e.kind == 'rank' || emptyFollowup) continue;
+    if (e.kind == 'rank' || e.kind == 'resumed' || emptyFollowup) continue;
     if (e.kind == 'search') {
       final queries = <String>{};
       var j = i;

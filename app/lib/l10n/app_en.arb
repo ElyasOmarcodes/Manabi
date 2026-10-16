@@ -870,5 +870,6 @@
     }
   },
   "researchSteps": "Research steps",
-  "welcomeSub": "Answers drawn only from the classical books, every quote checked against its page."
+  "welcomeSub": "Answers drawn only from the classical books, every quote checked against its page.",
+  "actFollowupFailed": "Could not read further; the answer uses what was read"
 }

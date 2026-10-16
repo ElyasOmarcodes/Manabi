@@ -887,10 +887,21 @@ export const createPipeline = ({ gemini, turath: client, catalog, features = {} 
       const fresh = [...around, ...extra.candidates];
       if (!fresh.length) break;
       usedQueries = [...usedQueries, ...followQueries];
+      const before = { candidates, ranking };
       candidates = [...keep, ...fresh].map((c, i) => ({ ...c, key: `C${i + 1}` }));
       onEvent("sources", { count: candidates.length, totalMatches });
       onEvent("stage", { stage: "reading" });
-      ranking = await rank(`rank${round + 1}`, candidates, usedQueries);
+      try {
+        ranking = await rank(`rank${round + 1}`, candidates, usedQueries);
+      } catch (e) {
+        // A further reading that fails costs only itself: the answer is
+        // written from what was read before, not given up.
+        if (e?.code === "AUTH") throw e;
+        act("followupFailed", { error: String(e?.message ?? e).slice(0, 160) });
+        candidates = before.candidates;
+        ranking = before.ranking;
+        break;
+      }
     }
     const byKey = new Map(candidates.map((c) => [c.key, c]));
     let selected = [...new Set((ranking.selected ?? []).map((k) => String(k).trim().toUpperCase()))].map((k) => byKey.get(k)).filter(Boolean);

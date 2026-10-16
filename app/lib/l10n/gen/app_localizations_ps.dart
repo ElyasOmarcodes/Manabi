@@ -1772,4 +1772,8 @@ class AppLocalizationsPs extends AppLocalizations {
   @override
   String get welcomeSub =>
       'ځوابونه یوازې له معتبرو کلاسیکو کتابونو، او هر نقل له خپل مخ سره پرتله شوی.';
+
+  @override
+  String get actFollowupFailed =>
+      'نور لوستل ونه شول؛ ځواب له لوستل شویو مخونو لیکل کېږي';
 }

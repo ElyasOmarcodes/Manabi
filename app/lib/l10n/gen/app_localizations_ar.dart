@@ -1769,4 +1769,8 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get welcomeSub =>
       'أجوبة من كتب التراث وحدها، وكلّ نقلٍ موثَّق بصفحته.';
+
+  @override
+  String get actFollowupFailed =>
+      'تعذّرت القراءة الإضافية؛ يُكتب الجواب مما قُرئ';
 }

@@ -3311,6 +3311,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Answers drawn only from the classical books, every quote checked against its page.'**
   String get welcomeSub;
+
+  /// No description provided for @actFollowupFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not read further; the answer uses what was read'**
+  String get actFollowupFailed;
 }
 
 class _AppLocalizationsDelegate

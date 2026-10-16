@@ -1778,4 +1778,8 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get welcomeSub =>
       'Answers drawn only from the classical books, every quote checked against its page.';
+
+  @override
+  String get actFollowupFailed =>
+      'Could not read further; the answer uses what was read';
 }

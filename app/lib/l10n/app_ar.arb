@@ -589,5 +589,6 @@
   "actSearches": "{count} عمليات بحث: {queries}",
   "researchedFor": "بحث {seconds} ثانية",
   "researchSteps": "خطوات البحث",
-  "welcomeSub": "أجوبة من كتب التراث وحدها، وكلّ نقلٍ موثَّق بصفحته."
+  "welcomeSub": "أجوبة من كتب التراث وحدها، وكلّ نقلٍ موثَّق بصفحته.",
+  "actFollowupFailed": "تعذّرت القراءة الإضافية؛ يُكتب الجواب مما قُرئ"
 }
