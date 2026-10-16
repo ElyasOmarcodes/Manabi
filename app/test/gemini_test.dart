@@ -99,7 +99,7 @@ void main() {
     final gemini = GeminiClient(apiKey: 'k', client: client);
     final out = await gemini.generateJson(system: 's', prompt: 'p', schema: const {});
     expect(out.model, 'gemini-3.5-flash-lite');
-    expect(calls, ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-2.5-flash', 'gemini-3.5-flash-lite']);
+    expect(calls, ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-2.5-flash', 'gemini-3.5-flash-lite']);
     calls.clear();
     await gemini.generateJson(system: 's', prompt: 'p', schema: const {});
     expect(calls, ['gemini-3.5-flash-lite'], reason: 'failed models stay benched');

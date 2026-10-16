@@ -48,7 +48,7 @@ class TierLimits {
 const _cooldown = {
   'QUOTA': Duration(hours: 1),
   'MODEL_NOT_FOUND': Duration(hours: 24),
-  'OVERLOADED': Duration(minutes: 3),
+  'OVERLOADED': Duration(seconds: 45),
   'TIMEOUT': Duration(minutes: 5),
 };
 
@@ -402,8 +402,18 @@ class GeminiClient implements JsonModel, WebSearchModel {
     final tried = <String>{};
     var retries = 0;
     final pausesAtStart = _pauses;
+    final busyTries = <String, int>{};
+    var waitedForBusy = false;
     while (true) {
       final name = (await _candidates(tier, prefer)).where((m) => !tried.contains(m)).firstOrNull;
+      // Every model busy at once (a demand spike): wait a little and try them again.
+      if (name == null && !waitedForBusy && DateTime.now().isBefore(deadline.subtract(const Duration(seconds: 10))) && _benched.values.any((b) => b.error.status == 503 || b.error.code == 'HTTP')) {
+        waitedForBusy = true;
+        await Future<void>.delayed(const Duration(seconds: 5));
+        _benched.removeWhere((_, b) => b.error.code == 'HTTP');
+        tried.removeWhere((m) => !_benched.containsKey(m));
+        continue;
+      }
       if (name == null) {
         // Nothing left: report the most telling reason (quota beats the rest).
         final stored = [for (final e in _benched.entries) if (_isBenched(e.key, DateTime.now())) e.value.error];
@@ -454,6 +464,12 @@ class GeminiClient implements JsonModel, WebSearchModel {
         final e = GeminiException(raw.code, '${raw.message} [$name]', retryable: raw.retryable, status: raw.status);
         last = e;
         final reason = _pinned ? null : _benchReason(raw);
+        // A busy model is asked once more after a moment before the next one.
+        if (reason == 'OVERLOADED' && (busyTries[name] ?? 0) < 1) {
+          busyTries[name] = (busyTries[name] ?? 0) + 1;
+          await Future<void>.delayed(const Duration(milliseconds: 1500));
+          continue;
+        }
         if (reason != null) {
           _benched[name] = (until: DateTime.now().add(_cooldown[reason]!), at: DateTime.now(), error: e);
           tried.add(name);

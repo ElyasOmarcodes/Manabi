@@ -63,7 +63,8 @@ test("quota, retired and overloaded models are skipped until a working one answe
   const gemini = createGemini({ apiKey: "k", fetch });
   const out = await gemini.generateJson({ system: "s", prompt: "p", schema: {} });
   assert.equal(out.model, "gemini-3.5-flash-lite");
-  assert.deepEqual(calls, ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-2.5-flash", "gemini-3.5-flash-lite"]);
+  // The busy one is asked once more after a moment.
+  assert.deepEqual(calls, ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-2.5-flash", "gemini-3.5-flash-lite"]);
   calls.length = 0;
   await gemini.generateJson({ system: "s", prompt: "p", schema: {} });
   assert.deepEqual(calls, ["gemini-3.5-flash-lite"], "failed models stay benched");
@@ -167,4 +168,16 @@ test("a picked Gemma model gets the instructions in the prompt and its JSON is r
   // An unknown pick is ignored.
   const other = await gemini.generateJson({ system: "S", prompt: "P", schema: {}, prefer: "gemini-9-ultra" });
   assert.equal(other.model, "gemini-2.5-flash");
+});
+
+test("when every model is busy at once, it waits and asks again", async () => {
+  const models = listed(["gemini-3.8-flash", "gemini-3.5-flash-lite"]);
+  let busy = 4;
+  const fetch = async (url) => {
+    if (url.includes("/models?")) return json(200, { models });
+    if (busy-- > 0) return json(503, { error: { message: "This model is currently experiencing high demand." } });
+    return answer({ ok: true });
+  };
+  const out = await createGemini({ apiKey: "k", fetch }).generateJson({ system: "s", prompt: "p", schema: {} });
+  assert.ok(out.model);
 });

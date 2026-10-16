@@ -14,7 +14,7 @@ const FALLBACK = { main: ["gemini-flash-latest", "gemini-flash-lite-latest"], fa
 const TIER_LIMITS = { fast: { callMs: 40_000, totalMs: 90_000, idleMs: 20_000 }, main: { callMs: 60_000, totalMs: 150_000, idleMs: 35_000 } };
 
 /** How long a model is skipped after it fails in a way another model can avoid. */
-const COOLDOWN_MS = { QUOTA: 60 * 60_000, MODEL_NOT_FOUND: 24 * 60 * 60_000, OVERLOADED: 3 * 60_000, TIMEOUT: 5 * 60_000 };
+const COOLDOWN_MS = { QUOTA: 60 * 60_000, MODEL_NOT_FOUND: 24 * 60 * 60_000, OVERLOADED: 45_000, TIMEOUT: 5 * 60_000 };
 
 export class GeminiError extends Error {
   constructor(code, message, { status, retryable = false } = {}) {
@@ -247,8 +247,18 @@ export const createGemini = ({ apiKey, model, fetch: fetcher = fetch, timeoutMs 
     let lastError;
     let retries = 0;
     const tried = new Set();
+    const busyTries = new Map();
+    let waitedForBusy = false;
     for (;;) {
       const name = (await candidates(tier, prefer)).find((m) => !tried.has(m));
+      // Every model busy at once (a demand spike): wait a little and try them again.
+      if (!name && !waitedForBusy && now() < deadline - 10_000 && [...benched.values()].some((b) => b.error.code === "HTTP")) {
+        waitedForBusy = true;
+        await sleep(5_000);
+        for (const [m, b] of benched) if (b.error.code === "HTTP") benched.delete(m);
+        for (const m of [...tried]) if (!benched.has(m)) tried.delete(m);
+        continue;
+      }
       if (!name) {
         // Nothing left: report the most telling reason (quota beats the rest).
         const stored = [...benched.values()].map((b) => b.error);
@@ -295,6 +305,12 @@ export const createGemini = ({ apiKey, model, fetch: fetcher = fetch, timeoutMs 
         const error = raw instanceof GeminiError ? new GeminiError(raw.code, `${raw.message} [${name}]`, { status: raw.status, retryable: raw.retryable }) : raw;
         lastError = error;
         const reason = model ? undefined : benchReason(raw);
+        // A busy model is asked once more after a moment before the next one.
+        if (reason === "OVERLOADED" && (busyTries.get(name) ?? 0) < 1) {
+          busyTries.set(name, 1);
+          await sleep(1_500);
+          continue;
+        }
         if (reason) {
           benched.set(name, { until: now() + COOLDOWN_MS[reason], error });
           tried.add(name);
